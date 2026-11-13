@@ -1,29 +1,81 @@
-# HK 0.1.0 — Implementation Plan
+# HK 0.2.0 — Implementation Plan
 
-## Delivered foundation
+**Status:** Design baseline approved for implementation planning; code changes have not started.
 
-- [x] Rust workspace and package metadata
-- [x] Source positions and diagnostics
-- [x] Lexer for keywords, identifiers, numbers, strings, operators, punctuation, and comments
-- [x] AST and parser for declarations, expressions, blocks, conditions, loops, functions, arrays, calls, indexing, and properties
-- [x] Tagged runtime values and lexical environments
-- [x] Mutable and constant bindings
-- [x] Arithmetic, comparisons, equality, short-circuit logic
-- [x] Conditions, while, and for
-- [x] Named functions, recursion, return propagation
-- [x] Arrays, indexing, mutation, length
-- [x] print native function
-- [x] CLI and initial integration tests
-- [x] Specification, architecture, examples
+The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
-## Remaining before a stable 0.1.0 release
+## Release objective
 
-- [ ] Run formatting, tests, and Clippy on supported platforms
-- [ ] Add parser recovery and multi-error reporting
-- [ ] Add tests for every diagnostic and source location
-- [ ] Add fuzz/property-based testing for lexer and parser
-- [ ] Profile recursion and memory behavior
-- [ ] Publish release artifacts and installation instructions
-- [ ] Audit the implementation against every normative rule in HK-LANGUAGE-SPEC.md
+Introduce optional annotations for variables and named-function parameters/returns, a static checker, and runtime guards at dynamic-to-typed boundaries, while preserving unannotated 0.1.x behavior.
 
-Unchecked items are not claimed as complete. The first commit is an implementation baseline, not a claim that release hardening is finished.
+## Phase 0 — Design baseline
+
+- [x] Select gradual typing as the 0.2.0 model
+- [x] Define source-level types: number, string, bool, null, array, any
+- [x] Define annotation grammar for variables and named functions
+- [x] Define static compatibility and dynamic boundary rules
+- [x] Define array behavior and return-path policy
+- [x] Define architecture, diagnostics, acceptance criteria, and non-goals
+- [ ] Review the specification against every 0.1.x semantic edge case before coding
+
+## Phase 1 — Frontend syntax (alpha.1)
+
+- [ ] Add colon and arrow tokens with regression coverage
+- [ ] Extend AST with optional type annotations
+- [ ] Parse variable annotations
+- [ ] Parse parameter annotations
+- [ ] Parse function return annotations
+- [ ] Reject unknown type names and malformed annotations with source diagnostics
+- [ ] Add parser tests for valid and invalid syntax
+- [ ] Confirm all existing unannotated syntax remains unchanged
+
+**Exit gate:** annotated source parses into an AST with precise source locations; no runtime typing behavior is claimed yet.
+
+## Phase 2 — Static type system (alpha.2)
+
+- [ ] Add the source-level type representation and compatibility helpers
+- [ ] Implement lexical type scopes consistent with runtime scopes
+- [ ] Check variable initializers and assignments
+- [ ] Check unary and binary operators
+- [ ] Check Boolean conditions and preserve short-circuit behavior
+- [ ] Track named function signatures, including self-recursion
+- [ ] Check statically known function arguments and return expressions
+- [ ] Implement conservative typed-function return-path analysis
+- [ ] Add stable E3001–E3009 diagnostics
+- [ ] Ensure static errors occur before any runtime output or side effect
+
+**Exit gate:** all statically provable type violations are rejected before execution; dynamic expressions remain dynamic.
+
+## Phase 3 — Runtime contracts (beta)
+
+- [ ] Store declared type metadata on runtime bindings
+- [ ] Centralize initialization and assignment contract checks
+- [ ] Store parameter and return contract metadata on functions
+- [ ] Guard dynamic arguments before function body execution
+- [ ] Guard dynamic return values before they escape the function
+- [ ] Guard dynamic values used in concrete typed contexts
+- [ ] Ensure every violation returns an HK diagnostic, never a Rust panic
+- [ ] Test aliasing, shadowing, recursion, and all mutation paths
+
+**Exit gate:** no dynamic value can cross a concrete typed boundary unchecked.
+
+## Phase 4 — Stabilization and release candidate
+
+- [ ] Run the complete 0.1.x regression suite unchanged
+- [ ] Add positive, negative, and dynamic-boundary test matrices
+- [ ] Add malformed-input and generated-input panic tests
+- [ ] Extend fuzzing to parser annotations and type-checker paths
+- [ ] Review diagnostics, documentation, and examples
+- [ ] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied
+- [ ] Verify Linux, Windows, and macOS CI
+- [ ] Record known limitations and release notes
+
+**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes.
+
+## Release acceptance
+
+A release candidate is not a release. Publish 0.2.0 only after all mandatory acceptance criteria pass and the implementation, specification, examples, and changelog agree.
+
+## Explicitly deferred
+
+Generics, unions, optional types, typed array elements, flow-sensitive narrowing, global inference, function types, anonymous functions, closures, modules, bytecode, VM, native compilation, WASM, and FFI are outside this release.
