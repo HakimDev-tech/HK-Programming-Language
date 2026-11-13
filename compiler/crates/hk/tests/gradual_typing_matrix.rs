@@ -77,7 +77,10 @@ fn negative_matrix_rejects_known_static_contract_violations() {
         ),
         ("fn wrong() -> number { return \"wrong\"; }", "E3004"),
         ("let value: number = 1 + \"wrong\";", "E3005"),
-        ("let value: number = 1; if (value) { print(value); }", "E3006"),
+        (
+            "let value: number = 1; if (value) { print(value); }",
+            "E3006",
+        ),
         (
             "fn maybe(flag: bool) -> number { if (flag) { return 1; } }",
             "E3009",
@@ -95,7 +98,10 @@ fn negative_matrix_rejects_known_static_contract_violations() {
 
 #[test]
 fn negative_matrix_rejects_non_boolean_loop_conditions() {
-    assert_eq!(error_code("let value: number = 1; while (value) {}"), "E3006");
+    assert_eq!(
+        error_code("let value: number = 1; while (value) {}"),
+        "E3006"
+    );
     assert_eq!(
         error_code("let value: number = 1; for (; value; ) {}"),
         "E3006"
@@ -181,6 +187,7 @@ fn typed_function_return_analysis_handles_nested_blocks_and_both_branches() {
         }
         print(choose(true));
     "#;
+
     assert_eq!(
         run("gradual-typing-matrix.hk", valid).unwrap(),
         vec!["1"]
