@@ -25,3 +25,17 @@ pub(super) enum S {
     Block(Vec<S>), If(E,Box<S>,Option<Box<S>>), While(E,Box<S>),
     For(Option<Box<S>>,Option<E>,Option<E>,Box<S>), Return(Option<E>,usize,usize),
 }
+
+impl S {
+    pub(super) fn source_position(&self)->(usize,usize){
+        match self {
+            S::Var(_,_,_,line,column)|S::Fn(_,_,_,line,column)|S::Return(_,line,column)=>(*line,*column),
+            S::Expr(expression)=>expression.source_position(),
+            S::If(condition,_,_)|S::While(condition,_)=>condition.source_position(),
+            S::For(Some(initializer),_,_,_)=>initializer.source_position(),
+            S::For(None,Some(condition),_,_)=>condition.source_position(),
+            S::For(_,_,_,body)=>body.source_position(),
+            S::Block(statements)=>statements.first().map(S::source_position).unwrap_or((1,1)),
+        }
+    }
+}
