@@ -96,7 +96,14 @@ fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Re
     if value_matches(expected, value) {
         Ok(())
     } else {
-        Err(format!("Runtime type contract violation during {boundary}: expected {expected}, found {}.", value.ty().to_lowercase()))
+        Err(format!("Runtime type contract violation during {boundary}: expected {expected}, found {}.", match value {
+                V::Num(_) => "number",
+                V::Str(_) => "string",
+                V::Bool(_) => "bool",
+                V::Null => "null",
+                V::Arr(_) => "array",
+                V::Fun(_) | V::Print => "function",
+            }))
     }
 }
 
@@ -130,12 +137,19 @@ impl Env {
             ..Self::default()
         }))
     }
-    fn define(&mut self, n: String, v: V, m: bool, contract: Option<Type>) -> std::result::Result<(), String> {
+    fn define(
+        &mut self,
+        n: String,
+        v: V,
+        m: bool,
+        contract: Option<Type>,
+        boundary: &str,
+    ) -> std::result::Result<(), String> {
         if self.values.contains_key(&n) {
             return Err(format!("'{n}' is already declared in this scope."));
         }
         if let Some(expected) = contract {
-            ensure_contract(expected, &v, "initialization")?;
+            ensure_contract(expected, &v, boundary)?;
             self.contracts.insert(n.clone(), expected);
         }
         if !m {
@@ -255,7 +269,13 @@ impl Engine {
                 let value = self.eval(initializer)?;
                 self.env
                     .borrow_mut()
-                    .define(name.clone(), value, *mutable, Some(Type::from(*annotation)))
+                    .define(
+                        name.clone(),
+                        value,
+                        *mutable,
+                        Some(Type::from(*annotation)),
+                        "variable initialization",
+                    )
                     .map_err(|message| self.contract_error(message, *line, *column))?;
             }
             S::TypedFn(name, parameters, return_type, body, line, column) => {
@@ -268,14 +288,14 @@ impl Engine {
                 }));
                 self.env
                     .borrow_mut()
-                    .define(name.clone(), function, false, None)
+                    .define(name.clone(), function, false, None, "function declaration")
                     .map_err(|message| self.error(message, *line, *column))?;
             }
             S::Var(n, e, m, l, c) => {
                 let v = self.eval(e)?;
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), v, *m, None)
+                    .define(n.clone(), v, *m, None, "variable initialization")
                     .map_err(|x| self.error(x, *l, *c))?;
             }
             S::Fn(n, p, b, l, c) => {
@@ -288,7 +308,7 @@ impl Engine {
                 }));
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), f, false, None)
+                    .define(n.clone(), f, false, None, "function declaration")
                     .map_err(|x| self.error(x, *l, *c))?;
             }
             S::Expr(e) => {
@@ -468,6 +488,7 @@ impl Engine {
                                     value,
                                     true,
                                     parameter.annotation.map(Type::from),
+                                    "function parameter",
                                 )
                                 .map_err(|message| self.contract_error(message, *l, *c))?;
                         }
