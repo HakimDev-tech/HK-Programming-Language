@@ -314,22 +314,23 @@ mod tests {
         assert_eq!(run("test.hk", r#"print("a\nb");"#).unwrap(), vec!["a\nb"]);
     }
     #[test]
-    fn parses_variable_type_annotations_without_executing_them() {
-        let error = run("typed.hk", "let age: number = 18;").unwrap_err();
-        assert_eq!(error.code, "E2004");
-        assert!(error.message.contains("parsed but not executable"));
-        assert_eq!((error.line, error.column), (1, 5));
+    fn executes_annotated_variable_declarations() {
+        assert_eq!(
+            run("typed.hk", "let age: number = 18; print(age);").unwrap(),
+            vec!["18"]
+        );
     }
 
     #[test]
-    fn parses_typed_function_parameters_and_return_annotations() {
-        let error = run(
-            "typed.hk",
-            "fn add(a: number, b: number) -> number { return a + b; }",
-        )
-        .unwrap_err();
-        assert_eq!(error.code, "E2004");
-        assert!(error.message.contains("Typed functions"));
+    fn executes_typed_function_parameters_and_return_annotations() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn add(a: number, b: number) -> number { return a + b; } print(add(2, 3));",
+            )
+            .unwrap(),
+            vec!["5"]
+        );
     }
 
     #[test]
@@ -340,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_all_supported_type_names() {
+    fn executes_all_supported_type_names() {
         let cases = [
             ("number", "1"),
             ("string", "\"value\""),
@@ -351,19 +352,20 @@ mod tests {
         ];
         for (ty, initializer) in cases {
             let source = format!("let value: {ty} = {initializer};");
-            let error = run("typed.hk", &source).unwrap_err();
-            assert_eq!(error.code, "E2004", "failed for type {ty}");
+            assert!(run("typed.hk", &source).is_ok(), "failed for type {ty}");
         }
     }
 
     #[test]
-    fn rejects_typed_syntax_nested_before_runtime_execution() {
-        let error = run(
-            "typed.hk",
-            "fn outer() { if (true) { let inner: bool = true; } }",
-        )
-        .unwrap_err();
-        assert_eq!(error.code, "E2004");
+    fn executes_nested_typed_syntax() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn outer() -> number { if (true) { let inner: bool = true; return 7; } return 0; } print(outer());",
+            )
+            .unwrap(),
+            vec!["7"]
+        );
     }
     #[test]
     fn rejects_incompatible_typed_variable_initializers() {
@@ -409,13 +411,15 @@ mod tests {
     }
 
     #[test]
-    fn accepts_statically_valid_annotations_but_keeps_execution_gated() {
-        let error = run(
-            "typed.hk",
-            "fn add(a: number, b: number) -> number { return a + b; } let total: number = add(2, 3);",
-        )
-        .unwrap_err();
-        assert_eq!(error.code, "E2004");
+    fn executes_statically_valid_annotated_programs() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn add(a: number, b: number) -> number { return a + b; } let total: number = add(2, 3); print(total);",
+            )
+            .unwrap(),
+            vec!["5"]
+        );
     }
 
     #[test]
@@ -435,17 +439,19 @@ mod tests {
             "fn calculate(value: number) -> number { return value; } { let calculate = 1; calculate(); }",
         )
         .unwrap_err();
-        assert_eq!(error.code, "E2004");
+        assert!(error.message.contains("Cannot call a value of type Number"));
     }
 
     #[test]
     fn typed_function_parameters_remain_assignable() {
-        let error = run(
-            "typed.hk",
-            "fn update(value: number) -> number { value = 2; return value; }",
-        )
-        .unwrap_err();
-        assert_eq!(error.code, "E2004");
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn update(value: number) -> number { value = 2; return value; } print(update(1));",
+            )
+            .unwrap(),
+            vec!["2"]
+        );
     }
     #[test]
     fn rejects_incompatible_typed_variable_assignments() {
@@ -456,9 +462,8 @@ mod tests {
     #[test]
     fn accepts_null_and_any_return_fallthrough_contracts() {
         for signature in ["-> null", "-> any"] {
-            let source = format!("fn maybe() {signature} {{}}");
-            let error = run("typed.hk", &source).unwrap_err();
-            assert_eq!(error.code, "E2004");
+            let source = format!("fn maybe() {signature} {{}} print(maybe());");
+            assert_eq!(run("typed.hk", &source).unwrap(), vec!["null"]);
         }
     }
 
@@ -467,4 +472,100 @@ mod tests {
         let error = run("typed.hk", "let result: number = 1 + \"text\";").unwrap_err();
         assert_eq!(error.code, "E3005");
     }
+    #[test]
+    fn runtime_guards_dynamic_typed_variable_initializers() {
+        let error = run(
+            "typed.hk",
+            "let dynamic = \"wrong\"; let value: number = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("expected number, found string"));
+    }
+
+    #[test]
+    fn runtime_guards_assignments_to_typed_bindings() {
+        let error = run(
+            "typed.hk",
+            "let value: number = 1; let dynamic = \"wrong\"; value = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("assignment"));
+    }
+
+    #[test]
+    fn runtime_guards_typed_parameters_through_dynamic_function_aliases() {
+        let error = run(
+            "typed.hk",
+            "fn square(value: number) -> number { return value * value; } let operation = square; operation(\"wrong\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("initialization"));
+    }
+
+    #[test]
+    fn runtime_guards_typed_function_returns_from_dynamic_expressions() {
+        let error = run(
+            "typed.hk",
+            "fn dynamic() { return \"wrong\"; } fn typed() -> number { return dynamic(); } typed();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("function return"));
+    }
+
+    #[test]
+    fn runtime_contracts_survive_function_aliasing() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn square(value: number) -> number { return value * value; } let operation = square; print(operation(4));",
+            )
+            .unwrap(),
+            vec!["16"]
+        );
+    }
+
+    #[test]
+    fn typed_array_bindings_do_not_constrain_array_elements_or_aliases() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "let raw = [1]; let values: array = raw; raw[0] = \"changed\"; print(values[0]);",
+            )
+            .unwrap(),
+            vec!["changed"]
+        );
+    }
+
+    #[test]
+    fn failed_typed_assignment_does_not_replace_the_previous_value() {
+        let error = run(
+            "typed.hk",
+            "let value: number = 1; let dynamic = \"wrong\"; value = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+    }
+
+    #[test]
+    fn typed_const_still_rejects_reassignment() {
+        let error = run("typed.hk", "const value: number = 1; value = 2;").unwrap_err();
+        assert_eq!(error.code, "E3002");
+    }
+
+    #[test]
+    fn runtime_contracts_check_null_exactly() {
+        let error = run("typed.hk", "let value: null = 1;").unwrap_err();
+        assert_eq!(error.code, "E3001");
+        let error = run(
+            "typed.hk",
+            "let dynamic = 1; let value: null = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+    }
+
 }
