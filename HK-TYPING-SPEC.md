@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification; alpha.1 parsing, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch. Cross-platform CI and review remain pending  
+**Status:** Normative specification; alpha.1 parsing, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch. Alpha.4 stabilization is in progress; cross-platform CI and review remain release gates  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x
