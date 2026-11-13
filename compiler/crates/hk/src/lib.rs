@@ -328,7 +328,7 @@ mod tests {
         let error = run("typed.hk", "let age: number = 18;").unwrap_err();
         assert_eq!(error.code, "E2004");
         assert!(error.message.contains("parsed but not executable"));
-        assert_eq!((error.line, error.column), (1, 1));
+        assert_eq!((error.line, error.column), (1, 5));
     }
 
     #[test]
