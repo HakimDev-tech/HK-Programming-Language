@@ -5,7 +5,7 @@
 - Recognize `:` and `->` in the lexer.
 - Parse optional variable, parameter, and function return annotations for `number`, `string`, `bool`, `null`, `array`, and `any`.
 - Preserve annotations in dedicated AST nodes with source locations.
-- Reject execution of annotated programs with E3001 until static checking and runtime contracts are available.
+- Reject execution of annotated programs with E2004 until static checking and runtime contracts are available.
 - Add regression tests for supported type names, typed declarations/functions, unknown types, and nested annotations.
 
 ## Unreleased — HK 0.2.0 design
