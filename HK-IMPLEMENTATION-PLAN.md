@@ -70,10 +70,11 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Add a dedicated seed corpus for variable contracts, indirect function contracts, and short-circuit behavior
 - [x] Preserve the existing 0.1.x regression tests while adding gradual-typing coverage
 - [x] Add positive, negative, and dynamic-boundary acceptance matrices in `compiler/crates/hk/tests/gradual_typing_matrix.rs`
-- [x] Extend fuzzing with annotation-heavy seeds and complete a successful corpus run
+- [x] Extend fuzzing with annotation-heavy seeds and complete a successful corpus run on the preceding stabilization head
+- [ ] Complete the dedicated fuzz run on the final alpha.4 head
 - [x] Review the normative specification, diagnostics, README, roadmap, and executable example
-- [ ] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied on the final alpha.4 head
-- [ ] Verify Linux, Windows, and macOS CI on the final alpha.4 head
+- [x] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied on the final alpha.4 head
+- [x] Verify Linux, Windows, and macOS CI on the final alpha.4 head
 - [x] Record known limitations and the alpha.4 stabilization changes in the specification and changelog
 
 **Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes on the same final commit; no alpha.4 completion claim before final CI and review are green.
