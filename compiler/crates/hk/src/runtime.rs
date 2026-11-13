@@ -1,6 +1,7 @@
-use super::ast::{E, S};
+use super::ast::{E, Param, S};
 use super::lexer::{Lit, K};
 use super::{HkError, Result};
+use super::types::Type;
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -10,7 +11,8 @@ use std::{
 #[derive(Clone)]
 struct Fun {
     name: String,
-    params: Vec<String>,
+    params: Vec<Param>,
+    return_type: Option<Type>,
     body: Vec<S>,
     env: Weak<RefCell<Env>>,
 }
@@ -79,6 +81,25 @@ impl V {
         }
     }
 }
+fn value_matches(expected: Type, value: &V) -> bool {
+    match expected {
+        Type::Any => true,
+        Type::Number => matches!(value, V::Num(_)),
+        Type::String => matches!(value, V::Str(_)),
+        Type::Bool => matches!(value, V::Bool(_)),
+        Type::Null => matches!(value, V::Null),
+        Type::Array => matches!(value, V::Arr(_)),
+    }
+}
+
+fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Result<(), String> {
+    if value_matches(expected, value) {
+        Ok(())
+    } else {
+        Err(format!("Runtime type contract violation during {boundary}: expected {expected}, found {}.", value.ty().to_lowercase()))
+    }
+}
+
 fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usize>) -> bool {
     let mut pending = vec![value.clone()];
     while let Some(current) = pending.pop() {
@@ -99,6 +120,7 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
 struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
+    contracts: HashMap<String, Type>,
     parent: Option<Rc<RefCell<Env>>>,
 }
 impl Env {
@@ -108,9 +130,13 @@ impl Env {
             ..Self::default()
         }))
     }
-    fn define(&mut self, n: String, v: V, m: bool) -> std::result::Result<(), String> {
+    fn define(&mut self, n: String, v: V, m: bool, contract: Option<Type>) -> std::result::Result<(), String> {
         if self.values.contains_key(&n) {
             return Err(format!("'{n}' is already declared in this scope."));
+        }
+        if let Some(expected) = contract {
+            ensure_contract(expected, &v, "initialization")?;
+            self.contracts.insert(n.clone(), expected);
         }
         if !m {
             self.constants.insert(n.clone());
@@ -135,17 +161,21 @@ impl Env {
     fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), String> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (exists, is_const, parent) = {
+            let (exists, is_const, contract, parent) = {
                 let env = scope.borrow();
                 (
                     env.values.contains_key(n),
                     env.constants.contains(n),
+                    env.contracts.get(n).copied(),
                     env.parent.clone(),
                 )
             };
             if exists {
                 if is_const {
                     return Err(format!("Cannot reassign constant '{n}'."));
+                }
+                if let Some(expected) = contract {
+                    ensure_contract(expected, &v, "assignment")?;
                 }
                 scope.borrow_mut().values.insert(n.into(), v);
                 return Ok(());
