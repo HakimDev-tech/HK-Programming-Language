@@ -22,28 +22,54 @@ fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
     for statement in statements {
         match statement {
             S::TypedVar(_, _, _, _, line, column) => {
-                return Some((*line, *column, "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.".into()));
+                return Some((
+                    *line,
+                    *column,
+                    "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.".into(),
+                ));
             }
             S::TypedFn(_, _, _, _, line, column) => {
-                return Some((*line, *column, "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.".into()));
+                return Some((
+                    *line,
+                    *column,
+                    "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.".into(),
+                ));
             }
             S::Fn(_, _, body, _, _) | S::Block(body) => {
-                if let Some(found) = first_type_annotation(body) { return Some(found); }
+                if let Some(found) = first_type_annotation(body) {
+                    return Some(found);
+                }
             }
             S::If(_, then_branch, else_branch) => {
-                if let Some(found) = first_type_annotation(std::slice::from_ref(then_branch.as_ref())) { return Some(found); }
+                if let Some(found) =
+                    first_type_annotation(std::slice::from_ref(then_branch.as_ref()))
+                {
+                    return Some(found);
+                }
                 if let Some(branch) = else_branch {
-                    if let Some(found) = first_type_annotation(std::slice::from_ref(branch.as_ref())) { return Some(found); }
+                    if let Some(found) =
+                        first_type_annotation(std::slice::from_ref(branch.as_ref()))
+                    {
+                        return Some(found);
+                    }
                 }
             }
             S::While(_, body) => {
-                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) { return Some(found); }
+                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) {
+                    return Some(found);
+                }
             }
             S::For(initializer, _, _, body) => {
                 if let Some(initializer) = initializer {
-                    if let Some(found) = first_type_annotation(std::slice::from_ref(initializer.as_ref())) { return Some(found); }
+                    if let Some(found) =
+                        first_type_annotation(std::slice::from_ref(initializer.as_ref()))
+                    {
+                        return Some(found);
+                    }
                 }
-                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) { return Some(found); }
+                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) {
+                    return Some(found);
+                }
             }
             S::Var(_, _, _, _, _) | S::Expr(_) | S::Return(_, _, _) => {}
         }
@@ -279,7 +305,8 @@ mod tests {
         let error = run(
             "typed.hk",
             "fn add(a: number, b: number) -> number { return a + b; }",
-        ).unwrap_err();
+        )
+        .unwrap_err();
         assert_eq!(error.code, "E3001");
         assert!(error.message.contains("Typed functions"));
     }
