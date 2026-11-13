@@ -709,12 +709,8 @@ impl Engine {
                 }
                 _ => {
                     let right_value = self.eval(operation.right)?;
-                    value = self.binary(
-                        value,
-                        operation.operator,
-                        right_value,
-                        operation.positions,
-                    )?;
+                    value =
+                        self.binary(value, operation.operator, right_value, operation.positions)?;
                 }
             }
         }
