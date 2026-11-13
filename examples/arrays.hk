@@ -1,0 +1,3 @@
+const users = ["Ada", "Grace", "Linus"];
+let index = 0;
+while (index < users.length) { print(users[index]); index = index + 1; }
