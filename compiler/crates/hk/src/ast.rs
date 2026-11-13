@@ -35,10 +35,28 @@ impl E {
         }
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TypeName {
+    Number,
+    String,
+    Bool,
+    Null,
+    Array,
+    Any,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct Param {
+    pub(super) name: String,
+    pub(super) annotation: Option<TypeName>,
+}
+
 #[derive(Clone, Debug)]
 pub(super) enum S {
     Var(String, E, bool, usize, usize),
+    TypedVar(String, TypeName, E, bool, usize, usize),
     Fn(String, Vec<String>, Vec<S>, usize, usize),
+    TypedFn(String, Vec<Param>, Option<TypeName>, Vec<S>, usize, usize),
     Expr(E),
     Block(Vec<S>),
     If(E, Box<S>, Option<Box<S>>),
@@ -52,6 +70,8 @@ impl S {
         match self {
             S::Var(_, _, _, line, column)
             | S::Fn(_, _, _, line, column)
+            | S::TypedVar(_, _, _, _, line, column)
+            | S::TypedFn(_, _, _, _, line, column)
             | S::Return(_, line, column) => (*line, *column),
             S::Expr(expression) => expression.source_position(),
             S::If(condition, _, _) | S::While(condition, _) => condition.source_position(),
