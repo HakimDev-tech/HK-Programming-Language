@@ -1,14 +1,19 @@
 name: CI
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", "fix/**", "chore/**"]
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   rust:
-    runs-on: ubuntu-latest
+    name: Rust (${{ matrix.os }}})
+    runs-on: ${{ matrix.os }}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -18,3 +23,6 @@ jobs:
       - run: cargo fmt --all
       - run: cargo test --workspace
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
