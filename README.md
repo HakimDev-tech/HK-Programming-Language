@@ -22,7 +22,7 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
-HK 0.2.0 gradual typing is implemented through alpha.3 on a feature branch: optional annotations, pre-execution static checking, and runtime contracts for typed bindings and function boundaries. This work is not yet merged or a stable release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
+HK 0.2.0 gradual typing has its syntax, static checker, and runtime contracts implemented on feature branches. Alpha.4 is a focused stabilization pass adding compatibility and acceptance-matrix coverage; the work is not yet merged or a stable release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
 
 ## Requirements
 
