@@ -224,18 +224,20 @@ fn unary_dynamic_guard_points_to_the_operand() {
 
 #[test]
 fn binary_dynamic_guard_points_to_the_offending_operand() {
-    let source = "let marker: bool = true; let value = 1; print(value - \"bad\");";
+    let source =
+        "let marker: bool = true; let value = 1; let dynamic = \"bad\"; print(value - dynamic);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
-    assert_eq!(error.column, source.find("\"bad\"").unwrap() + 1);
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
 }
 
 #[test]
 fn dynamic_array_index_guard_points_to_the_index_expression() {
-    let source = "let marker: bool = true; let values = [1]; print(values[\"bad\"]);";
+    let source =
+        "let marker: bool = true; let values = [1]; let dynamic = \"bad\"; print(values[dynamic]);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
-    assert_eq!(error.column, source.find("\"bad\"").unwrap() + 1);
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
 }
 
 #[test]
