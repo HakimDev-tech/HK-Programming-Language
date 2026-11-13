@@ -1,0 +1,39 @@
+name: Fuzz
+
+on:
+  push:
+    branches: [main, "test/**"]
+    paths:
+      - "compiler/crates/hk/src/**"
+      - "fuzz/**"
+      - "Cargo.toml"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    paths:
+      - "compiler/crates/hk/src/**"
+      - "fuzz/**"
+      - "Cargo.toml"
+      - ".github/workflows/fuzz.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUSTUP_TOOLCHAIN: nightly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Build fuzz target
+        run: cargo fuzz build run
+      - name: Fuzz HK source parser and interpreter
+        run: cargo fuzz run run -- -max_total_time=45 -max_len=4096
