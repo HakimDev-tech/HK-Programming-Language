@@ -1,7 +1,7 @@
-use super::ast::{E, Param, S};
+use super::ast::{Param, E, S};
 use super::lexer::{Lit, K};
-use super::{HkError, Result};
 use super::types::Type;
+use super::{HkError, Result};
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -96,14 +96,17 @@ fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Re
     if value_matches(expected, value) {
         Ok(())
     } else {
-        Err(format!("Runtime type contract violation during {boundary}: expected {expected}, found {}.", match value {
+        Err(format!(
+            "Runtime type contract violation during {boundary}: expected {expected}, found {}.",
+            match value {
                 V::Num(_) => "number",
                 V::Str(_) => "string",
                 V::Bool(_) => "bool",
                 V::Null => "null",
                 V::Arr(_) => "array",
                 V::Fun(_) | V::Print => "function",
-            }))
+            }
+        ))
     }
 }
 
@@ -301,7 +304,13 @@ impl Engine {
             S::Fn(n, p, b, l, c) => {
                 let f = V::Fun(Rc::new(Fun {
                     name: n.clone(),
-                    params: p.iter().map(|name| Param { name: name.clone(), annotation: None }).collect(),
+                    params: p
+                        .iter()
+                        .map(|name| Param {
+                            name: name.clone(),
+                            annotation: None,
+                        })
+                        .collect(),
                     return_type: None,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
