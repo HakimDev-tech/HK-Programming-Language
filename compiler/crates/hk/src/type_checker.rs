@@ -546,4 +546,3 @@ fn statement_guarantees_return(statement: &S) -> bool {
         _ => false,
     }
 }
-
