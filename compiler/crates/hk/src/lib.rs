@@ -14,8 +14,11 @@ pub(crate) type Result<T> = std::result::Result<T, HkError>;
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
-    type_checker::TypeChecker::new(source_name, source).check(&statements)?;
-    if let Some((line, column, message)) = first_type_annotation(&statements) {
+    let annotation = first_type_annotation(&statements);
+    if annotation.is_some() {
+        type_checker::TypeChecker::new(source_name, source).check(&statements)?;
+    }
+    if let Some((line, column, message)) = annotation {
         return Err(HkError::new(
             "E2004",
             message,
