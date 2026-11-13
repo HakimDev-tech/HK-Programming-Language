@@ -1,19 +1,30 @@
 # Changelog
 
+## Unreleased — HK 0.2.0-alpha.3
+
+- Execute programs containing valid gradual type annotations after the alpha.2 static checker succeeds.
+- Store declared type contracts on individual runtime bindings, preserving dynamic unannotated bindings and independent array aliases.
+- Enforce annotated variable initialization and reassignment before writes become observable.
+- Enforce annotated function parameter contracts before entering the function body, including calls through dynamic aliases.
+- Enforce annotated return contracts on explicit returns and implicit fallthrough (`null` and `any`).
+- Add E3008 runtime contract diagnostics and regression tests for dynamic-to-typed boundaries, aliasing, and array mutation.
+- Keep typed array bindings heterogeneous: contracts constrain the binding, not array elements.
+
+
 ## Unreleased — HK 0.2.0-alpha.2
 
 - Add an internal type representation and compatibility relation.
 - Add lexical type scopes and static checks for annotated variable initialization, assignment, direct function calls, return values, operators, conditions, and conservative return-path completeness.
 - Run static checking before the alpha execution gate; wholly unannotated programs remain on the dynamic 0.1.x path.
 - Add regression tests for static mismatches, return fallthrough, function shadowing, mutable parameters, and unannotated compatibility.
-- Typed programs remain non-executable until runtime contract enforcement is implemented.
+- Typed programs were gated until alpha.3 runtime contract enforcement.
 
 ## Unreleased — HK 0.2.0-alpha.1
 
 - Recognize `:` and `->` in the lexer.
 - Parse optional variable, parameter, and function return annotations for `number`, `string`, `bool`, `null`, `array`, and `any`.
 - Preserve annotations in dedicated AST nodes with source locations.
-- Reject execution of annotated programs with E2004 until static checking and runtime contracts are available.
+- Initially gate execution of annotated programs with E2004; alpha.2 added static checking and alpha.3 removed this gate after runtime contracts were implemented.
 - Add regression tests for supported type names, typed declarations/functions, unknown types, and nested annotations.
 
 ## Unreleased — HK 0.2.0 design
@@ -23,7 +34,7 @@
 - Define static checking, operator-specific runtime guards, dynamic function-call boundaries, heterogeneous array behavior, assignment-expression typing, and conservative return-path analysis.
 - Clarify short-circuit guard timing, sequential name resolution, array binding contracts, and null/any return fallthrough.
 - Add the normative design baseline in HK-TYPING-SPEC.md and the phased implementation plan.
-- The type checker and runtime contract enforcement remain unimplemented.
+- Gradual typing semantics are specified in HK-TYPING-SPEC.md.
 
 ## Unreleased — HK 0.1.x hardening
 
