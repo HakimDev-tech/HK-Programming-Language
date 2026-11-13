@@ -211,12 +211,13 @@ struct Engine {
     output: Vec<String>,
     source: String,
     source_text: String,
+    typed_mode: bool,
     call_depth: usize,
     eval_depth: usize,
     exec_depth: usize,
 }
 impl Engine {
-    fn new(source: &str, source_text: &str) -> Self {
+    fn new(source: &str, source_text: &str, typed_mode: bool) -> Self {
         let e = Rc::new(RefCell::new(Env::default()));
         e.borrow_mut().values.insert("print".into(), V::Print);
         Self {
@@ -224,6 +225,7 @@ impl Engine {
             output: vec![],
             source: source.into(),
             source_text: source_text.into(),
+            typed_mode,
             call_depth: 0,
             eval_depth: 0,
             exec_depth: 0,
@@ -234,6 +236,10 @@ impl Engine {
     }
     fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
+    }
+    fn type_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+        let code = if self.typed_mode { "E3008" } else { "E3000" };
+        HkError::new(code, msg, &self.source, line, col, &self.source_text)
     }
     fn run(&mut self, ss: &[S]) -> Result<()> {
         for s in ss {
@@ -434,14 +440,14 @@ impl Engine {
                         if let V::Num(n) = v {
                             self.finite(-n, *l, *c)
                         } else {
-                            Err(self.error("Unary '-' expects Number.", *l, *c))
+                            Err(self.type_error("Unary '-' expects Number.", *l, *c))
                         }
                     }
                     K::Bang => {
                         if let V::Bool(b) = v {
                             Ok(V::Bool(!b))
                         } else {
-                            Err(self.error("'!' expects Boolean.", *l, *c))
+                            Err(self.type_error("'!' expects Boolean.", *l, *c))
                         }
                     }
                     _ => unreachable!(),
@@ -519,7 +525,7 @@ impl Engine {
                         Ok(value)
                     }
                     v => {
-                        Err(self.error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
+                        Err(self.type_error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
                     }
                 }
             }
@@ -532,7 +538,7 @@ impl Engine {
                         self.error(format!("Array index {idx} is out of bounds."), *l, *c)
                     })
                 } else {
-                    Err(self.error("Indexing requires Array.", *l, *c))
+                    Err(self.type_error("Indexing requires Array.", *l, *c))
                 }
             }
             E::SetIndex(a, i, r, l, c) => {
@@ -560,7 +566,7 @@ impl Engine {
                     items[idx] = v.clone();
                     Ok(v)
                 } else {
-                    Err(self.error("Indexed assignment requires Array.", *l, *c))
+                    Err(self.type_error("Indexed assignment requires Array.", *l, *c))
                 }
             }
             E::Property(a, n, l, c) => {
@@ -570,7 +576,7 @@ impl Engine {
                         return Ok(V::Num(items.borrow().len() as f64));
                     }
                 }
-                Err(self.error(
+                Err(self.type_error(
                     format!("Property '{n}' is not available on {}.", o.ty()),
                     *l,
                     *c,
@@ -619,7 +625,7 @@ impl Engine {
             K::Plus => match (a, b) {
                 (V::Num(x), V::Num(y)) => self.finite(x + y, l, c),
                 (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
-                (x, y) => Err(self.error(
+                (x, y) => Err(self.type_error(
                     format!(
                         "'+' expects two Numbers or two Strings, got {} and {}.",
                         x.ty(),
@@ -633,7 +639,7 @@ impl Engine {
                 let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
                     (x, y)
                 } else {
-                    return Err(self.error("Arithmetic operators require Number operands.", l, c));
+                    return Err(self.type_error("Arithmetic operators require Number operands.", l, c));
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
                     return Err(self.error("Division or modulo by zero.", l, c));
@@ -654,7 +660,7 @@ impl Engine {
                 let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
                     (x, y)
                 } else {
-                    return Err(self.error("Ordering comparisons require Number operands.", l, c));
+                    return Err(self.type_error("Ordering comparisons require Number operands.", l, c));
                 };
                 Ok(V::Bool(match op {
                     K::Gt => x > y,
@@ -680,7 +686,7 @@ impl Engine {
         if let V::Bool(b) = v {
             Ok(b)
         } else {
-            Err(self.error(
+            Err(self.type_error(
                 format!("Condition must be Boolean, received {}.", v.ty()),
                 l,
                 c,
@@ -695,7 +701,7 @@ impl Engine {
                 Err(self.error("Array index must be a non-negative integer.", l, c))
             }
         } else {
-            Err(self.error("Array index must be Number.", l, c))
+            Err(self.type_error("Array index must be Number.", l, c))
         }
     }
 }
@@ -704,8 +710,9 @@ pub(super) fn execute(
     source_name: &str,
     source_text: &str,
     statements: &[S],
+    typed_mode: bool,
 ) -> Result<Vec<String>> {
-    let mut engine = Engine::new(source_name, source_text);
+    let mut engine = Engine::new(source_name, source_text, typed_mode);
     engine.run(statements)?;
     Ok(engine.output)
 }
