@@ -156,10 +156,7 @@ mod tests {
     }
     #[test]
     fn deep_left_associative_expression_evaluates_without_stack_growth() {
-        let expression = std::iter::repeat("1")
-            .take(300)
-            .collect::<Vec<_>>()
-            .join(" + ");
+        let expression = vec!["1"; 300].join(" + ");
         let source = format!("print({expression});");
         assert_eq!(run("deep.hk", &source).unwrap(), vec!["300"]);
     }
