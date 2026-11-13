@@ -77,7 +77,7 @@ mod tests {
         assert!(error.message.contains("already declared"));
     }
     #[test] fn diagnostics_include_source_excerpt_and_caret(){
-        let error=run("diagnostic.hk","let value = 1;\\nvalue = 2;").unwrap_err();
+        let error=run("diagnostic.hk","let value = 1;\nvalue = 2;").unwrap_err();
         let rendered=error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
