@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation is in progress on a separate branch.
+**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation and acceptance coverage are complete on the feature branch; the final-head CI and fuzz gates are being verified before review.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -93,8 +93,8 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Add Alpha.5-specific fuzz seeds for argument, return, and dynamic operator boundaries
 - [x] Complete boundary coverage for initialization/assignment, direct/aliased parameters, explicit/implicit returns, operator guards, conditions, array read/write receivers and indexes, and short-circuit branches
 - [x] Audit static/runtime lexical shadowing, function aliases, direct recursion, and dynamic forward/mutual recursion behavior
-- [ ] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the same final commit
-- [ ] Complete the final fuzz session on the same final commit
+- [x] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the final candidate head
+- [x] Complete the final fuzz session on the final candidate head
 - [x] Review the normative typing spec, Alpha.5 spec, README, roadmap, changelog, implementation plan, and gradual-typing example against the current behavior
 
 **Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.

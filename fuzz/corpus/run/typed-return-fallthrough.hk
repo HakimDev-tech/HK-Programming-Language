@@ -1,0 +1,4 @@
+fn nullable() -> null {}
+fn dynamic() -> any {}
+print(nullable());
+print(dynamic());
