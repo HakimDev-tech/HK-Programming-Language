@@ -2,7 +2,7 @@
 
 ## Decision
 
-The 0.1.0 implementation is a Rust modular monolith in one Cargo package. Lexer, AST, parser, runtime values, interpreter, diagnostics, and CLI have explicit module boundaries. This avoids premature crate boundaries while preserving separable responsibilities. Extract modules into independent workspace crates only after dependency contracts are proven.
+The 0.1.0 implementation is a Rust modular monolith in one Cargo package. The implementation is split into explicit Rust modules: lexer, ast, parser, runtime, and diagnostics; the CLI remains in main.rs. This avoids premature crate boundaries while preserving separable responsibilities. Extract modules into independent workspace crates only after dependency contracts are proven.
 
 TypeScript is reserved for future developer tooling (playground, editor integration, website). C++ is reserved for optional native interoperability or measured low-level components. Neither is a dependency of the 0.1.0 compiler.
 
@@ -31,7 +31,9 @@ HIR, MIR, bytecode, LLVM, WASM, package manager, LSP, and C/C++ FFI are not impl
 
 ## Engineering constraints
 
-- Preserve source locations through the frontend.
+- Preserve source locations through the frontend and render source excerpts with caret markers.
+- Bound parser nesting, expression evaluation, statement execution, function call depth, and recursive value display.
+- Traverse environment parent chains and array-reference graphs iteratively to avoid host-stack growth.
 - Keep language semantics independent of CLI formatting.
 - Avoid unsafe Rust without a measured requirement and safety review.
 - Add regression tests for fixed language bugs.
