@@ -351,8 +351,16 @@ mod tests {
 
     #[test]
     fn parses_all_supported_type_names() {
-        for ty in ["number", "string", "bool", "null", "array", "any"] {
-            let source = format!("let value: {ty} = null;");
+        let cases = [
+            ("number", "1"),
+            ("string", "\"value\""),
+            ("bool", "true"),
+            ("null", "null"),
+            ("array", "[]"),
+            ("any", "null"),
+        ];
+        for (ty, initializer) in cases {
+            let source = format!("let value: {ty} = {initializer};");
             let error = run("typed.hk", &source).unwrap_err();
             assert_eq!(error.code, "E2004", "failed for type {ty}");
         }
