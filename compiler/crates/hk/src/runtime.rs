@@ -544,7 +544,7 @@ impl Engine {
                         }
                         Ok(value)
                     }
-                    v => Err(self.type_error(
+                    v => Err(self.error(
                         format!("Cannot call a value of type {}.", v.ty()),
                         *l,
                         *c,
@@ -652,7 +652,7 @@ impl Engine {
             K::Plus => match (a, b) {
                 (V::Num(x), V::Num(y)) => self.finite(x + y, l, c),
                 (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
-                (x, y) => Err(self.type_error(
+                (x, y) => Err(self.error(
                     format!(
                         "'+' expects two Numbers or two Strings, got {} and {}.",
                         x.ty(),
