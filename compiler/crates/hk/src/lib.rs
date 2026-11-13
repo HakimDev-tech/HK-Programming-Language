@@ -168,7 +168,7 @@ impl Parser {
         if self.take(K::Eq){let t=self.prev().clone();let v=self.assign()?;return match e{
             E::Var(n,_,_)=>Ok(E::Assign(n,Box::new(v),t.line,t.col)),
             E::Index(o,i,l,c)=>Ok(E::SetIndex(o,i,Box::new(v),l,c)),
-            _=>Err(self.error("Invalid assignment target."))};}
+            _=>Err(HkError{code:"E2002",message:"Invalid assignment target.".into(),source:self.name.clone(),line:t.line,column:t.col})};}
         Ok(e)
     }
     fn or(&mut self)->Result<E>{let mut e=self.and()?;while self.take(K::Or){let t=self.prev().clone();e=E::Binary(Box::new(e),K::Or,Box::new(self.and()?),t.line,t.col);}Ok(e)}
@@ -237,6 +237,16 @@ impl V {
     }
     fn eq(&self,b:&V)->bool{match(self,b){(V::Num(a),V::Num(b))=>a==b,(V::Str(a),V::Str(b))=>a==b,(V::Bool(a),V::Bool(b))=>a==b,(V::Null,V::Null)=>true,(V::Arr(a),V::Arr(b))=>Rc::ptr_eq(a,b),(V::Fun(a),V::Fun(b))=>Rc::ptr_eq(a,b),(V::Print,V::Print)=>true,_=>false}}
 }
+fn contains_array_reference(value:&V,target:usize,visited:&mut HashSet<usize>)->bool{
+    if let V::Arr(array)=value{
+        let identity=Rc::as_ptr(array) as usize;
+        if identity==target{return true;}
+        if !visited.insert(identity){return false;}
+        let found=array.borrow().iter().any(|item|contains_array_reference(item,target,visited));
+        visited.remove(&identity);
+        found
+    }else{false}
+}
 #[derive(Default)]
 struct Env { values:HashMap<String,V>, constants:HashSet<String>, parent:Option<Rc<RefCell<Env>>> }
 impl Env {
@@ -299,7 +309,7 @@ impl Engine {
                 v=>Err(self.error(format!("Cannot call a value of type {}.",v.ty()),*l,*c))
             }}
             E::Index(a,i,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
-            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{let mut items=items.borrow_mut();if idx>=items.len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
+            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{let identity=Rc::as_ptr(&items) as usize;if contains_array_reference(&v,identity,&mut HashSet::new()){return Err(self.error("Cyclic array references are not supported in HK 0.1.x.",*l,*c));}let mut items=items.borrow_mut();if idx>=items.len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
             E::Property(a,n,l,c)=>{let o=self.eval(a)?;if n=="length"{if let V::Arr(items)=o{return Ok(V::Num(items.borrow().len() as f64));}}Err(self.error(format!("Property '{n}' is not available on {}.",o.ty()),*l,*c))}
         }
     }
@@ -335,8 +345,13 @@ mod tests {
     #[test] fn conditions_require_booleans(){assert!(run("test.hk","if(1){print(1);}").unwrap_err().message.contains("Boolean"));}
     #[test] fn division_by_zero_fails(){assert!(run("test.hk","print(1/0);").unwrap_err().message.contains("zero"));}
     #[test] fn lexical_scopes_allow_shadowing(){assert_eq!(run("test.hk","let x=1;{let x=2;print(x);}print(x);").unwrap(),vec!["2","1"]);}
-    #[test] fn cyclic_arrays_print_without_recursing_forever(){
-        assert_eq!(run("test.hk","let a=[null];a[0]=a;print(a);").unwrap(),vec!["[<cycle>]"]);
+    #[test] fn cyclic_array_references_are_rejected_without_leaking(){
+        let error=run("test.hk","let a=[null];a[0]=a;").unwrap_err();
+        assert!(error.message.contains("Cyclic array references are not supported"));
+    }
+    #[test] fn indirect_cyclic_array_references_are_rejected(){
+        let error=run("test.hk","let a=[null];let b=[a];a[0]=b;").unwrap_err();
+        assert!(error.message.contains("Cyclic array references are not supported"));
     }
     #[test] fn recursive_calls_stop_at_a_controlled_limit(){
         let error=run("test.hk","fn recurse(n){return recurse(n+1);}recurse(0);").unwrap_err();
