@@ -383,7 +383,10 @@ fn dynamic_while_and_for_conditions_report_the_condition() {
     let while_source = "let marker: bool = true; let dynamic = 1; while (dynamic) {}";
     let while_error = run("gradual-typing-matrix.hk", while_source).unwrap_err();
     assert_eq!(while_error.code, "E3008");
-    assert_eq!(while_error.column, while_source.rfind("dynamic").unwrap() + 1);
+    assert_eq!(
+        while_error.column,
+        while_source.rfind("dynamic").unwrap() + 1
+    );
 
     let for_source = "let marker: bool = true; let dynamic = 1; for (; dynamic; ) {}";
     let for_error = run("gradual-typing-matrix.hk", for_source).unwrap_err();
@@ -393,8 +396,7 @@ fn dynamic_while_and_for_conditions_report_the_condition() {
 
 #[test]
 fn dynamic_array_write_guards_report_receiver_and_index() {
-    let receiver_source =
-        "let marker: bool = true; let dynamic = 1; dynamic[0] = 2;";
+    let receiver_source = "let marker: bool = true; let dynamic = 1; dynamic[0] = 2;";
     let receiver_error = run("gradual-typing-matrix.hk", receiver_source).unwrap_err();
     assert_eq!(receiver_error.code, "E3008");
     assert_eq!(
