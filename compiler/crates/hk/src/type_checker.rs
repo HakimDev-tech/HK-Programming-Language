@@ -60,7 +60,7 @@ impl<'a> TypeChecker<'a> {
 
     fn define_binding(&mut self, name: &str, binding: Binding) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name.to_owned(), binding);
+            scope.entry(name.to_owned()).or_insert(binding);
         }
     }
 
@@ -249,7 +249,7 @@ impl<'a> TypeChecker<'a> {
 
     fn define_function(&mut self, name: &str, signature: FunctionSignature) {
         if let Some(scope) = self.functions.last_mut() {
-            scope.insert(name.to_owned(), signature);
+            scope.entry(name.to_owned()).or_insert(signature);
         }
     }
 
