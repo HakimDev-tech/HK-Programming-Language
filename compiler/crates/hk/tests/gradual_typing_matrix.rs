@@ -528,7 +528,6 @@ fn alpha6_for_initializer_scope_ends_after_the_loop() {
     );
 }
 
-
 #[test]
 fn known_non_callable_values_are_rejected_statically_but_any_remains_dynamic() {
     let statically_non_callable = [

@@ -464,9 +464,7 @@ impl<'a> TypeChecker<'a> {
                     let (callee_line, callee_column) = callee.source_position();
                     return Err(self.error(
                         "E3010",
-                        format!(
-                            "Cannot call a value of type {callee_type}; expected a function."
-                        ),
+                        format!("Cannot call a value of type {callee_type}; expected a function."),
                         callee_line,
                         callee_column,
                     ));
