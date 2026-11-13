@@ -35,15 +35,15 @@ Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unan
 - [x] Verify sequential function resolution, shadowing, recursion, and dynamic forward calls.
 - [x] Verify explicit block scopes, branch isolation, loop scope lifetime, and `for` analysis order.
 - [x] Identify and correct missing static rejection of calls through known concrete non-function values (E3010).
-- [ ] Review the final diff for unintended behavior changes.
+- [x] Review the final integration diff for unintended behavior changes.
 
 ### 2. Regression and robustness
 
 - [x] Preserve the existing 0.1.x regression suite.
 - [x] Maintain the gradual-typing acceptance matrix.
 - [x] Add regression coverage for E3010 and preserve dynamic `any` call behavior.
-- [ ] Run the complete workspace test suite on the exact final integration commit.
-- [ ] Run parser/interpreter fuzzing on the exact final integration commit.
+- [x] Run the complete workspace test suite on the exact final integration commit.
+- [x] Run parser/interpreter fuzzing on the exact final integration commit.
 - [ ] Review panic safety, depth limits, and malformed-source behavior.
 
 ### 3. Documentation and release consistency
@@ -59,14 +59,14 @@ Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unan
 
 A 0.2.0 release candidate may be considered only after all of the following pass on the same exact commit:
 
-- [ ] `cargo fmt --all -- --check`
-- [ ] `cargo test --workspace`
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] `cargo doc --workspace --no-deps`
-- [ ] Linux, Windows, and macOS CI
-- [ ] Dedicated fuzz workflow
-- [ ] Final semantic and documentation review
-- [ ] Explicit review of known limitations and compatibility guarantees
+- [x] `cargo fmt --all -- --check`
+- [x] `cargo test --workspace`
+- [x] `cargo clippy --workspace --all-targets -- -D warnings`
+- [x] `cargo doc --workspace --no-deps`
+- [x] Linux, Windows, and macOS CI
+- [x] Dedicated fuzz workflow
+- [x] Final semantic and documentation review
+- [x] Explicit review of known limitations and compatibility guarantees
 
 Passing these gates does not authorize publication or merging. HK 0.2.0 remains unreleased until the integration is reviewed and explicitly approved.
 
