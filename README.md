@@ -20,7 +20,7 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
-Progressive typing is a design goal for 0.2.0. It is not implemented in 0.1.0.
+Progressive typing is a design target for 0.2.0 and is not implemented yet. The proposed semantics and acceptance criteria are documented in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md).
 
 ## Requirements
 
@@ -59,7 +59,8 @@ greet(name);
 
 ## Documentation
 
-- HK-LANGUAGE-SPEC.md
+- HK-LANGUAGE-SPEC.md (0.1.x behavior)
+- HK-TYPING-SPEC.md (0.2.0 design; not implemented)
 - HK-ARCHITECTURE.md
 - HK-IMPLEMENTATION-PLAN.md
 - ROADMAP.md
