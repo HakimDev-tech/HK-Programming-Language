@@ -502,12 +502,7 @@ mod tests {
     fn runtime_contracts_check_null_exactly() {
         let error = run("typed.hk", "let value: null = 1;").unwrap_err();
         assert_eq!(error.code, "E3001");
-        let error = run(
-            "typed.hk",
-            "let dynamic = 1; let value: null = dynamic;",
-        )
-        .unwrap_err();
+        let error = run("typed.hk", "let dynamic = 1; let value: null = dynamic;").unwrap_err();
         assert_eq!(error.code, "E3008");
     }
-
 }
