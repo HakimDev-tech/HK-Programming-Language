@@ -22,7 +22,7 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
-HK 0.2.0 gradual typing has its syntax, static checker, and runtime contracts implemented on feature branches. Alpha.4 stabilization is validated; Alpha.5 boundary conformance and diagnostic provenance are implemented and validated on the feature branch. The work remains unmerged and is not a stable release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md), [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md), and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
+HK 0.2.0 gradual typing has its syntax, static checker, and runtime contracts implemented on feature branches. Alpha.4 stabilization is validated; Alpha.5 boundary conformance and diagnostic provenance are validated on its feature branch. Alpha.6 implements checker/runtime scope conformance and runtime-ordered `for` analysis, with focused regression coverage; its code passed Linux, Windows, and macOS CI plus the fuzz workflow on commit `3ff25e4`. The work remains unmerged and is not a stable release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md), [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md), [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md), and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
 
 ## Requirements
 
@@ -64,6 +64,7 @@ greet(name);
 - HK-LANGUAGE-SPEC.md (0.1.x behavior)
 - HK-TYPING-SPEC.md (0.2.0 gradual typing specification and implementation status)
 - HK-ALPHA5-SPEC.md (Alpha.5 boundary conformance and diagnostic acceptance criteria)
+- HK-ALPHA6-SPEC.md (Alpha.6 scope and loop-analysis conformance criteria)
 - HK-ARCHITECTURE.md
 - HK-IMPLEMENTATION-PLAN.md
 - ROADMAP.md
