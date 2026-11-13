@@ -151,9 +151,31 @@ Values of any type may flow into an `any` destination.
 | Known named-function call | Declared return type, otherwise `any` |
 | Call through dynamic value | `any`; runtime retains callability and arity checks |
 
-For an operator with an `any` operand, the checker inserts no conversion. The runtime operator remains responsible for checking the actual operand tags and reporting the existing operator error if the operation is invalid. When an `any` value is used where a concrete type is required (for example, a typed binding, parameter, return, or condition), a contract guard is required.
+The rules for `any` are operator-specific; it is not a blanket exemption from runtime checking:
 
-For `+`, a known `number` plus known `string` is rejected statically. If either side is `any`, the expression remains dynamic and the existing runtime operator rules decide whether the operation is valid.
+- For arithmetic operators `-`, `*`, `/`, `%`, unary `-`, ordering comparisons, and unary `!`, an `any` operand receives a runtime guard for the required operand type (`number` or `bool`) at the point that operand is evaluated.
+- For `&&` and `||`, each evaluated operand must be Boolean. A dynamic right operand is checked only if short-circuit evaluation reaches it; the checker must never evaluate it eagerly.
+- For `+`, `any` uses the existing runtime overload behavior: number-plus-number and string-plus-string are valid, and other runtime combinations produce the existing operator diagnostic. The checker must not guess a concrete type or insert a one-sided conversion.
+- Equality accepts operands of any type and therefore requires no operand-type guard.
+- An `any` array receiver or index receives a runtime guard for `array` or `number`, respectively, when used for indexing. An `any` receiver for `.length` receives an `array` guard.
+
+Known incompatible concrete operands remain static errors. Runtime guards must preserve left-to-right evaluation and must not evaluate an expression more than once.
+
+
+
+### 5.1 Dynamic operands and assignment expressions
+
+An assignment expression to an annotated binding has the declared binding type as its static result type, because the assignment succeeds only after its contract has been enforced. An assignment expression to an unannotated binding has the static type of its right-hand expression. In both cases, the expression evaluates to the assigned runtime value. A failed contract check prevents the write from occurring.
+
+A dynamic function alias does not erase the callee's runtime contracts. For example:
+
+```hk
+fn square(value: number) -> number { return value * value; }
+let operation = square;
+operation("wrong"); // runtime parameter-contract diagnostic
+```
+
+The call through `operation` is not statically resolved in 0.2.0, but the parameter guard still runs before the function body.
 
 ## 6. Arrays
 
@@ -171,11 +193,13 @@ The checker does not infer element types, track array contents through aliases, 
 
 ## 7. Conditions, short-circuiting, and name resolution
 
-Conditions of `if`, `while`, and a present `for` condition require `bool`. A known non-boolean type is rejected statically. An `any` condition receives a runtime Boolean check.
+Conditions of `if`, `while`, and a present `for` condition require `bool`. A known non-boolean type is rejected statically. An `any` condition receives a runtime Boolean check when evaluated. An omitted `for` condition means an unconditional loop and has no condition expression to check.
 
-The checker must preserve left-to-right short-circuit semantics of `&&` and `||`. It must not introduce eager evaluation or make runtime-only name failures observable in a branch that is skipped.
+The checker analyzes both syntactic operands of logical expressions for statically provable errors, but runtime guards and expression evaluation remain lazy: a right operand skipped by `&&` or `||` is not evaluated and cannot produce a runtime-only error. This preserves left-to-right short-circuit semantics without suppressing genuine static errors in source code.
 
-The checker resolves declarations and function signatures that are available under the existing sequential declaration model, including a function's own signature for recursion. It must not introduce forward-reference or mutual-recursion semantics absent from 0.1.x. Runtime remains responsible for dynamic/unresolved names in paths where static proof is not available. Existing duplicate-declaration and use-before-declaration behavior must remain intact.
+The checker resolves declarations and function signatures available at the current source position under the existing sequential declaration model. A function's own signature is visible in its body for direct recursion; later declarations are not visible earlier, and mutual recursion is not introduced. A direct call to a currently known function identifier can be checked for arity and argument compatibility. If a function value is copied into an unannotated variable, passed as a value, or otherwise called through an expression whose function identity is not statically known, the call is dynamic: its static result is `any`, and runtime callability/arity checks plus the callee's own parameter/return contracts remain authoritative.
+
+Names not resolvable by the checker remain dynamic for compatibility and are diagnosed by the existing runtime when evaluated. The checker must not turn an otherwise runtime-only unresolved-name failure into an eager error in a skipped logical operand. Existing duplicate-declaration and use-before-declaration behavior must remain intact.
 
 ## 8. Return-path analysis
 
@@ -204,7 +228,7 @@ Runtime guards are mandatory at every boundary where a dynamic value enters a co
 
 A failed guard returns a normal HK diagnostic, never a Rust panic. A guard must run before the invalid value becomes observable through the contracted binding or function body.
 
-The implementation must centralize binding writes and function-boundary checks so no mutation path bypasses a contract. Existing array element mutation remains heterogeneous and is not governed by the array variable's `array` annotation beyond requiring the receiver to be an array.
+The implementation must centralize binding writes and function-boundary checks so no mutation path bypasses a contract. The declared type metadata belongs to the binding, not to the value or array object; aliases to the same array remain independently typed bindings. Existing array element mutation remains heterogeneous and is not governed by the array variable's `array` annotation beyond requiring the receiver to be an array. Rebinding an annotated binding is checked, but mutating an element of an array does not impose an element contract.
 
 ## 10. Pipeline and error policy
 
