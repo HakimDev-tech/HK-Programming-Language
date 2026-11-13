@@ -469,5 +469,4 @@ mod tests {
         let error = run("typed.hk", "let result: number = 1 + \"text\";").unwrap_err();
         assert_eq!(error.code, "E3005");
     }
-
 }
