@@ -124,9 +124,10 @@ Values of any type may flow into an `any` destination.
 - An annotated return type applies to every returned value.
 - An `any` return expression requires a runtime guard.
 - A known incompatible return expression is a static error.
-- A function with no return annotation preserves the 0.1.x implicit-null behavior.
-- A function annotated `-> null` may fall through because its implicit result is null.
-- A function annotated with any other concrete type must not have a reachable fallthrough path.
+- A function with no return annotation preserves the 0.1.x implicit-null behavior and has no declared return contract.
+- A function annotated `-> null` may fall through because its implicit result is null; every explicit return must also return null.
+- A function annotated `-> any` may fall through because its implicit null result is accepted by `any`; explicit returns are unrestricted.
+- A function annotated with a concrete type other than `null` must not have a reachable fallthrough path. An explicit bare `return;` is a return of null and is statically incompatible with every other concrete return type.
 
 ## 5. Expression typing
 
@@ -213,6 +214,7 @@ The minimum conservative control-flow rules are:
 - Loops are not assumed to execute and do not by themselves guarantee a return.
 - An infinite loop is not proven in 0.2.0.
 - A function annotated `-> null` may fall through.
+- A function annotated `-> any` may fall through.
 - A function without a return annotation keeps 0.1.x semantics.
 
 This is intentionally conservative; no sophisticated theorem proving or constant-condition reachability analysis is required.
