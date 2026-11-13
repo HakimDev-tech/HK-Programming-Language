@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Design baseline approved for implementation planning; code changes have not started.
+**Status:** V0.2.0-alpha.1 frontend syntax in progress; static checking and runtime contracts are not implemented.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -20,16 +20,16 @@ Introduce optional annotations for variables and named-function parameters/retur
 
 ## Phase 1 — Frontend syntax (alpha.1)
 
-- [ ] Add colon and arrow tokens with regression coverage
-- [ ] Extend AST with optional type annotations
-- [ ] Parse variable annotations
-- [ ] Parse parameter annotations
-- [ ] Parse function return annotations
-- [ ] Reject unknown type names and malformed annotations with source diagnostics
-- [ ] Add parser tests for valid and invalid syntax
-- [ ] Confirm all existing unannotated syntax remains unchanged
+- [x] Add colon and arrow tokens with regression coverage
+- [x] Extend AST with optional type annotations
+- [x] Parse variable annotations
+- [x] Parse parameter annotations
+- [x] Parse function return annotations
+- [x] Reject unknown type names and malformed annotations with source diagnostics
+- [x] Add parser tests for valid and invalid syntax
+- [x] Confirm all existing unannotated syntax remains unchanged
 
-**Exit gate:** annotated source parses into an AST with precise source locations; no runtime typing behavior is claimed yet.
+**Exit gate:** annotated source parses into an AST with precise source locations; execution of annotated programs is deliberately rejected with E3001 until the static checker and runtime contracts are implemented.
 
 ## Phase 2 — Static type system (alpha.2)
 
