@@ -132,7 +132,6 @@ enum EnvError {
     Constant(String),
     Undefined(String),
     Contract(String),
-
 }
 
 #[derive(Default)]
