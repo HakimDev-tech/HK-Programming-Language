@@ -229,9 +229,8 @@ impl<'a> TypeChecker<'a> {
                         let (line, column) = condition.source_position();
                         self.require(Type::Bool, actual, "E3006", "for condition", line, column)?;
                     }
-                    // Runtime executes the body before the increment. An unbraced
-                    // body's declarations therefore remain visible to the increment
-                    // within this loop scope; an explicit block manages its own scope.
+                    // Runtime executes the body before the increment. Analyze in
+                    // that order; explicit block declarations leave scope normally.
                     self.check_statement(body)?;
                     if let Some(increment) = increment {
                         self.check_expression(increment)?;
