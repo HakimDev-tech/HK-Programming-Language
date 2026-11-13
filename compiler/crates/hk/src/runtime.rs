@@ -524,9 +524,11 @@ impl Engine {
                         }
                         Ok(value)
                     }
-                    v => {
-                        Err(self.type_error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
-                    }
+                    v => Err(self.type_error(
+                        format!("Cannot call a value of type {}.", v.ty()),
+                        *l,
+                        *c,
+                    )),
                 }
             }
             E::Index(a, i, l, c) => {
@@ -639,7 +641,11 @@ impl Engine {
                 let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
                     (x, y)
                 } else {
-                    return Err(self.type_error("Arithmetic operators require Number operands.", l, c));
+                    return Err(self.type_error(
+                        "Arithmetic operators require Number operands.",
+                        l,
+                        c,
+                    ));
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
                     return Err(self.error("Division or modulo by zero.", l, c));
@@ -660,7 +666,11 @@ impl Engine {
                 let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
                     (x, y)
                 } else {
-                    return Err(self.type_error("Ordering comparisons require Number operands.", l, c));
+                    return Err(self.type_error(
+                        "Ordering comparisons require Number operands.",
+                        l,
+                        c,
+                    ));
                 };
                 Ok(V::Bool(match op {
                     K::Gt => x > y,
