@@ -544,11 +544,9 @@ impl Engine {
                         }
                         Ok(value)
                     }
-                    v => Err(self.error(
-                        format!("Cannot call a value of type {}.", v.ty()),
-                        *l,
-                        *c,
-                    )),
+                    v => {
+                        Err(self.error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
+                    }
                 }
             }
             E::Index(a, i, l, c) => {
