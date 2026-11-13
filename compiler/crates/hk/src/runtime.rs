@@ -127,6 +127,13 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
 }
 
 #[derive(Default)]
+enum EnvError {
+    Duplicate(String),
+    Constant(String),
+    Undefined(String),
+    Contract(String),
+}
+
 struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
@@ -147,12 +154,12 @@ impl Env {
         m: bool,
         contract: Option<Type>,
         boundary: &str,
-    ) -> std::result::Result<(), String> {
+    ) -> std::result::Result<(), EnvError> {
         if self.values.contains_key(&n) {
-            return Err(format!("'{n}' is already declared in this scope."));
+            return Err(EnvError::Duplicate(format!("'{n}' is already declared in this scope.")));
         }
         if let Some(expected) = contract {
-            ensure_contract(expected, &v, boundary)?;
+            ensure_contract(expected, &v, boundary).map_err(EnvError::Contract)?;
             self.contracts.insert(n.clone(), expected);
         }
         if !m {
@@ -175,7 +182,7 @@ impl Env {
         }
         None
     }
-    fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), String> {
+    fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), EnvError> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
             let (exists, is_const, contract, parent) = {
@@ -189,17 +196,17 @@ impl Env {
             };
             if exists {
                 if is_const {
-                    return Err(format!("Cannot reassign constant '{n}'."));
+                    return Err(EnvError::Constant(format!("Cannot reassign constant '{n}'.")));
                 }
                 if let Some(expected) = contract {
-                    ensure_contract(expected, &v, "assignment")?;
+                    ensure_contract(expected, &v, "assignment").map_err(EnvError::Contract)?;
                 }
                 scope.borrow_mut().values.insert(n.into(), v);
                 return Ok(());
             }
             current = parent;
         }
-        Err(format!("Undefined variable '{n}'."))
+        Err(EnvError::Undefined(format!("Undefined variable '{n}'.")))
     }
 }
 enum Flow {
@@ -236,6 +243,14 @@ impl Engine {
     }
     fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
+    }
+    fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
+        match error {
+            EnvError::Contract(message) => self.contract_error(message, line, column),
+            EnvError::Duplicate(message)
+            | EnvError::Constant(message)
+            | EnvError::Undefined(message) => self.error(message, line, column),
+        }
     }
     fn type_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         let code = if self.typed_mode { "E3008" } else { "E3000" };
@@ -285,7 +300,7 @@ impl Engine {
                         Some(Type::from(*annotation)),
                         "variable initialization",
                     )
-                    .map_err(|message| self.contract_error(message, *line, *column))?;
+                    .map_err(|error| self.env_error(error, *line, *column))?;
             }
             S::TypedFn(name, parameters, return_type, body, line, column) => {
                 let function = V::Fun(Rc::new(Fun {
@@ -298,14 +313,14 @@ impl Engine {
                 self.env
                     .borrow_mut()
                     .define(name.clone(), function, false, None, "function declaration")
-                    .map_err(|message| self.error(message, *line, *column))?;
+                    .map_err(|error| self.env_error(error, *line, *column))?;
             }
             S::Var(n, e, m, l, c) => {
                 let v = self.eval(e)?;
                 self.env
                     .borrow_mut()
                     .define(n.clone(), v, *m, None, "variable initialization")
-                    .map_err(|x| self.error(x, *l, *c))?;
+                    .map_err(|error| self.env_error(error, *l, *c))?;
             }
             S::Fn(n, p, b, l, c) => {
                 let f = V::Fun(Rc::new(Fun {
@@ -422,7 +437,7 @@ impl Engine {
                 .ok_or_else(|| self.error(format!("Undefined variable '{n}'."), *l, *c)),
             E::Assign(n, e, l, c) => {
                 let v = self.eval(e)?;
-                Env::set(&self.env, n, v.clone()).map_err(|x| self.error(x, *l, *c))?;
+                Env::set(&self.env, n, v.clone()).map_err(|error| self.env_error(error, *l, *c))?;
                 Ok(v)
             }
             E::Group(e) => self.eval(e),
@@ -505,7 +520,7 @@ impl Engine {
                                     parameter.annotation.map(Type::from),
                                     "function parameter",
                                 )
-                                .map_err(|message| self.contract_error(message, *l, *c))?;
+                                .map_err(|error| self.env_error(error, *l, *c))?;
                         }
                         let old = self.env.clone();
                         self.env = call;
