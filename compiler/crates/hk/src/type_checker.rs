@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{E, S, TypeName};
+use crate::ast::{E, S};
 use crate::lexer::{K, Lit};
 use crate::{HkError, Result};
 
@@ -69,10 +69,15 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn function(&self, name: &str) -> Option<FunctionSignature> {
-        self.functions
-            .iter()
-            .rev()
-            .find_map(|scope| scope.get(name).cloned())
+        for (bindings, functions) in self.scopes.iter().zip(self.functions.iter()).rev() {
+            if let Some(signature) = functions.get(name) {
+                return Some(signature.clone());
+            }
+            if bindings.contains_key(name) {
+                return None;
+            }
+        }
+        None
     }
 
     fn check_statement(&mut self, statement: &S) -> Result<()> {
@@ -93,7 +98,15 @@ impl<'a> TypeChecker<'a> {
                     return_type: None,
                 };
                 self.define_function(name, signature);
-                self.check_function_body(parameters.iter().map(|name| (name.as_str(), Type::Any)).collect(), body, None)?;
+                self.define_binding(name, Binding { ty: Type::Any, mutable: false });
+                self.check_function_body(
+                    parameters
+                        .iter()
+                        .map(|name| (name.as_str(), Type::Any))
+                        .collect(),
+                    body,
+                    None,
+                )?;
             }
             S::TypedFn(name, parameters, return_type, body, _, _) => {
                 let parameter_types = parameters
@@ -105,6 +118,7 @@ impl<'a> TypeChecker<'a> {
                     return_type: return_type.map(Type::from),
                 };
                 self.define_function(name, signature);
+                self.define_binding(name, Binding { ty: Type::Any, mutable: false });
                 let parameter_bindings = parameters
                     .iter()
                     .zip(parameter_types.iter())
@@ -205,7 +219,7 @@ impl<'a> TypeChecker<'a> {
         let previous_return_type = self.return_type;
         self.return_type = return_type;
         for (name, ty) in parameters {
-            self.define_binding(name, Binding { ty, mutable: false });
+            self.define_binding(name, Binding { ty, mutable: true });
         }
         let result = self.check(body);
         self.return_type = previous_return_type;
@@ -373,7 +387,3 @@ fn statement_guarantees_return(statement: &S) -> bool {
     }
 }
 
-#[allow(dead_code)]
-fn _type_name_is_exhaustive(value: TypeName) -> Type {
-    Type::from(value)
-}
