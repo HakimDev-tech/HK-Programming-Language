@@ -386,18 +386,17 @@ mod tests {
 
     #[test]
     fn rejects_incompatible_typed_function_returns() {
-        let error = run(
-            "typed.hk",
-            "fn label() -> string { return 42; }",
-        )
-        .unwrap_err();
+        let error = run("typed.hk", "fn label() -> string { return 42; }").unwrap_err();
         assert_eq!(error.code, "E3004");
     }
 
     #[test]
     fn rejects_non_boolean_typed_conditions() {
-        let error = run("typed.hk", "let enabled: number = 1; if (enabled) { print(enabled); }")
-            .unwrap_err();
+        let error = run(
+            "typed.hk",
+            "let enabled: number = 1; if (enabled) { print(enabled); }",
+        )
+        .unwrap_err();
         assert_eq!(error.code, "E3006");
     }
 
@@ -450,5 +449,4 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, "E2004");
     }
-
 }
