@@ -13,7 +13,7 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
     if let Some((line, column, message)) = first_type_annotation(&statements) {
-        return Err(HkError::new("E3001", message, source_name, line, column, source));
+        return Err(HkError::new("E2004", message, source_name, line, column, source));
     }
     runtime::execute(source_name, source, &statements)
 }
@@ -21,7 +21,8 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
 fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
     for statement in statements {
         match statement {
-            S::TypedVar(_, ty, _, _, line, column) => {
+            S::TypedVar(name, ty, initializer, mutable, line, column) => {
+                let _metadata = (name, initializer, mutable);
                 return Some((
                     *line,
                     *column,
@@ -30,7 +31,8 @@ fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
                     ),
                 ));
             }
-            S::TypedFn(_, params, return_type, _, line, column) => {
+            S::TypedFn(name, params, return_type, body, line, column) => {
+                let _metadata = (name, body);
                 let parameter_contracts = params
                     .iter()
                     .filter_map(|parameter| {
@@ -311,7 +313,7 @@ mod tests {
     #[test]
     fn parses_variable_type_annotations_without_executing_them() {
         let error = run("typed.hk", "let age: number = 18;").unwrap_err();
-        assert_eq!(error.code, "E3001");
+        assert_eq!(error.code, "E2004");
         assert!(error.message.contains("parsed but not executable"));
         assert_eq!((error.line, error.column), (1, 1));
     }
@@ -323,7 +325,7 @@ mod tests {
             "fn add(a: number, b: number) -> number { return a + b; }",
         )
         .unwrap_err();
-        assert_eq!(error.code, "E3001");
+        assert_eq!(error.code, "E2004");
         assert!(error.message.contains("Typed functions"));
     }
 
@@ -339,7 +341,7 @@ mod tests {
         for ty in ["number", "string", "bool", "null", "array", "any"] {
             let source = format!("let value: {ty} = null;");
             let error = run("typed.hk", &source).unwrap_err();
-            assert_eq!(error.code, "E3001", "failed for type {ty}");
+            assert_eq!(error.code, "E2004", "failed for type {ty}");
         }
     }
 
