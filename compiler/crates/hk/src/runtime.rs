@@ -156,7 +156,9 @@ impl Env {
         boundary: &str,
     ) -> std::result::Result<(), EnvError> {
         if self.values.contains_key(&n) {
-            return Err(EnvError::Duplicate(format!("'{n}' is already declared in this scope.")));
+            return Err(EnvError::Duplicate(format!(
+                "'{n}' is already declared in this scope."
+            )));
         }
         if let Some(expected) = contract {
             ensure_contract(expected, &v, boundary).map_err(EnvError::Contract)?;
@@ -196,7 +198,9 @@ impl Env {
             };
             if exists {
                 if is_const {
-                    return Err(EnvError::Constant(format!("Cannot reassign constant '{n}'.")));
+                    return Err(EnvError::Constant(format!(
+                        "Cannot reassign constant '{n}'."
+                    )));
                 }
                 if let Some(expected) = contract {
                     ensure_contract(expected, &v, "assignment").map_err(EnvError::Contract)?;
