@@ -364,27 +364,7 @@ impl Engine {
                     _ => unreachable!(),
                 }
             }
-            E::Binary(a, op, b, l, c) => {
-                let x = self.eval(a)?;
-                if *op == K::And {
-                    let v = self.boolean(x, *l, *c)?;
-                    if !v {
-                        return Ok(V::Bool(false));
-                    }
-                    let right = self.eval(b)?;
-                    return Ok(V::Bool(self.boolean(right, *l, *c)?));
-                }
-                if *op == K::Or {
-                    let v = self.boolean(x, *l, *c)?;
-                    if v {
-                        return Ok(V::Bool(true));
-                    }
-                    let right = self.eval(b)?;
-                    return Ok(V::Bool(self.boolean(right, *l, *c)?));
-                }
-                let y = self.eval(b)?;
-                self.binary(x, *op, y, *l, *c)
-            }
+            E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
                 let f = self.eval(callee)?;
                 let mut vs = vec![];
@@ -503,6 +483,42 @@ impl Engine {
             }
         }
     }
+    fn eval_binary_chain(&mut self, expression: &E) -> Result<V> {
+        let mut operations: Vec<(K, &E, usize, usize)> = Vec::new();
+        let mut cursor = expression;
+        while let E::Binary(left, operator, right, line, column) = cursor {
+            operations.push((*operator, right.as_ref(), *line, *column));
+            cursor = left.as_ref();
+        }
+
+        let mut value = self.eval(cursor)?;
+        for (operator, right, line, column) in operations.into_iter().rev() {
+            match operator {
+                K::And => {
+                    if !self.boolean(value, line, column)? {
+                        value = V::Bool(false);
+                    } else {
+                        let right_value = self.eval(right)?;
+                        value = V::Bool(self.boolean(right_value, line, column)?);
+                    }
+                }
+                K::Or => {
+                    if self.boolean(value, line, column)? {
+                        value = V::Bool(true);
+                    } else {
+                        let right_value = self.eval(right)?;
+                        value = V::Bool(self.boolean(right_value, line, column)?);
+                    }
+                }
+                _ => {
+                    let right_value = self.eval(right)?;
+                    value = self.binary(value, operator, right_value, line, column)?;
+                }
+            }
+        }
+        Ok(value)
+    }
+
     fn binary(&self, a: V, op: K, b: V, l: usize, c: usize) -> Result<V> {
         match op {
             K::Plus => match (a, b) {
