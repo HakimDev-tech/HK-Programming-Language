@@ -14,10 +14,11 @@ pub(crate) type Result<T> = std::result::Result<T, HkError>;
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
-    if has_type_annotations(&statements) {
+    let typed_mode = has_type_annotations(&statements);
+    if typed_mode {
         type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     }
-    runtime::execute(source_name, source, &statements)
+    runtime::execute(source_name, source, &statements, typed_mode)
 }
 
 fn has_type_annotations(statements: &[S]) -> bool {
