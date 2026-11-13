@@ -13,7 +13,14 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
     if let Some((line, column, message)) = first_type_annotation(&statements) {
-        return Err(HkError::new("E2004", message, source_name, line, column, source));
+        return Err(HkError::new(
+            "E2004",
+            message,
+            source_name,
+            line,
+            column,
+            source,
+        ));
     }
     runtime::execute(source_name, source, &statements)
 }
@@ -350,8 +357,8 @@ mod tests {
         let error = run(
             "typed.hk",
             "fn outer() { if (true) { let inner: bool = true; } }",
-        ).unwrap_err();
+        )
+        .unwrap_err();
         assert_eq!(error.code, "E2004");
     }
-
 }
