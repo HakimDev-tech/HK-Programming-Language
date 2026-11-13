@@ -1,12 +1,24 @@
 # Fuzzing HK
 
-HK currently has deterministic malformed-input and generated-input regression tests in the normal workspace suite. For longer-running coverage, run the test suite repeatedly with different source corpora and preserve every discovered crash as a regression test.
+HK has two layers of input robustness coverage:
 
-Recommended local commands:
+1. Deterministic regression tests in the normal workspace suite, including malformed inputs, generated source strings, deep nesting, and panic checks.
+2. A dedicated cargo-fuzz target that feeds arbitrary byte sequences to the public `hk::run` entry point. Non-UTF-8 inputs are ignored because HK source files are UTF-8.
+
+## Local usage
+
+Install cargo-fuzz with a nightly Rust toolchain, then run:
 
 ~~~bash
-cargo test --workspace
-cargo test -p hk generated_source_inputs_never_panic
+cargo install cargo-fuzz --locked
+cargo fuzz build run
+cargo fuzz run run -- -max_total_time=120 -max_len=4096
 ~~~
 
-A dedicated cargo-fuzz target is intentionally deferred until the interpreter API and AST boundaries are stable enough to avoid maintaining a duplicate fuzz harness. The source entry point to fuzz is hk::run(source_name, source); fuzzers must treat both successful execution and HkError as valid outcomes and flag panics, hangs, or unbounded resource growth.
+Crashes and minimized inputs should be retained as regression fixtures and converted into deterministic tests before a fix is considered complete.
+
+## Continuous fuzzing
+
+The GitHub Actions workflow builds the fuzz target and runs a bounded 45-second fuzz session on relevant pushes and pull requests. A weekly scheduled run provides additional coverage.
+
+The harness treats successful execution and structured HK diagnostics as valid outcomes. It is intended to detect panics and pathological parser/runtime behavior, not to validate the semantic correctness of arbitrary programs.
