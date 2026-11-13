@@ -418,3 +418,34 @@ fn dynamic_array_write_guards_report_receiver_and_index() {
 fn typed_null_return_rejects_non_null_values_statically() {
     assert_eq!(error_code("fn invalid() -> null { return 1; }"), "E3004");
 }
+
+#[test]
+fn direct_typed_function_parameter_contract_reports_dynamic_argument() {
+    let source =
+        "fn take(value: number) -> number { return value; } let dynamic = \"bad\"; take(dynamic);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn logical_or_dynamic_guards_report_evaluated_operands() {
+    let left_source = "let marker: bool = true; let dynamic = 1; print(dynamic || true);";
+    let left_error = run("gradual-typing-matrix.hk", left_source).unwrap_err();
+    assert_eq!(left_error.code, "E3008");
+    assert_eq!(left_error.column, left_source.rfind("dynamic").unwrap() + 1);
+
+    let right_source = "let marker: bool = true; let dynamic = 1; print(false || dynamic);";
+    let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
+    assert_eq!(right_error.code, "E3008");
+    assert_eq!(right_error.column, right_source.rfind("dynamic").unwrap() + 1);
+
+    assert_eq!(
+        run(
+            "gradual-typing-matrix.hk",
+            "let marker: bool = true; let dynamic = 1; print(true || dynamic);"
+        )
+        .unwrap(),
+        vec!["true"]
+    );
+}
