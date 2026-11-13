@@ -14,88 +14,30 @@ pub(crate) type Result<T> = std::result::Result<T, HkError>;
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
-    let annotation = first_type_annotation(&statements);
-    if annotation.is_some() {
+    if has_type_annotations(&statements) {
         type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     }
     runtime::execute(source_name, source, &statements)
 }
 
-fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
-    for statement in statements {
-        match statement {
-            S::TypedVar(name, ty, initializer, mutable, line, column) => {
-                let _metadata = (name, initializer, mutable);
-                return Some((
-                    *line,
-                    *column,
-                    format!(
-                        "Type annotations (including '{ty:?}') are parsed but not executable in HK 0.2.0-alpha.1."
-                    ),
-                ));
-            }
-            S::TypedFn(name, params, return_type, body, line, column) => {
-                let _metadata = (name, body);
-                let parameter_contracts = params
-                    .iter()
-                    .filter_map(|parameter| {
-                        parameter
-                            .annotation
-                            .map(|ty| format!("{}: {ty:?}", parameter.name))
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let return_contract = return_type
-                    .map(|ty| format!("{ty:?}"))
-                    .unwrap_or_else(|| "unannotated".into());
-                return Some((
-                    *line,
-                    *column,
-                    format!(
-                        "Typed functions (parameters [{parameter_contracts}], return {return_contract}) are parsed but not executable in HK 0.2.0-alpha.1."
-                    ),
-                ));
-            }
-            S::Fn(_, _, body, _, _) | S::Block(body) => {
-                if let Some(found) = first_type_annotation(body) {
-                    return Some(found);
-                }
-            }
-            S::If(_, then_branch, else_branch) => {
-                if let Some(found) =
-                    first_type_annotation(std::slice::from_ref(then_branch.as_ref()))
-                {
-                    return Some(found);
-                }
-                if let Some(branch) = else_branch {
-                    if let Some(found) =
-                        first_type_annotation(std::slice::from_ref(branch.as_ref()))
-                    {
-                        return Some(found);
-                    }
-                }
-            }
-            S::While(_, body) => {
-                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) {
-                    return Some(found);
-                }
-            }
-            S::For(initializer, _, _, body) => {
-                if let Some(initializer) = initializer {
-                    if let Some(found) =
-                        first_type_annotation(std::slice::from_ref(initializer.as_ref()))
-                    {
-                        return Some(found);
-                    }
-                }
-                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) {
-                    return Some(found);
-                }
-            }
-            S::Var(_, _, _, _, _) | S::Expr(_) | S::Return(_, _, _) => {}
+fn has_type_annotations(statements: &[S]) -> bool {
+    statements.iter().any(|statement| match statement {
+        S::TypedVar(..) | S::TypedFn(..) => true,
+        S::Fn(_, _, body, _, _) | S::Block(body) => has_type_annotations(body),
+        S::If(_, then_branch, else_branch) => {
+            has_type_annotations(std::slice::from_ref(then_branch.as_ref()))
+                || else_branch.as_ref().is_some_and(|branch| {
+                    has_type_annotations(std::slice::from_ref(branch.as_ref()))
+                })
         }
-    }
-    None
+        S::While(_, body) => has_type_annotations(std::slice::from_ref(body.as_ref())),
+        S::For(initializer, _, _, body) => {
+            initializer.as_ref().is_some_and(|statement| {
+                has_type_annotations(std::slice::from_ref(statement.as_ref()))
+            }) || has_type_annotations(std::slice::from_ref(body.as_ref()))
+        }
+        S::Var(..) | S::Expr(..) | S::Return(..) => false,
+    })
 }
 
 #[cfg(test)]
