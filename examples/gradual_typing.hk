@@ -1,0 +1,14 @@
+// HK 0.2.0 gradual typing — alpha.3
+// Unannotated bindings remain dynamic. Contracts are enforced when values
+// cross into annotated bindings or annotated function parameters/returns.
+
+fn double(value: number) -> number {
+    return value * 2;
+}
+
+let input = 21;                 // dynamic binding (any)
+let checked: number = input;    // runtime guard: input must be a number
+let result: number = double(checked);
+
+let operation = double;         // dynamic function alias keeps its contracts
+print(operation(result));       // prints 84
