@@ -68,6 +68,24 @@ greet(name);
 - ROADMAP.md
 - examples/
 
+## Gradual typing example (0.2.0 alpha)
+
+The 0.2.0 feature branch supports optional annotations and runtime contracts:
+
+~~~hk
+fn double(value: number) -> number {
+    return value * 2;
+}
+
+let input = 21;                 // dynamic binding
+let checked: number = input;    // runtime-checked boundary
+let result: number = double(checked);
+let operation = double;         // aliases preserve function contracts
+print(operation(result));       // 84
+~~~
+
+Run it from the feature branch with `cargo run -p hk -- run examples/gradual_typing.hk`. This is alpha functionality, not a stable 0.2.0 release.
+
 ## Runtime limits
 
 The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. Cyclic array references are rejected before mutation, preventing reference-counting leaks. Environment lookup and array graph checks are iterative. These are explicit 0.1.x interpreter constraints, not guarantees of an optimizing/native compiler.
