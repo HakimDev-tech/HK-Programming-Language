@@ -214,6 +214,21 @@ impl Env {
         Err(EnvError::Undefined(format!("Undefined variable '{n}'.")))
     }
 }
+type SourcePosition = (usize, usize);
+
+#[derive(Clone, Copy)]
+struct BinaryPositions {
+    operator: SourcePosition,
+    left: SourcePosition,
+    right: SourcePosition,
+}
+
+struct BinaryOperation<'a> {
+    operator: K,
+    right: &'a E,
+    positions: BinaryPositions,
+}
+
 enum Flow {
     Next,
     Return(V, usize, usize),
@@ -642,59 +657,63 @@ impl Engine {
         }
     }
     fn eval_binary_chain(&mut self, expression: &E) -> Result<V> {
-        let mut operations: Vec<(K, &E, (usize, usize), (usize, usize), usize, usize)> = Vec::new();
+        let mut operations = Vec::new();
         let mut cursor = expression;
         while let E::Binary(left, operator, right, line, column) = cursor {
-            operations.push((
-                *operator,
-                right.as_ref(),
-                left.source_position(),
-                right.source_position(),
-                *line,
-                *column,
-            ));
+            operations.push(BinaryOperation {
+                operator: *operator,
+                right: right.as_ref(),
+                positions: BinaryPositions {
+                    operator: (*line, *column),
+                    left: left.source_position(),
+                    right: right.source_position(),
+                },
+            });
             cursor = left.as_ref();
         }
 
         let mut value = self.eval(cursor)?;
-        for (operator, right, left_position, right_position, line, column) in
-            operations.into_iter().rev()
-        {
-            match operator {
+        for operation in operations.into_iter().rev() {
+            match operation.operator {
                 K::And => {
-                    if !self.boolean(value, left_position.0, left_position.1)? {
+                    if !self.boolean(
+                        value,
+                        operation.positions.left.0,
+                        operation.positions.left.1,
+                    )? {
                         value = V::Bool(false);
                     } else {
-                        let right_value = self.eval(right)?;
+                        let right_value = self.eval(operation.right)?;
                         value = V::Bool(self.boolean(
                             right_value,
-                            right_position.0,
-                            right_position.1,
+                            operation.positions.right.0,
+                            operation.positions.right.1,
                         )?);
                     }
                 }
                 K::Or => {
-                    if self.boolean(value, left_position.0, left_position.1)? {
+                    if self.boolean(
+                        value,
+                        operation.positions.left.0,
+                        operation.positions.left.1,
+                    )? {
                         value = V::Bool(true);
                     } else {
-                        let right_value = self.eval(right)?;
+                        let right_value = self.eval(operation.right)?;
                         value = V::Bool(self.boolean(
                             right_value,
-                            right_position.0,
-                            right_position.1,
+                            operation.positions.right.0,
+                            operation.positions.right.1,
                         )?);
                     }
                 }
                 _ => {
-                    let right_value = self.eval(right)?;
+                    let right_value = self.eval(operation.right)?;
                     value = self.binary(
                         value,
-                        operator,
+                        operation.operator,
                         right_value,
-                        line,
-                        column,
-                        left_position,
-                        right_position,
+                        operation.positions,
                     )?;
                 }
             }
@@ -702,19 +721,10 @@ impl Engine {
         Ok(value)
     }
 
-    fn binary(
-        &self,
-        a: V,
-        op: K,
-        b: V,
-        l: usize,
-        c: usize,
-        left_position: (usize, usize),
-        right_position: (usize, usize),
-    ) -> Result<V> {
+    fn binary(&self, a: V, op: K, b: V, positions: BinaryPositions) -> Result<V> {
         match op {
             K::Plus => match (a, b) {
-                (V::Num(x), V::Num(y)) => self.finite(x + y, l, c),
+                (V::Num(x), V::Num(y)) => self.finite(x + y, positions.operator.0, positions.operator.1),
                 (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
                 (x, y) => Err(self.error(
                     format!(
@@ -722,8 +732,8 @@ impl Engine {
                         x.ty(),
                         y.ty()
                     ),
-                    l,
-                    c,
+                    positions.operator.0,
+                    positions.operator.1,
                 )),
             },
             K::Minus | K::Star | K::Slash | K::Percent => {
@@ -732,20 +742,20 @@ impl Engine {
                     (left, _) if !matches!(&left, V::Num(_)) => {
                         return Err(self.type_error(
                             "Arithmetic operators require Number operands.",
-                            left_position.0,
-                            left_position.1,
+                            positions.left.0,
+                            positions.left.1,
                         ));
                     }
-                    (_, right) => {
+                    (_, _) => {
                         return Err(self.type_error(
                             "Arithmetic operators require Number operands.",
-                            right_position.0,
-                            right_position.1,
+                            positions.right.0,
+                            positions.right.1,
                         ));
                     }
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
-                    return Err(self.error("Division or modulo by zero.", l, c));
+                    return Err(self.error("Division or modulo by zero.", positions.operator.0, positions.operator.1));
                 }
                 self.finite(
                     match op {
@@ -755,8 +765,8 @@ impl Engine {
                         K::Percent => x % y,
                         _ => unreachable!(),
                     },
-                    l,
-                    c,
+                    positions.operator.0,
+                    positions.operator.1,
                 )
             }
             K::Gt | K::GtEq | K::Lt | K::LtEq => {
@@ -765,15 +775,15 @@ impl Engine {
                     (left, _) if !matches!(&left, V::Num(_)) => {
                         return Err(self.type_error(
                             "Ordering comparisons require Number operands.",
-                            left_position.0,
-                            left_position.1,
+                            positions.left.0,
+                            positions.left.1,
                         ));
                     }
-                    (_, right) => {
+                    (_, _) => {
                         return Err(self.type_error(
                             "Ordering comparisons require Number operands.",
-                            right_position.0,
-                            right_position.1,
+                            positions.right.0,
+                            positions.right.1,
                         ));
                     }
                 };
