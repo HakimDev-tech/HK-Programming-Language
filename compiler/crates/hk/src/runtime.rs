@@ -248,31 +248,38 @@ impl Engine {
     }
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
-            S::TypedVar(_, _, _, _, l, c) => {
-                return Err(self.error(
-                    "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.",
-                    *l,
-                    *c,
-                ));
+            S::TypedVar(name, annotation, initializer, mutable, line, column) => {
+                let value = self.eval(initializer)?;
+                self.env
+                    .borrow_mut()
+                    .define(name.clone(), value, *mutable, Some(Type::from(*annotation)))
+                    .map_err(|message| self.contract_error(message, *line, *column))?;
             }
-            S::TypedFn(_, _, _, _, l, c) => {
-                return Err(self.error(
-                    "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.",
-                    *l,
-                    *c,
-                ));
+            S::TypedFn(name, parameters, return_type, body, line, column) => {
+                let function = V::Fun(Rc::new(Fun {
+                    name: name.clone(),
+                    params: parameters.clone(),
+                    return_type: return_type.map(Type::from),
+                    body: body.clone(),
+                    env: Rc::downgrade(&self.env),
+                }));
+                self.env
+                    .borrow_mut()
+                    .define(name.clone(), function, false, None)
+                    .map_err(|message| self.error(message, *line, *column))?;
             }
             S::Var(n, e, m, l, c) => {
                 let v = self.eval(e)?;
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), v, *m)
+                    .define(n.clone(), v, *m, None)
                     .map_err(|x| self.error(x, *l, *c))?;
             }
             S::Fn(n, p, b, l, c) => {
                 let f = V::Fun(Rc::new(Fun {
                     name: n.clone(),
-                    params: p.clone(),
+                    params: p.iter().map(|name| Param { name: name.clone(), annotation: None }).collect(),
+                    return_type: None,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
                 }));
