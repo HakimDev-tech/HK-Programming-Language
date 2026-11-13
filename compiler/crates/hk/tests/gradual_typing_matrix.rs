@@ -453,7 +453,6 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
     );
 }
 
-
 #[test]
 fn alpha6_if_branches_preserve_outer_contracts_without_leaking_declarations() {
     assert_eq!(
