@@ -1,0 +1,193 @@
+use hk::run;
+
+fn error_code(source: &str) -> String {
+    run("gradual-typing-matrix.hk", source)
+        .expect_err("program should fail")
+        .code
+        .to_owned()
+}
+
+#[test]
+fn positive_matrix_accepts_all_source_types_and_valid_contracts() {
+    let source = r#"
+        let count: number = 2;
+        let label: string = "HK";
+        let enabled: bool = true;
+        let empty: null = null;
+        let values: array = [1, "mixed", false];
+        let dynamic: any = values;
+        fn add(a: number, b: number) -> number { return a + b; }
+        fn choose(flag: bool) -> number {
+            if (flag) { return add(count, 1); }
+            else { return 0; }
+        }
+        print(choose(enabled));
+        print(label);
+        print(empty);
+        print(values.length);
+        print(dynamic.length);
+    "#;
+
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["3", "HK", "null", "3", "3"]
+    );
+}
+
+#[test]
+fn positive_matrix_accepts_null_and_any_fallthrough() {
+    let source = r#"
+        fn nullable() -> null {}
+        fn dynamic() -> any {}
+        print(nullable());
+        print(dynamic());
+    "#;
+
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["null", "null"]
+    );
+}
+
+#[test]
+fn positive_matrix_accepts_assignment_and_dynamic_index_boundary() {
+    let source = r#"
+        let count: number = 1;
+        count = 2;
+        let values: array = [10, "text"];
+        let first: number = values[0];
+        print(count + first);
+        print(values[1]);
+    "#;
+
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["12", "text"]
+    );
+}
+
+#[test]
+fn negative_matrix_rejects_known_static_contract_violations() {
+    let cases = [
+        ("let value: number = \"wrong\";", "E3001"),
+        ("let value: number = 1; value = \"wrong\";", "E3002"),
+        (
+            "fn take(value: number) -> number { return value; } take(\"wrong\");",
+            "E3003",
+        ),
+        ("fn wrong() -> number { return \"wrong\"; }", "E3004"),
+        ("let value: number = 1 + \"wrong\";", "E3005"),
+        ("let value: number = 1; if (value) { print(value); }", "E3006"),
+        (
+            "fn maybe(flag: bool) -> number { if (flag) { return 1; } }",
+            "E3009",
+        ),
+    ];
+
+    for (source, expected_code) in cases {
+        assert_eq!(
+            error_code(source),
+            expected_code,
+            "unexpected diagnostic for source: {source}"
+        );
+    }
+}
+
+#[test]
+fn negative_matrix_rejects_non_boolean_loop_conditions() {
+    assert_eq!(error_code("let value: number = 1; while (value) {}"), "E3006");
+    assert_eq!(
+        error_code("let value: number = 1; for (; value; ) {}"),
+        "E3006"
+    );
+}
+
+#[test]
+fn dynamic_boundary_matrix_checks_variables_assignments_parameters_and_returns() {
+    let cases = [
+        "let dynamic = \"wrong\"; let value: number = dynamic;",
+        "let value: number = 1; let dynamic = \"wrong\"; value = dynamic;",
+        "fn take(value: number) -> number { return value; } let operation = take; operation(\"wrong\");",
+        "fn source() { return \"wrong\"; } fn take() -> number { return source(); } take();",
+    ];
+
+    for source in cases {
+        assert_eq!(
+            error_code(source),
+            "E3008",
+            "expected runtime contract violation for source: {source}"
+        );
+    }
+}
+
+#[test]
+fn dynamic_boundary_matrix_guards_any_conditions_and_array_operations() {
+    assert_eq!(
+        error_code("let marker: bool = true; let value = 1; if (value) {}"),
+        "E3008"
+    );
+    assert_eq!(
+        error_code("let marker: bool = true; let value = 1; print(value[0]);"),
+        "E3008"
+    );
+    assert_eq!(
+        error_code("let marker: bool = true; let value = 1; print(value.length);"),
+        "E3008"
+    );
+}
+
+#[test]
+fn dynamic_boundary_matrix_preserves_short_circuit_and_legacy_diagnostics() {
+    assert_eq!(
+        run(
+            "gradual-typing-matrix.hk",
+            "let marker: bool = true; let value = 1; print(false && value); print(true || value);"
+        )
+        .unwrap(),
+        vec!["false", "true"]
+    );
+
+    assert_eq!(
+        error_code("let marker: bool = true; let value = 1; print(value + \"text\");"),
+        "E3000"
+    );
+    assert_eq!(
+        error_code("let marker: bool = true; let value = 1; value();"),
+        "E3000"
+    );
+}
+
+#[test]
+fn typed_array_contracts_do_not_leak_to_elements_or_aliases() {
+    let source = r#"
+        let raw = [1];
+        let values: array = raw;
+        raw[0] = "changed";
+        print(values[0]);
+    "#;
+
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["changed"]
+    );
+}
+
+#[test]
+fn typed_function_return_analysis_handles_nested_blocks_and_both_branches() {
+    let valid = r#"
+        fn choose(flag: bool) -> number {
+            if (flag) { { return 1; } }
+            else { return 2; }
+        }
+        print(choose(true));
+    "#;
+    assert_eq!(
+        run("gradual-typing-matrix.hk", valid).unwrap(),
+        vec!["1"]
+    );
+
+    assert_eq!(
+        error_code("fn choose(flag: bool) -> number { if (flag) { return 1; } }"),
+        "E3009"
+    );
+}
