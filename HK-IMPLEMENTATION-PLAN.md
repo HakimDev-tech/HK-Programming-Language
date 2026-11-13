@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; alpha.4 is a bounded stabilization pass, not a new feature phase.
+**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation is in progress on a separate branch.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -78,6 +78,25 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Record known limitations and the alpha.4 stabilization changes in the specification and changelog
 
 **Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes on the same final commit; no alpha.4 completion claim before final CI and review are green.
+
+
+## Phase 5 — Boundary conformance and diagnostic provenance (alpha.5)
+
+- [x] Specify runtime boundary invariants and diagnostic source-location requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md)
+- [x] Report parameter contract failures at the offending argument, including calls through aliases
+- [x] Report explicit return contract failures at the returned expression
+- [x] Report unary/binary/logical guard failures at the offending operand
+- [x] Report array receiver and index guard failures at their respective expressions
+- [x] Add regression tests for left/right operands, logical short-circuit boundaries, array receivers/indexes, and function alias boundaries
+- [x] Verify function/variable shadowing, independent typed shadowed bindings, and mutual recursion behavior
+- [x] Verify failed parameter validation prevents function-body side effects and evaluates argument expressions once
+- [x] Add Alpha.5-specific fuzz seeds for argument, return, and dynamic operator boundaries
+- [ ] Complete full boundary matrix, including assignment atomicity and explicit/implicit return boundaries
+- [ ] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the same final commit
+- [ ] Complete the final fuzz session on the same final commit
+- [ ] Update normative typing documentation, changelog, examples, and README to match final behavior
+
+**Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.
 
 ## Release acceptance
 

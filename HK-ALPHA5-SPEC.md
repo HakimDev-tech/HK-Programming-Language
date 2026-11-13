@@ -1,6 +1,6 @@
 # HK 0.2.0 — Alpha.5 Boundary Conformance Specification
 
-**Status:** Proposed normative specification for Alpha.5; implementation has not started.
+**Status:** Normative implementation target for Alpha.5; diagnostic-provenance work is in progress on `feat/v0.2-alpha5-boundary-conformance`. The acceptance gates remain open.
 **Baseline:** Alpha.4 stabilization head `8445732178148ae7295509d5630622ec2547dbf5`.
 **Target:** Improve conformance, diagnostics, and regression coverage at static/dynamic boundaries without expanding the language surface.
 
@@ -101,11 +101,11 @@ Add explicit tests for:
 - a nested function declaration shadowing an outer binding;
 - independent contracts for shadowed typed bindings;
 - direct recursion;
-- rejection/legacy behavior for forward references and mutual recursion;
+- legacy behavior for forward references and mutual recursion, including runtime contract enforcement when a later-declared function is called after its declaration executes;
 - calls through dynamic aliases;
 - arity and parameter-contract failures through aliases.
 
-The checker and runtime must agree on lexical name resolution. If a mismatch is found, correct it without broadening the language's declaration-order rules.
+The checker and runtime must agree on lexical name resolution. The current dynamic runtime permits later-declared named functions to be called after their declarations execute; when a statically unresolved call is treated as `any`, the runtime still enforces contracts carried by the resolved function value. Alpha.5 must preserve this behavior unless a regression test proves it differs from the V0.1.x baseline. Do not broaden declaration-order rules.
 
 ## 5. Evaluation and side-effect guarantees
 

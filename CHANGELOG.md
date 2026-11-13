@@ -1,3 +1,12 @@
+## Unreleased — HK 0.2.0-alpha.5
+
+- Report runtime parameter-contract violations at the offending argument expression.
+- Report explicit function return-contract violations at the returned expression; call expressions expose their callee source position for expression diagnostics.
+- Report unary, binary, logical, array receiver, and array index guards at the offending operand/receiver/index.
+- Add regression tests for function shadowing, independent shadowed contracts, mutual recursion, and failed parameter validation before function-body side effects.
+- Add dedicated fuzz seeds for argument, return, and dynamic operator boundaries.
+- Keep Alpha.5 limited to conformance and diagnostics; no new language syntax or types are introduced.
+
 ## Unreleased — HK 0.2.0-alpha.4
 
 - Preserve legacy E3000 diagnostics for dynamic `+` overload failures and non-callable values, rather than misclassifying them as runtime contract violations (E3008).
