@@ -27,7 +27,7 @@ Rust stable toolchain with Cargo.
 ## Build and test
 
 ~~~bash
-cargo fmt --all -- --check
+cargo fmt --all
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p hk -- version
