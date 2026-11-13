@@ -142,7 +142,7 @@ impl Parser {
     }
     fn function(&mut self)->Result<S>{
         let n=self.id("Expected function name.")?;self.expect(K::LParen,"Expected '(' after function name.")?;
-        let mut p=vec![];if !self.check(K::RParen){loop{if p.len()>=255{return Err(self.error("Too many parameters."));}p.push(self.id("Expected parameter name.")?.text);if !self.take(K::Comma){break;}}}
+        let mut p=vec![];let mut names=HashSet::new();if !self.check(K::RParen){loop{if p.len()>=255{return Err(self.error("Too many parameters."));}let param=self.id("Expected parameter name.")?;if !names.insert(param.text.clone()){return Err(HkError{code:"E2001",message:format!("Duplicate parameter '{}'.",param.text),source:self.name.clone(),line:param.line,column:param.col});}p.push(param.text);if !self.take(K::Comma){break;}}}
         self.expect(K::RParen,"Expected ')' after parameters.")?;self.expect(K::LBrace,"Expected '{' before function body.")?;
         let b=self.block_body()?;Ok(S::Fn(n.text,p,b,n.line,n.col))
     }
@@ -168,7 +168,7 @@ impl Parser {
         if self.take(K::Eq){let t=self.prev().clone();let v=self.assign()?;return match e{
             E::Var(n,_,_)=>Ok(E::Assign(n,Box::new(v),t.line,t.col)),
             E::Index(o,i,l,c)=>Ok(E::SetIndex(o,i,Box::new(v),l,c)),
-            _=>Err(self.error("Invalid assignment target."))};}
+            _=>Err(HkError{code:"E2002",message:"Invalid assignment target.".into(),source:self.name.clone(),line:t.line,column:t.col})};}
         Ok(e)
     }
     fn or(&mut self)->Result<E>{let mut e=self.and()?;while self.take(K::Or){let t=self.prev().clone();e=E::Binary(Box::new(e),K::Or,Box::new(self.and()?),t.line,t.col);}Ok(e)}
@@ -204,7 +204,7 @@ impl Parser {
     fn take(&mut self,k:K)->bool{if self.check(k){self.advance();true}else{false}}
     fn take_any(&mut self,ks:&[K])->bool{for k in ks{if self.take(*k){return true;}}false}
     fn check(&self,k:K)->bool{self.peek().kind==k}
-    fn advance(&mut self)->&Token{if !self.check(K::Eof){self.i+=1;}self.prev()}
+    fn advance(&mut self)->&Token{let current=self.i;if !self.check(K::Eof){self.i+=1;}&self.t[current]}
     fn peek(&self)->&Token{&self.t[self.i]}
     fn prev(&self)->&Token{&self.t[self.i-1]}
     fn error(&self,msg:&str)->HkError{HkError{code:"E2000",message:msg.into(),source:self.name.clone(),line:self.peek().line,column:self.peek().col}}
@@ -216,8 +216,36 @@ struct Fun { name:String, params:Vec<String>, body:Vec<S>, env:Weak<RefCell<Env>
 enum V { Num(f64), Str(String), Bool(bool), Null, Arr(Rc<RefCell<Vec<V>>>), Fun(Rc<Fun>), Print }
 impl V {
     fn ty(&self)->&'static str{match self{V::Num(_)=>"Number",V::Str(_)=>"String",V::Bool(_)=>"Boolean",V::Null=>"Null",V::Arr(_)=>"Array",V::Fun(_)|V::Print=>"Function"}}
-    fn show(&self)->String{match self{V::Num(n) if n.fract()==0.0=>format!("{n:.0}"),V::Num(n)=>n.to_string(),V::Str(s)=>s.clone(),V::Bool(b)=>b.to_string(),V::Null=>"null".into(),V::Arr(a)=>format!("[{}]",a.borrow().iter().map(V::show).collect::<Vec<_>>().join(", ")),V::Fun(f)=>format!("<fn {}>",f.name),V::Print=>"<native fn print>".into()}}
+    fn show(&self)->String{self.show_with(&mut HashSet::new())}
+    fn show_with(&self,seen:&mut HashSet<usize>)->String{
+        match self{
+            V::Num(n) if n.fract()==0.0=>format!("{n:.0}"),
+            V::Num(n)=>n.to_string(),
+            V::Str(s)=>s.clone(),
+            V::Bool(b)=>b.to_string(),
+            V::Null=>"null".into(),
+            V::Arr(a)=>{
+                let identity=Rc::as_ptr(a) as usize;
+                if !seen.insert(identity){return "[<cycle>]".into();}
+                let rendered=a.borrow().iter().map(|value|value.show_with(seen)).collect::<Vec<_>>().join(", ");
+                seen.remove(&identity);
+                format!("[{rendered}]")
+            }
+            V::Fun(f)=>format!("<fn {}>",f.name),
+            V::Print=>"<native fn print>".into()
+        }
+    }
     fn eq(&self,b:&V)->bool{match(self,b){(V::Num(a),V::Num(b))=>a==b,(V::Str(a),V::Str(b))=>a==b,(V::Bool(a),V::Bool(b))=>a==b,(V::Null,V::Null)=>true,(V::Arr(a),V::Arr(b))=>Rc::ptr_eq(a,b),(V::Fun(a),V::Fun(b))=>Rc::ptr_eq(a,b),(V::Print,V::Print)=>true,_=>false}}
+}
+fn contains_array_reference(value:&V,target:usize,visited:&mut HashSet<usize>)->bool{
+    if let V::Arr(array)=value{
+        let identity=Rc::as_ptr(array) as usize;
+        if identity==target{return true;}
+        if !visited.insert(identity){return false;}
+        let found=array.borrow().iter().any(|item|contains_array_reference(item,target,visited));
+        visited.remove(&identity);
+        found
+    }else{false}
 }
 #[derive(Default)]
 struct Env { values:HashMap<String,V>, constants:HashSet<String>, parent:Option<Rc<RefCell<Env>>> }
@@ -228,9 +256,9 @@ impl Env {
     fn set(e:&Rc<RefCell<Self>>,n:&str,v:V)->std::result::Result<(),String>{let(exists,c,p)={let x=e.borrow();(x.values.contains_key(n),x.constants.contains(n),x.parent.clone())};if exists{if c{return Err(format!("Cannot reassign constant '{n}'."));}e.borrow_mut().values.insert(n.into(),v);return Ok(());}if let Some(p)=p{return Self::set(&p,n,v);}Err(format!("Undefined variable '{n}'."))}
 }
 enum Flow { Next, Return(V, usize, usize) }
-struct Engine { env:Rc<RefCell<Env>>, output:Vec<String>, source:String }
+struct Engine { env:Rc<RefCell<Env>>, output:Vec<String>, source:String, call_depth:usize }
 impl Engine {
-    fn new(source:&str)->Self{let e=Rc::new(RefCell::new(Env::default()));e.borrow_mut().values.insert("print".into(),V::Print);Self{env:e,output:vec![],source:source.into()}}
+    fn new(source:&str)->Self{let e=Rc::new(RefCell::new(Env::default()));e.borrow_mut().values.insert("print".into(),V::Print);Self{env:e,output:vec![],source:source.into(),call_depth:0}}
     fn error(&self,msg:impl Into<String>,line:usize,col:usize)->HkError{HkError{code:"E3000",message:msg.into(),source:self.source.clone(),line,column:col}}
     fn run(&mut self,ss:&[S])->Result<()>{for s in ss{if let Flow::Return(_,line,col)=self.exec(s)?{return Err(self.error("'return' is only valid inside a function.",line,col));}}Ok(())}
     fn exec_all(&mut self,ss:&[S])->Result<Flow>{for s in ss{match self.exec(s)?{Flow::Next=>{},r@Flow::Return(..)=>return Ok(r)}}Ok(Flow::Next)}
@@ -264,11 +292,24 @@ impl Engine {
             }
             E::Call(callee,args,l,c)=>{let f=self.eval(callee)?;let mut vs=vec![];for a in args{vs.push(self.eval(a)?);}match f{
                 V::Print=>{if vs.len()!=1{return Err(self.error(format!("print() expects one argument, received {}.",vs.len()),*l,*c));}self.output.push(vs[0].show());Ok(V::Null)}
-                V::Fun(fun)=>{if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;let call=Env::child(parent);for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}let old=self.env.clone();self.env=call;let r=self.exec_all(&fun.body);self.env=old;match r?{Flow::Next=>Ok(V::Null),Flow::Return(v,_,_)=>Ok(v)}}
+                V::Fun(fun)=>{
+                    if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}
+                    if self.call_depth>=64{return Err(self.error("Maximum function call depth (64) exceeded.",*l,*c));}
+                    let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;
+                    let call=Env::child(parent);
+                    for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}
+                    let old=self.env.clone();
+                    self.env=call;
+                    self.call_depth+=1;
+                    let r=self.exec_all(&fun.body);
+                    self.call_depth-=1;
+                    self.env=old;
+                    match r?{Flow::Next=>Ok(V::Null),Flow::Return(v,_,_)=>Ok(v)}
+                }
                 v=>Err(self.error(format!("Cannot call a value of type {}.",v.ty()),*l,*c))
             }}
             E::Index(a,i,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
-            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{let mut items=items.borrow_mut();if idx>=items.len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
+            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{if idx>=items.borrow().len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}let identity=Rc::as_ptr(&items) as usize;if contains_array_reference(&v,identity,&mut HashSet::new()){return Err(self.error("Cyclic array references are not supported in HK 0.1.x.",*l,*c));}let mut items=items.borrow_mut();items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
             E::Property(a,n,l,c)=>{let o=self.eval(a)?;if n=="length"{if let V::Arr(items)=o{return Ok(V::Num(items.borrow().len() as f64));}}Err(self.error(format!("Property '{n}' is not available on {}.",o.ty()),*l,*c))}
         }
     }
@@ -304,4 +345,62 @@ mod tests {
     #[test] fn conditions_require_booleans(){assert!(run("test.hk","if(1){print(1);}").unwrap_err().message.contains("Boolean"));}
     #[test] fn division_by_zero_fails(){assert!(run("test.hk","print(1/0);").unwrap_err().message.contains("zero"));}
     #[test] fn lexical_scopes_allow_shadowing(){assert_eq!(run("test.hk","let x=1;{let x=2;print(x);}print(x);").unwrap(),vec!["2","1"]);}
+    #[test] fn cyclic_array_references_are_rejected_without_leaking(){
+        let error=run("test.hk","let a=[null];a[0]=a;").unwrap_err();
+        assert!(error.message.contains("Cyclic array references are not supported"));
+    }
+    #[test] fn indirect_cyclic_array_references_are_rejected(){
+        let error=run("test.hk","let a=[null];let b=[a];a[0]=b;").unwrap_err();
+        assert!(error.message.contains("Cyclic array references are not supported"));
+    }
+    #[test] fn recursive_calls_stop_at_a_controlled_limit(){
+        let error=run("test.hk","fn recurse(n){return recurse(n+1);}recurse(0);").unwrap_err();
+        assert!(error.message.contains("Maximum function call depth"));
+    }
+    #[test] fn duplicate_function_parameters_are_rejected_at_declaration(){
+        let error=run("test.hk","fn invalid(value,value){return value;}").unwrap_err();
+        assert_eq!(error.code,"E2001");
+        assert!(error.message.contains("Duplicate parameter"));
+        assert_eq!((error.line,error.column),(1,18));
+    }
+    #[test] fn eof_diagnostics_point_to_end_of_input(){
+        let error=run("test.hk","print(1").unwrap_err();
+        assert_eq!(error.code,"E2000");
+        assert_eq!((error.line,error.column),(1,8));
+    }
+    #[test] fn short_circuit_operators_do_not_evaluate_right_operand(){
+        assert_eq!(run("test.hk","print(false && missing);print(true || missing);").unwrap(),vec!["false","true"]);
+    }
+    #[test] fn for_loop_scope_does_not_leak(){
+        let error=run("test.hk","for(let i=0;i<1;i=i+1){}print(i);").unwrap_err();
+        assert!(error.message.contains("Undefined variable"));
+    }
+    #[test] fn invalid_assignment_reports_operator_position(){
+        let error=run("test.hk","(1)=2;").unwrap_err();
+        assert_eq!(error.code,"E2002");
+        assert_eq!((error.line,error.column),(1,4));
+    }
+    #[test] fn unknown_single_logical_operator_is_lexical_error(){
+        let error=run("test.hk","print(true & false);").unwrap_err();
+        assert_eq!(error.code,"E1001");
+    }
+    #[test] fn unterminated_string_is_lexical_error(){
+        let error=run("test.hk","print(\"unfinished);").unwrap_err();
+        assert_eq!(error.code,"E1004");
+    }
+    #[test] fn array_bounds_are_checked_for_reads_and_writes(){
+        assert!(run("test.hk","let a=[1];print(a[1]);").unwrap_err().message.contains("out of bounds"));
+        assert!(run("test.hk","let a=[1];a[1]=2;").unwrap_err().message.contains("out of bounds"));
+    }
+    #[test] fn arrays_compare_by_identity(){
+        assert_eq!(run("test.hk","let a=[1];let b=a;let c=[1];print(a==b);print(a==c);").unwrap(),vec!["true","false"]);
+    }
+    #[test] fn duplicate_declarations_in_one_scope_are_rejected(){
+        let error=run("test.hk","let value=1;let value=2;").unwrap_err();
+        assert!(error.message.contains("already declared"));
+    }
+    #[test] fn strings_support_only_documented_escapes(){
+        assert_eq!(run("test.hk",r#"print("a\\nb");"#).unwrap(),vec!["a\\nb"]);
+        assert_eq!(run("test.hk",r#"print("a\nb");"#).unwrap(),vec!["a\nb"]);
+    }
 }

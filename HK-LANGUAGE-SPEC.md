@@ -34,7 +34,7 @@ Strings use double quotes. Supported escapes are newline, carriage return, tab, 
 
 Conditions and logical operators require Boolean. There is no truthiness conversion. && and || short-circuit left-to-right.
 
-Arrays are ordered, mutable, and may contain different types. Indexes are zero-based non-negative integers. Out-of-range reads/writes fail. The read-only property .length returns a Number. Array equality compares identity, not contents. A const binding cannot be reassigned, but an array referenced by a constant may be mutated.
+Arrays are ordered, mutable, and may contain different types. Indexes are zero-based non-negative integers. Out-of-range reads/writes fail. The read-only property .length returns a Number. Array equality compares identity, not contents. A const binding cannot be reassigned, but an array referenced by a constant may be mutated. Cyclic array references are rejected at indexed assignment to avoid reference-counting leaks and unbounded display recursion.
 
 ## 4. Bindings and scopes
 
@@ -73,7 +73,7 @@ print(add(2, 3));
 
 The for initializer and increment are optional; both semicolon separators remain mandatory. An omitted condition is treated as true.
 
-Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
+Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. Duplicate parameter names are syntax errors. The interpreter limits active user-function calls to 64; exceeding this limit produces a runtime diagnostic rather than overflowing the host stack. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
 
 ## 7. Built-ins
 
@@ -81,7 +81,7 @@ Only print(value) is guaranteed. It accepts exactly one argument, writes its dis
 
 ## 8. Diagnostics and CLI
 
-Lexical, syntax, and runtime errors must not cause an uncontrolled process panic. Diagnostics include an error code, message, source name, line, and column.
+Lexical, syntax, and runtime errors must not cause an uncontrolled process panic. Diagnostics include an error code, message, source name, line, and column. End-of-file errors point to the end-of-input position. Runtime errors and invalid input must be reported without uncontrolled panics.
 
 Commands:
 - hk run <file.hk>
