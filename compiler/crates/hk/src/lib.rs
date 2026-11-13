@@ -143,7 +143,7 @@ mod tests {
     }
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
-        let error = run("diagnostic.hk", "let value = 1;\nvalue = 2;").unwrap_err();
+        let error = run("diagnostic.hk", "const value = 1;\nvalue = 2;").unwrap_err();
         let rendered = error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
@@ -168,11 +168,11 @@ mod tests {
     }
     #[test]
     fn deeply_nested_array_display_is_bounded() {
-        let mut source = "1".to_string();
+        let mut program = "let value = 1;".to_string();
         for _ in 0..100 {
-            source = format!("[{source}]");
+            program.push_str("value = [value];");
         }
-        let program = format!("print({source});");
+        program.push_str("print(value);");
         let output = run("deep.hk", &program).unwrap();
         assert!(output[0].contains("<max-depth>"));
     }
