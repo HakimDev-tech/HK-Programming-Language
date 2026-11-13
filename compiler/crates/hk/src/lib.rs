@@ -240,9 +240,9 @@ impl Engine {
             S::Fn(n,p,b,l,c)=>{let f=V::Fun(Rc::new(Fun{name:n.clone(),params:p.clone(),body:b.clone(),env:Rc::downgrade(&self.env)}));self.env.borrow_mut().define(n.clone(),f,false).map_err(|x|self.error(x,*l,*c))?;}
             S::Expr(e)=>{self.eval(e)?;}
             S::Block(b)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=self.exec_all(b);self.env=old;return r;}
-            S::If(c,a,b)=>{let v=self.eval(c)?;if self.boolean(v,1,1)?{return self.exec(a);}if let Some(b)=b{return self.exec(b);}}
-            S::While(c,b)=>loop{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}if let Flow::Return(v,line,col)=self.exec(b)?{return Ok(Flow::Return(v,line,col));}},
-            S::For(init,cond,inc,body)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=(||{if let Some(i)=init{self.exec(i)?;}loop{if let Some(c)=cond{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}}if let Flow::Return(v)=self.exec(body)?{return Ok(Flow::Return(v));}if let Some(i)=inc{self.eval(i)?;}}Ok(Flow::Next)})();self.env=old;return r;}
+            S::If(c,a,b)=>{let v=self.eval(c)?;let (line,col)=c.source_position();if self.boolean(v,line,col)?{return self.exec(a);}if let Some(b)=b{return self.exec(b);}}
+            S::While(c,b)=>loop{let v=self.eval(c)?;let (line,col)=c.source_position();if !self.boolean(v,line,col)?{break;}if let Flow::Return(v,line,col)=self.exec(b)?{return Ok(Flow::Return(v,line,col));}},
+            S::For(init,cond,inc,body)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=(||{if let Some(i)=init{self.exec(i)?;}loop{if let Some(c)=cond{let v=self.eval(c)?;let (line,col)=c.source_position();if !self.boolean(v,line,col)?{break;}}if let Flow::Return(v,line,col)=self.exec(body)?{return Ok(Flow::Return(v,line,col));}if let Some(i)=inc{self.eval(i)?;}}Ok(Flow::Next)})();self.env=old;return r;}
             S::Return(e,line,col)=>return Ok(Flow::Return(if let Some(e)=e{self.eval(e)?}else{V::Null},*line,*col)),
         }Ok(Flow::Next)
     }
