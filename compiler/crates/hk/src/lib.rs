@@ -449,4 +449,25 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, "E2004");
     }
+    #[test]
+    fn rejects_incompatible_typed_variable_assignments() {
+        let error = run("typed.hk", "let count: number = 1; count = \"wrong\";").unwrap_err();
+        assert_eq!(error.code, "E3002");
+    }
+
+    #[test]
+    fn accepts_null_and_any_return_fallthrough_contracts() {
+        for signature in ["-> null", "-> any"] {
+            let source = format!("fn maybe() {signature} {{}}");
+            let error = run("typed.hk", &source).unwrap_err();
+            assert_eq!(error.code, "E2004");
+        }
+    }
+
+    #[test]
+    fn rejects_known_incompatible_arithmetic_operands() {
+        let error = run("typed.hk", "let result: number = 1 + \"text\";").unwrap_err();
+        assert_eq!(error.code, "E3005");
+    }
+
 }
