@@ -76,6 +76,38 @@ mod tests {
         let error=run("test.hk","let value=1;let value=2;").unwrap_err();
         assert!(error.message.contains("already declared"));
     }
+    #[test] fn diagnostics_include_source_excerpt_and_caret(){
+        let error=run("diagnostic.hk","let value = 1;\\nvalue = 2;").unwrap_err();
+        let rendered=error.to_string();
+        assert!(rendered.contains("2 | value = 2;"));
+        assert!(rendered.contains("^"));
+    }
+    #[test] fn deeply_nested_unary_input_returns_a_diagnostic(){
+        let source=format!("{}true;","!".repeat(300));
+        let error=run("deep.hk",&source).unwrap_err();
+        assert!(error.message.contains("nesting depth"));
+    }
+    #[test] fn deeply_nested_blocks_return_a_diagnostic(){
+        let source=format!("{}print(1);{}","{".repeat(300),"}".repeat(300));
+        let error=run("deep.hk",&source).unwrap_err();
+        assert!(error.message.contains("nesting depth"));
+    }
+    #[test] fn deeply_nested_array_expression_returns_a_diagnostic(){
+        let source=format!("print({}1{});","[".repeat(200),"]".repeat(200));
+        let error=run("deep.hk",&source).unwrap_err();
+        assert!(error.message.contains("nesting depth"));
+    }
+    #[test] fn deeply_nested_array_display_is_bounded(){
+        let mut source="1".to_string();
+        for _ in 0..100{source=format!("[{source}]");}
+        let program=format!("print({source});");
+        let output=run("deep.hk",&program).unwrap();
+        assert!(output[0].contains("<max-depth>"));
+    }
+    #[test] fn malformed_source_corpus_never_panics(){
+        let corpus=["@", "&", "|", "print(", "fn f( {", "let = ;", "[[[", "if(true){", "\\\"unterminated", "1 + * 2;", "((((((((("];
+        for source in corpus{assert!(std::panic::catch_unwind(||run("fuzz.hk",source)).is_ok(),"panicked on {source:?}");}
+    }
     #[test] fn strings_support_only_documented_escapes(){
         assert_eq!(run("test.hk",r#"print("a\\nb");"#).unwrap(),vec!["a\\nb"]);
         assert_eq!(run("test.hk",r#"print("a\nb");"#).unwrap(),vec!["a\nb"]);
