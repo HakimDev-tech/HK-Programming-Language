@@ -747,7 +747,6 @@ pub(super) fn execute(
     Ok(engine.output)
 }
 
-
 #[cfg(test)]
 mod contract_tests {
     use super::*;
@@ -766,12 +765,7 @@ mod contract_tests {
             )
             .unwrap();
 
-        let error = Env::set(
-            &environment,
-            "value",
-            V::Str("invalid".into()),
-        )
-        .unwrap_err();
+        let error = Env::set(&environment, "value", V::Str("invalid".into())).unwrap_err();
         assert!(matches!(error, EnvError::Contract(_)));
         assert!(matches!(Env::get(&environment, "value"), Some(V::Num(value)) if value == 1.0));
     }
