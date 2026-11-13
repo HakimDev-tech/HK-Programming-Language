@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; cross-platform CI and review remain release gates.
+**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; alpha.4 stabilization is in progress.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -63,18 +63,20 @@ Introduce optional annotations for variables and named-function parameters/retur
 
 **Exit gate:** implemented on the alpha.3 feature branch; verify via runtime contract test matrix and cross-platform CI before merge.
 
-## Phase 4 — Stabilization and release candidate
+## Phase 4 — Stabilization (alpha.4)
 
+- [x] Audit runtime diagnostic classification for mixed typed/dynamic programs; preserve E3000 for non-contract operator/call failures
+- [x] Add regression tests for dynamic `+` overload failures and non-callable dynamic values
+- [x] Add a dedicated seed corpus for variable contracts, indirect function contracts, and short-circuit behavior
 - [ ] Run the complete 0.1.x regression suite unchanged
-- [ ] Add positive, negative, and dynamic-boundary test matrices
-- [ ] Add malformed-input and generated-input panic tests
-- [ ] Extend fuzzing to parser annotations and type-checker paths
+- [ ] Complete positive, negative, and dynamic-boundary test matrices
+- [ ] Extend fuzzing and review findings from annotation-heavy corpus runs
 - [ ] Review diagnostics, documentation, and examples
 - [ ] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied
 - [ ] Verify Linux, Windows, and macOS CI
 - [ ] Record known limitations and release notes
 
-**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes.
+**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes; no alpha.4 release claim is made before CI and review complete.
 
 ## Release acceptance
 
