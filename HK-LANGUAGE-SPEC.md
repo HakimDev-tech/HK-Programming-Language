@@ -73,7 +73,7 @@ print(add(2, 3));
 
 The for initializer and increment are optional; both semicolon separators remain mandatory. An omitted condition is treated as true.
 
-Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. Duplicate parameter names are syntax errors. The interpreter limits active user-function calls to 256; exceeding this limit produces a runtime diagnostic rather than overflowing the host stack. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
+Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. Duplicate parameter names are syntax errors. The interpreter limits active user-function calls to 64; exceeding this limit produces a runtime diagnostic rather than overflowing the host stack. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
 
 ## 7. Built-ins
 
