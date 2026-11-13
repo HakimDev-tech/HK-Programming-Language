@@ -18,16 +18,6 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     if annotation.is_some() {
         type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     }
-    if let Some((line, column, message)) = annotation {
-        return Err(HkError::new(
-            "E2004",
-            message,
-            source_name,
-            line,
-            column,
-            source,
-        ));
-    }
     runtime::execute(source_name, source, &statements)
 }
 
