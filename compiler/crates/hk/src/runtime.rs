@@ -339,7 +339,7 @@ impl Engine {
                 self.env
                     .borrow_mut()
                     .define(n.clone(), f, false, None, "function declaration")
-                    .map_err(|x| self.error(x, *l, *c))?;
+                    .map_err(|error| self.env_error(error, *l, *c))?;
             }
             S::Expr(e) => {
                 self.eval(e)?;
