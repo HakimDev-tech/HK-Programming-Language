@@ -421,4 +421,34 @@ mod tests {
         assert_eq!(error.code, "E2004");
     }
 
+    #[test]
+    fn preserves_dynamic_behavior_for_unannotated_programs() {
+        let output = run(
+            "dynamic.hk",
+            "fn latent() { return 1 + \"text\"; } print(\"still dynamic\");",
+        )
+        .unwrap();
+        assert_eq!(output, vec!["still dynamic"]);
+    }
+
+    #[test]
+    fn respects_local_variable_shadowing_of_known_functions() {
+        let error = run(
+            "typed.hk",
+            "fn calculate(value: number) -> number { return value; } { let calculate = 1; calculate(); }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E2004");
+    }
+
+    #[test]
+    fn typed_function_parameters_remain_assignable() {
+        let error = run(
+            "typed.hk",
+            "fn update(value: number) -> number { value = 2; return value; }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E2004");
+    }
+
 }
