@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased — HK 0.2.0
+- Preserve 0.1.x dynamic behavior in unannotated regions of mixed typed/dynamic programs while retaining static checks at declared boundaries.
 
 - Add optional annotations for variables and named-function parameters and return values using `number`, `string`, `bool`, `null`, `array`, and `any`.
 - Add static type checking before runtime execution, including variable initialization/assignment, known function arguments/returns, operator operands, conditions, and conservative return-path checks.

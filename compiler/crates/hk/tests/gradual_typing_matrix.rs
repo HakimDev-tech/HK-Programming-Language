@@ -552,3 +552,58 @@ fn known_non_callable_values_are_rejected_statically_but_any_remains_dynamic() {
         "an any callee must retain the dynamic runtime callability check"
     );
 }
+
+#[test]
+fn mixed_program_unannotated_function_body_preserves_dynamic_typing() {
+    let source = r#"
+        let marker: bool = true;
+        fn legacy() {
+            let result = 1 + true;
+        }
+        print(marker);
+    "#;
+    assert_eq!(run("mixed-dynamic.hk", source).unwrap(), vec!["true"]);
+}
+
+#[test]
+fn called_unannotated_function_keeps_runtime_operator_diagnostic() {
+    let source = r#"
+        let marker: bool = true;
+        fn legacy() {
+            let result = 1 + true;
+        }
+        legacy();
+    "#;
+    let error = run("mixed-dynamic.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3000");
+}
+
+#[test]
+fn mixed_program_unannotated_short_circuit_remains_lazy() {
+    let source = r#"
+        let marker: bool = true;
+        print(false && (1 + true));
+        print(true || (1 + true));
+    "#;
+    assert_eq!(run("mixed-dynamic.hk", source).unwrap(), vec!["false", "true"]);
+}
+
+#[test]
+fn dynamic_caller_cannot_bypass_a_typed_function_boundary() {
+    let source = r#"
+        fn take(value: number) -> number { return value; }
+        fn legacy() { take("wrong"); }
+    "#;
+    assert_eq!(error_code(source), "E3003");
+}
+
+#[test]
+fn untyped_function_arity_remains_a_runtime_check_in_mixed_programs() {
+    let source = r#"
+        let marker: bool = true;
+        fn legacy(value) { return value; }
+        legacy();
+    "#;
+    assert_eq!(error_code(source), "E3000");
+}
+

@@ -197,7 +197,7 @@ The checker does not infer element types, track array contents through aliases, 
 
 Conditions of `if`, `while`, and a present `for` condition require `bool`. A known non-boolean type is rejected statically. An `any` condition receives a runtime Boolean check when evaluated. An omitted `for` condition means an unconditional loop and has no condition expression to check.
 
-The checker analyzes both syntactic operands of logical expressions for statically provable errors, but runtime guards and expression evaluation remain lazy: a right operand skipped by `&&` or `||` is not evaluated and cannot produce a runtime-only error. This preserves left-to-right short-circuit semantics without suppressing genuine static errors in source code.
+Within a typed checking region (defined in §7.3), the checker analyzes both syntactic operands of logical expressions for statically provable errors, but runtime guards and expression evaluation remain lazy: a right operand skipped by `&&` or `||` is not evaluated and cannot produce a runtime-only error. In a dynamic region, both operands retain 0.1.x runtime behavior and no static operator error is introduced merely because the file contains annotations elsewhere.
 
 The checker resolves declarations and function signatures available at the current source position under the existing sequential declaration model. A function's own signature is visible in its body for direct recursion. A later declaration is not available to the checker at an earlier source position, so a call to that name is statically treated as dynamic (`any`) rather than checked against a forward signature.
 

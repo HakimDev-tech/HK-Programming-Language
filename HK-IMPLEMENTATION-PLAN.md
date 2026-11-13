@@ -45,6 +45,7 @@ Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unan
 - [x] Run the complete workspace test suite on the exact final integration commit.
 - [x] Run parser/interpreter fuzzing on the exact final integration commit.
 - [ ] Review panic safety, depth limits, and malformed-source behavior.
+- [x] Preserve dynamic checking for unrelated unannotated code in mixed typed/dynamic programs; enforce declared typed boundaries.
 
 ### 3. Documentation and release consistency
 
