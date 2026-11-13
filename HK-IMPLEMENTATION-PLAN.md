@@ -1,8 +1,8 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on the feature branch. PR #10 remains open and unmerged for review.
+**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on its feature branch. PR #10 remains open and unmerged. Alpha.6 is specified as a scope and loop-analysis conformance increment; implementation has not started.
 
-The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
+The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). Phase-specific acceptance contracts are documented in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) and [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md). A semantic change requires updating the specification and tests before implementation.
 
 ## Release objective
 
@@ -66,7 +66,7 @@ Introduce optional annotations for variables and named-function parameters/retur
 ## Phase 4 — Stabilization (alpha.4)
 
 - [x] Audit runtime diagnostic classification for mixed typed/dynamic programs; preserve E3000 for non-contract operator/call failures
-- [x] Add regression tests for dynamic  overload failures and non-callable dynamic values
+- [x] Add regression tests for dynamic overload failures and non-callable dynamic values
 - [x] Add a dedicated seed corpus for variable contracts, indirect function contracts, and short-circuit behavior
 - [x] Preserve the existing 0.1.x regression tests while adding gradual-typing coverage
 - [x] Add positive, negative, and dynamic-boundary acceptance matrices in `compiler/crates/hk/tests/gradual_typing_matrix.rs`
@@ -78,7 +78,6 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Record known limitations and the alpha.4 stabilization changes in the specification and changelog
 
 **Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes on the same final commit; no alpha.4 completion claim before final CI and review are green.
-
 
 ## Phase 5 — Boundary conformance and diagnostic provenance (alpha.5)
 
@@ -98,6 +97,21 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Review the normative typing spec, Alpha.5 spec, README, roadmap, changelog, implementation plan, and gradual-typing example against the current behavior
 
 **Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.
+
+## Phase 6 — Scope and loop-analysis conformance (alpha.6)
+
+- [x] Audit checker scope creation against runtime environment creation
+- [x] Identify the extra synthetic scopes around `if` and `while` bodies
+- [x] Identify the mismatch between static and runtime `for` clause order
+- [x] Define conservative branch analysis and conditional-declaration visibility in [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md)
+- [x] Define `for` analysis order as initializer → condition → body → increment
+- [ ] Implement scope and loop-analysis conformance without changing runtime semantics
+- [ ] Add focused regressions for branch isolation, outer contracts, conditional declarations, and loop-clause visibility
+- [ ] Preserve all V0.1.x and Alpha.1–Alpha.5 tests unchanged
+- [ ] Run fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on one exact final commit
+- [ ] Review all normative documentation against the implementation
+
+**Exit gate:** all requirements in [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md) pass on one exact final commit. Alpha.6 is a checker-conformance increment, not a release candidate.
 
 ## Release acceptance
 
