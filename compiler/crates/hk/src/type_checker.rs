@@ -201,12 +201,12 @@ impl<'a> TypeChecker<'a> {
                 let (line, column) = condition.source_position();
                 self.require(Type::Bool, actual, "E3006", "if condition", line, column)?;
 
-                // Branches execute in the current runtime environment unless they
-                // contain an explicit block. Analyze each from the same incoming
-                // state, then discard branch-local declarations conservatively.
-                self.check_isolated_statement(then_branch)?;
+                // Declarations are only legal in explicit blocks. Those blocks
+                // create their own lexical scopes, so the control-flow statement
+                // itself must not introduce an additional checker scope.
+                self.check_statement(then_branch)?;
                 if let Some(branch) = else_branch {
-                    self.check_isolated_statement(branch)?;
+                    self.check_statement(branch)?;
                 }
             }
             S::While(condition, body) => {
@@ -214,9 +214,9 @@ impl<'a> TypeChecker<'a> {
                 let (line, column) = condition.source_position();
                 self.require(Type::Bool, actual, "E3006", "while condition", line, column)?;
 
-                // A while body may execute zero times. Match runtime scope creation
-                // but do not promote body-only declarations after the loop.
-                self.check_isolated_statement(body)?;
+                // The body may execute zero times. Any declarations are contained
+                // in an explicit block, whose normal scope ends after the body.
+                self.check_statement(body)?;
             }
             S::For(initializer, condition, increment, body) => {
                 self.push_scope();
@@ -253,15 +253,6 @@ impl<'a> TypeChecker<'a> {
             }
         }
         Ok(())
-    }
-
-    fn check_isolated_statement(&mut self, statement: &S) -> Result<()> {
-        let scopes = self.scopes.clone();
-        let functions = self.functions.clone();
-        let result = self.check_statement(statement);
-        self.scopes = scopes;
-        self.functions = functions;
-        result
     }
 
     fn define_function(&mut self, name: &str, signature: FunctionSignature) {
