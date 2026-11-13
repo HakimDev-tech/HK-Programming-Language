@@ -12,7 +12,6 @@ struct Binding {
     contract: Option<Type>,
     mutable: bool,
 }
-
 #[derive(Clone)]
 struct FunctionSignature {
     parameters: Vec<Type>,
@@ -362,18 +361,60 @@ impl<'a> TypeChecker<'a> {
                         }
                     }
                     K::Minus | K::Star | K::Slash | K::Percent => {
-                        self.require(Type::Number, left_type, "E3005", "left arithmetic operand", *line, *column)?;
-                        self.require(Type::Number, right_type, "E3005", "right arithmetic operand", *line, *column)?;
+                        self.require(
+                            Type::Number,
+                            left_type,
+                            "E3005",
+                            "left arithmetic operand",
+                            *line,
+                            *column,
+                        )?;
+                        self.require(
+                            Type::Number,
+                            right_type,
+                            "E3005",
+                            "right arithmetic operand",
+                            *line,
+                            *column,
+                        )?;
                         Ok(Type::Number)
                     }
                     K::Gt | K::GtEq | K::Lt | K::LtEq => {
-                        self.require(Type::Number, left_type, "E3005", "left comparison operand", *line, *column)?;
-                        self.require(Type::Number, right_type, "E3005", "right comparison operand", *line, *column)?;
+                        self.require(
+                            Type::Number,
+                            left_type,
+                            "E3005",
+                            "left comparison operand",
+                            *line,
+                            *column,
+                        )?;
+                        self.require(
+                            Type::Number,
+                            right_type,
+                            "E3005",
+                            "right comparison operand",
+                            *line,
+                            *column,
+                        )?;
                         Ok(Type::Bool)
                     }
                     K::And | K::Or => {
-                        self.require(Type::Bool, left_type, "E3005", "left logical operand", *line, *column)?;
-                        self.require(Type::Bool, right_type, "E3005", "right logical operand", *line, *column)?;
+                        self.require(
+                            Type::Bool,
+                            left_type,
+                            "E3005",
+                            "left logical operand",
+                            *line,
+                            *column,
+                        )?;
+                        self.require(
+                            Type::Bool,
+                            right_type,
+                            "E3005",
+                            "right logical operand",
+                            *line,
+                            *column,
+                        )?;
                         Ok(Type::Bool)
                     }
                     K::EqEq | K::BangEq => Ok(Type::Bool),
@@ -387,7 +428,11 @@ impl<'a> TypeChecker<'a> {
                         if signature.parameters.len() != arguments.len() {
                             return Err(self.error(
                                 "E3003",
-                                format!("Function '{name}' expects {} arguments, received {}.", signature.parameters.len(), arguments.len()),
+                                format!(
+                                    "Function '{name}' expects {} arguments, received {}.",
+                                    signature.parameters.len(),
+                                    arguments.len()
+                                ),
                                 *line,
                                 *column,
                             ));
@@ -395,7 +440,14 @@ impl<'a> TypeChecker<'a> {
                         for (argument, expected) in arguments.iter().zip(signature.parameters) {
                             let actual = self.check_expression(argument)?;
                             let (arg_line, arg_column) = argument.source_position();
-                            self.require(expected, actual, "E3003", "function argument", arg_line, arg_column)?;
+                            self.require(
+                                expected,
+                                actual,
+                                "E3003",
+                                "function argument",
+                                arg_line,
+                                arg_column,
+                            )?;
                         }
                         return Ok(signature.return_type.unwrap_or(Type::Any));
                     }
@@ -415,22 +467,57 @@ impl<'a> TypeChecker<'a> {
             E::Index(receiver, index, line, column) => {
                 let receiver_type = self.check_expression(receiver)?;
                 let index_type = self.check_expression(index)?;
-                self.require(Type::Array, receiver_type, "E3005", "array receiver", *line, *column)?;
-                self.require(Type::Number, index_type, "E3005", "array index", *line, *column)?;
+                self.require(
+                    Type::Array,
+                    receiver_type,
+                    "E3005",
+                    "array receiver",
+                    *line,
+                    *column,
+                )?;
+                self.require(
+                    Type::Number,
+                    index_type,
+                    "E3005",
+                    "array index",
+                    *line,
+                    *column,
+                )?;
                 Ok(Type::Any)
             }
             E::SetIndex(receiver, index, value, line, column) => {
                 let receiver_type = self.check_expression(receiver)?;
                 let index_type = self.check_expression(index)?;
                 let value_type = self.check_expression(value)?;
-                self.require(Type::Array, receiver_type, "E3005", "array receiver", *line, *column)?;
-                self.require(Type::Number, index_type, "E3005", "array index", *line, *column)?;
+                self.require(
+                    Type::Array,
+                    receiver_type,
+                    "E3005",
+                    "array receiver",
+                    *line,
+                    *column,
+                )?;
+                self.require(
+                    Type::Number,
+                    index_type,
+                    "E3005",
+                    "array index",
+                    *line,
+                    *column,
+                )?;
                 Ok(value_type)
             }
             E::Property(receiver, property, line, column) => {
                 let receiver_type = self.check_expression(receiver)?;
                 if property == "length" {
-                    self.require(Type::Array, receiver_type, "E3005", "property receiver", *line, *column)?;
+                    self.require(
+                        Type::Array,
+                        receiver_type,
+                        "E3005",
+                        "property receiver",
+                        *line,
+                        *column,
+                    )?;
                     Ok(Type::Number)
                 } else {
                     Ok(Type::Any)
