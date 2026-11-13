@@ -49,7 +49,10 @@ impl Parser {
         } else {
             None
         };
-        self.expect(K::Eq, "Expected '=' after variable name and optional type annotation.")?;
+        self.expect(
+            K::Eq,
+            "Expected '=' after variable name and optional type annotation.",
+        )?;
         let e = self.expr()?;
         self.expect(K::Semi, "Expected ';' after declaration.")?;
         Ok(match annotation {
@@ -83,7 +86,10 @@ impl Parser {
                 } else {
                     None
                 };
-                params.push(Param { name: param.text, annotation });
+                params.push(Param {
+                    name: param.text,
+                    annotation,
+                });
                 if !self.take(K::Comma) {
                     break;
                 }
@@ -97,11 +103,25 @@ impl Parser {
         };
         self.expect(K::LBrace, "Expected '{' before function body.")?;
         let body = self.block_body()?;
-        let has_annotations = return_type.is_some() || params.iter().any(|p| p.annotation.is_some());
+        let has_annotations =
+            return_type.is_some() || params.iter().any(|p| p.annotation.is_some());
         if has_annotations {
-            Ok(S::TypedFn(n.text, params, return_type, body, n.line, n.col))
+            Ok(S::TypedFn(
+                n.text,
+                params,
+                return_type,
+                body,
+                n.line,
+                n.col,
+            ))
         } else {
-            Ok(S::Fn(n.text, params.into_iter().map(|p| p.name).collect(), body, n.line, n.col))
+            Ok(S::Fn(
+                n.text,
+                params.into_iter().map(|p| p.name).collect(),
+                body,
+                n.line,
+                n.col,
+            ))
         }
     }
 
