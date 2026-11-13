@@ -1,123 +1,75 @@
-# HK 0.2.0 — Implementation Plan
+# HK 0.2.0 — Finalization Plan
 
-**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on its feature branch. PR #10 remains open and unmerged. Alpha.6 scope and loop-analysis conformance is implemented on its feature branch. The code passed fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on code commit `3ff25e4`; documentation synchronization is now being revalidated on the exact final head.
+**Status:** The gradual-typing implementation is complete on the integration candidate branch. It includes annotation syntax, static checking, runtime contracts, precise boundary diagnostics, and checker/runtime scope conformance. Finalization consolidates the implementation, closes semantic gaps found by audit, and verifies one exact commit before release consideration.
 
-The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). Phase-specific acceptance contracts are documented in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) and [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md). A semantic change requires updating the specification and tests before implementation.
+The normative language contract is [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). Internal engineering steps do not create separate Alpha versions.
 
 ## Release objective
 
-Introduce optional annotations for variables and named-function parameters/returns, a static checker, and runtime guards at dynamic-to-typed boundaries, while preserving unannotated 0.1.x behavior.
+Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unannotated code.
 
-## Phase 0 — Design baseline
+## Implemented capabilities
 
-- [x] Select gradual typing as the 0.2.0 model
-- [x] Define source-level types: number, string, bool, null, array, any
-- [x] Define annotation grammar for variables and named functions
-- [x] Define static compatibility and dynamic boundary rules
-- [x] Define array behavior and return-path policy
-- [x] Define architecture, diagnostics, acceptance criteria, and non-goals
-- [x] Review and clarify dynamic operator guards, short-circuit evaluation, function aliases, sequential name resolution, assignment-expression typing, array aliasing, and null/any return behavior
+- Optional annotations on variable declarations, named-function parameters, and named-function returns.
+- Source types: `number`, `string`, `bool`, `null`, `array`, and `any`.
+- Static checking before runtime execution.
+- Runtime contracts on typed bindings, parameters, and function returns.
+- Runtime guards when dynamic values enter concrete typed contexts.
+- Heterogeneous arrays with contracts attached to bindings, not array elements.
+- Direct named-function signature checking and dynamic function-alias behavior.
+- Conservative return-path analysis.
+- Stable diagnostics for static type failures and runtime contract violations.
+- Source-location provenance for dynamic boundary failures.
+- Checker scope behavior aligned with explicit runtime lexical scopes.
+- `for` clauses analyzed in runtime order: initializer, condition, body, increment.
+- Cross-platform CI, regression matrix, and dedicated parser/interpreter fuzz workflow.
 
-## Phase 1 — Frontend syntax (alpha.1)
+## Finalization work
 
-- [x] Add colon and arrow tokens with regression coverage
-- [x] Extend AST with optional type annotations
-- [x] Parse variable annotations
-- [x] Parse parameter annotations
-- [x] Parse function return annotations
-- [x] Reject unknown type names and malformed annotations with source diagnostics
-- [x] Add parser tests for valid and invalid syntax
-- [x] Confirm all existing unannotated syntax remains unchanged
+### 1. Semantic audit
 
-**Alpha.1 gate:** satisfied — annotated source parses into an AST with source locations.
+- [x] Compare normative typing rules with parser, checker, runtime, and integration tests.
+- [x] Verify typed binding initialization and assignment contracts.
+- [x] Verify parameter and return contracts, including aliases and fallthrough.
+- [x] Verify operator guards, array receiver/index guards, and short-circuit timing.
+- [x] Verify sequential function resolution, shadowing, recursion, and dynamic forward calls.
+- [x] Verify explicit block scopes, branch isolation, loop scope lifetime, and `for` analysis order.
+- [x] Identify and correct missing static rejection of calls through known concrete non-function values (E3010).
+- [ ] Review the final diff for unintended behavior changes.
 
-**Alpha.2 gate:** satisfied — static checking runs before execution and rejects known mismatches; wholly unannotated programs retain the dynamic 0.1.x path.
+### 2. Regression and robustness
 
-**Alpha.3 gate:** satisfied in implementation — valid annotated programs execute; dynamic values are checked at typed binding and function boundaries.
+- [x] Preserve the existing 0.1.x regression suite.
+- [x] Maintain the gradual-typing acceptance matrix.
+- [x] Add regression coverage for E3010 and preserve dynamic `any` call behavior.
+- [ ] Run the complete workspace test suite on the exact final integration commit.
+- [ ] Run parser/interpreter fuzzing on the exact final integration commit.
+- [ ] Review panic safety, depth limits, and malformed-source behavior.
 
-## Phase 2 — Static type system (alpha.2)
+### 3. Documentation and release consistency
 
-- [x] Add the source-level type representation and compatibility helpers
-- [x] Implement lexical type scopes consistent with runtime scopes
-- [x] Check variable initializers and assignments
-- [x] Check unary and binary operators
-- [x] Check Boolean conditions and preserve short-circuit behavior
-- [x] Track named function signatures, including self-recursion
-- [x] Check statically known function arguments and return expressions
-- [x] Implement conservative typed-function return-path analysis
-- [x] Add stable E3001–E3009 diagnostics
-- [x] Ensure static errors occur before any runtime output or side effect
+- [x] Consolidate incremental engineering history into one HK 0.2.0 changelog entry.
+- [x] Align architecture documentation with implemented module boundaries.
+- [x] Align README and roadmap with the actual branch and release status.
+- [x] Consolidate scope and loop-analysis rules into the normative typing specification.
+- [ ] Verify all examples against the final interpreter.
+- [ ] Verify every public claim against implementation and tests.
 
-**Exit gate:** all statically provable type violations are rejected before execution; dynamic expressions remain dynamic.
+### 4. Release gates
 
-## Phase 3 — Runtime contracts (alpha.3)
+A 0.2.0 release candidate may be considered only after all of the following pass on the same exact commit:
 
-- [x] Store declared type metadata on runtime bindings
-- [x] Centralize initialization and assignment contract checks
-- [x] Store parameter and return contract metadata on functions
-- [x] Guard dynamic arguments before function body execution
-- [x] Guard dynamic return values before they escape the function
-- [x] Guard dynamic values used in concrete typed contexts
-- [x] Ensure every violation returns an HK diagnostic, never a Rust panic
-- [x] Test aliasing, shadowing, recursion, and all mutation paths
+- [ ] `cargo fmt --all -- --check`
+- [ ] `cargo test --workspace`
+- [ ] `cargo clippy --workspace --all-targets -- -D warnings`
+- [ ] `cargo doc --workspace --no-deps`
+- [ ] Linux, Windows, and macOS CI
+- [ ] Dedicated fuzz workflow
+- [ ] Final semantic and documentation review
+- [ ] Explicit review of known limitations and compatibility guarantees
 
-**Exit gate:** implementation is present on the alpha.3 feature branch; stabilization verifies the acceptance matrix and cross-platform CI before merge.
+Passing these gates does not authorize publication or merging. HK 0.2.0 remains unreleased until the integration is reviewed and explicitly approved.
 
-## Phase 4 — Stabilization (alpha.4)
+## Deferred beyond 0.2.0
 
-- [x] Audit runtime diagnostic classification for mixed typed/dynamic programs; preserve E3000 for non-contract operator/call failures
-- [x] Add regression tests for dynamic overload failures and non-callable dynamic values
-- [x] Add a dedicated seed corpus for variable contracts, indirect function contracts, and short-circuit behavior
-- [x] Preserve the existing 0.1.x regression tests while adding gradual-typing coverage
-- [x] Add positive, negative, and dynamic-boundary acceptance matrices in `compiler/crates/hk/tests/gradual_typing_matrix.rs`
-- [x] Extend fuzzing with annotation-heavy seeds and complete a successful corpus run on the preceding stabilization head
-- [x] Complete the dedicated fuzz run on the final alpha.4 head
-- [x] Review the normative specification, diagnostics, README, roadmap, and executable example
-- [x] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied on the final alpha.4 head
-- [x] Verify Linux, Windows, and macOS CI on the final alpha.4 head
-- [x] Record known limitations and the alpha.4 stabilization changes in the specification and changelog
-
-**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes on the same final commit; no alpha.4 completion claim before final CI and review are green.
-
-## Phase 5 — Boundary conformance and diagnostic provenance (alpha.5)
-
-- [x] Specify runtime boundary invariants and diagnostic source-location requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md)
-- [x] Report parameter contract failures at the offending argument, including calls through aliases
-- [x] Report explicit return contract failures at the returned expression
-- [x] Report unary/binary/logical guard failures at the offending operand
-- [x] Report array receiver and index guard failures at their respective expressions
-- [x] Add regression tests for left/right operands, logical short-circuit boundaries, array receivers/indexes, and function alias boundaries
-- [x] Verify function/variable shadowing, independent typed shadowed bindings, and mutual recursion behavior
-- [x] Verify failed parameter validation prevents function-body side effects and evaluates argument expressions once
-- [x] Add Alpha.5-specific fuzz seeds for argument, return, and dynamic operator boundaries
-- [x] Complete boundary coverage for initialization/assignment, direct/aliased parameters, explicit/implicit returns, operator guards, conditions, array read/write receivers and indexes, and short-circuit branches
-- [x] Audit static/runtime lexical shadowing, function aliases, direct recursion, and dynamic forward/mutual recursion behavior
-- [x] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the final candidate head
-- [x] Complete the final fuzz session on the final candidate head
-- [x] Review the normative typing spec, Alpha.5 spec, README, roadmap, changelog, implementation plan, and gradual-typing example against the current behavior
-
-**Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.
-
-## Phase 6 — Scope and loop-analysis conformance (alpha.6)
-
-- [x] Audit checker scope creation against runtime environment creation
-- [x] Verify declaration grammar: branch and loop declarations require explicit blocks
-- [x] Remove synthetic checker scopes around `if` and `while`; preserve explicit `S::Block` scopes
-- [x] Analyze `if` branches independently through normal block-scope entry/exit
-- [x] Analyze `for` clauses in runtime order: initializer → condition → body → increment
-- [x] Preserve loop scope across initializer, condition, body, and increment; discard it after the loop
-- [x] Add focused regressions for branch isolation, outer contracts, block lifetime, loop diagnostic order, and loop-scope lifetime
-- [x] Preserve all V0.1.x and Alpha.1–Alpha.5 tests unchanged
-- [x] Run fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on code commit `3ff25e4` (CI run `43513851494`; fuzz run `43513851361`)
-- [x] Review the normative typing spec, Alpha.6 spec, README, roadmap, changelog, implementation plan, and existing gradual-typing example
-- [ ] Revalidate CI and fuzzing on the final documentation-synchronized commit
-
-**Exit gate:** all requirements in [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md) pass on one exact final commit. Alpha.6 is a checker-conformance increment, not a release candidate.
-
-## Release acceptance
-
-A release candidate is not a release. Publish 0.2.0 only after all mandatory acceptance criteria pass and the implementation, specification, examples, and changelog agree.
-
-## Explicitly deferred
-
-Generics, unions, optional types, typed array elements, flow-sensitive narrowing, global type inference, function types, anonymous functions, closures, modules, bytecode, VM, native compilation, WASM, and FFI are outside this release.
+Generics, unions, optional types, typed array elements, flow-sensitive narrowing, global type inference, source-level function types, anonymous functions, closures, modules, bytecode, VM, native compilation, WASM, FFI, package management, LSP, formatter, and debugger remain deferred.

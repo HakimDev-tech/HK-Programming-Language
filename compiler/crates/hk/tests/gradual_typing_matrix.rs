@@ -527,3 +527,29 @@ fn alpha6_for_initializer_scope_ends_after_the_loop() {
         "E3000"
     );
 }
+
+
+#[test]
+fn known_non_callable_values_are_rejected_statically_but_any_remains_dynamic() {
+    let statically_non_callable = [
+        "let value: number = 42; value();",
+        "let value: string = \"text\"; value();",
+        "let value: bool = true; value();",
+        "let value: null = null; value();",
+        "let value: array = []; value();",
+    ];
+
+    for source in statically_non_callable {
+        assert_eq!(
+            error_code(source),
+            "E3010",
+            "expected a static non-callable diagnostic for: {source}"
+        );
+    }
+
+    assert_eq!(
+        error_code("let value: any = 42; value();"),
+        "E3000",
+        "an any callee must retain the dynamic runtime callability check"
+    );
+}

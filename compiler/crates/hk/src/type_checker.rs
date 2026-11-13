@@ -459,7 +459,18 @@ impl<'a> TypeChecker<'a> {
                         return Ok(signature.return_type.unwrap_or(Type::Any));
                     }
                 }
-                self.check_expression(callee)?;
+                let callee_type = self.check_expression(callee)?;
+                if callee_type != Type::Any {
+                    let (callee_line, callee_column) = callee.source_position();
+                    return Err(self.error(
+                        "E3010",
+                        format!(
+                            "Cannot call a value of type {callee_type}; expected a function."
+                        ),
+                        callee_line,
+                        callee_column,
+                    ));
+                }
                 for argument in arguments {
                     self.check_expression(argument)?;
                 }

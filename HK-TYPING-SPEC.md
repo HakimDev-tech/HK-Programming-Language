@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification. Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 diagnostic provenance and expanded boundary-conformance coverage are implemented and validated on a separate feature branch. The implementation remains unmerged and is not a stable release.  
+**Status:** Normative specification for the HK 0.2.0 implementation candidate. The gradual-typing pipeline, runtime contracts, boundary diagnostics, and checker/runtime scope conformance are implemented on the integration branch. Final integration review and release gates remain pending; this is not a stable release.  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x
@@ -150,7 +150,8 @@ Values of any type may flow into an `any` destination.
 | Array index | Index must be `number`; result `any` |
 | Array `.length` | `number` |
 | Known named-function call | Declared return type, otherwise `any` |
-| Call through dynamic value | `any`; runtime retains callability and arity checks |
+| Call through dynamic value (`any`) | `any`; runtime retains callability and arity checks |
+| Call through a known concrete non-function value | Static error `E3010` at the callee expression |
 
 The rules for `any` are operator-specific; it is not a blanket exemption from runtime checking:
 
@@ -203,6 +204,30 @@ The checker resolves declarations and function signatures available at the curre
 Runtime name lookup remains dynamic, as in the 0.1.x interpreter. Consequently, a later-declared named function can be called after its declaration has executed; mutual recursion can work through these dynamic calls. This is not static forward-reference or mutual-recursion support: the checker does not know the later signature at the earlier call site. If the resolved runtime function carries parameter or return contracts, those contracts remain enforced. A function value copied into an unannotated variable, passed as a value, or otherwise called through an expression whose function identity is not statically known is likewise a dynamic call: its static result is `any`, and runtime callability/arity checks plus the callee's own parameter/return contracts remain authoritative.
 
 Names not resolvable by the checker remain dynamic for compatibility and are diagnosed by the existing runtime when evaluated. The checker must not turn an otherwise runtime-only unresolved-name failure into an eager error in a skipped logical operand. Existing duplicate-declaration and use-before-declaration behavior must remain intact.
+
+### 7.1 Lexical scopes and control-flow analysis
+
+The static checker must model the runtime's existing lexical environment creation:
+
+- An explicit block creates one child lexical scope.
+- An `if` statement and a `while` statement do not create scopes by themselves.
+- Each explicit block used as a branch or loop body creates and exits its own scope through the ordinary block rule.
+- The `then` and `else` branches are checked independently. Declarations and function signatures from one branch must not leak into the other branch or the enclosing scope.
+- A `for` statement creates one loop scope covering its initializer, condition, body, and increment. That scope ends after the loop.
+- The static analysis order for a `for` statement is initializer, condition, body, then increment, matching runtime order.
+- An explicit block used as a `for` body exits before the increment is checked; declarations local to that block are therefore not visible in the increment.
+- Scope stacks must be restored on both successful and failed checks. Static analysis must not execute source expressions.
+
+The grammar is unchanged: declarations in conditional and loop bodies require explicit blocks. No synthetic checker scope may be added around a control-flow body.
+
+### 7.2 Statically known callability
+
+The checker resolves direct calls to named functions using the sequential declaration model. For other call expressions, it checks the callee expression:
+
+- If the callee's static type is a known concrete source type (`number`, `string`, `bool`, `null`, or `array`), the call is rejected with `E3010` at the callee expression.
+- If the callee is `any`, callability and arity remain runtime checks. This includes unannotated aliases and forward references whose function signature is not available at the call site.
+- This rule does not introduce a source-level function type or change dynamic function alias semantics.
+
 
 ## 8. Return-path analysis
 
@@ -261,6 +286,7 @@ Proposed type diagnostic codes:
 | E3007 | Incompatible value for expected type |
 | E3008 | Runtime type contract violation |
 | E3009 | Typed function may fall through without returning |
+| E3010 | Statically known callee is not callable |
 
 Messages must state the expected and actual types where known and preserve source name, line, column, source excerpt, and caret. Codes are reserved for the 0.2.0 implementation and must be kept stable within the release candidate series.
 
@@ -311,6 +337,7 @@ A 0.2.0 release is acceptable only when all of the following hold:
 12. Malformed/generated source and type-checker inputs do not cause uncontrolled panics.
 13. Formatting, tests, Clippy with warnings denied, rustdoc with warnings denied, Linux/Windows/macOS CI, and dedicated fuzzing pass.
 14. Documentation and examples accurately describe shipped behavior and known limitations.
+15. Calls through statically known concrete non-function values are rejected with E3010, while calls through `any` retain runtime callability checks.
 
 ## 14. Deferred work
 

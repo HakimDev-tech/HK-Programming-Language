@@ -1,65 +1,17 @@
-## Unreleased — HK 0.2.0-alpha.6
-
-- Align static checker scope handling with the runtime: `if` and `while` do not create synthetic scopes; explicit blocks retain their lexical scopes.
-- Analyze C-style `for` clauses in runtime order: initializer, condition, body, then increment.
-- Add regression coverage for branch-local declarations and function signatures, outer typed contracts, block lifetime, loop diagnostic order, and loop initializer scope.
-- Preserve the existing grammar, runtime implementation, and 0.1.x dynamic behavior; no new syntax or types are introduced.
-
-## Unreleased — HK 0.2.0-alpha.5
-
-- Report runtime parameter-contract violations at the offending argument expression.
-- Report explicit function return-contract violations at the returned expression; call expressions expose their callee source position for expression diagnostics.
-- Report unary, binary, logical, array receiver, and array index guards at the offending operand/receiver/index.
-- Add regression tests for function shadowing, independent shadowed contracts, mutual recursion, and failed parameter validation before function-body side effects.
-- Add dedicated fuzz seeds for argument, return, and dynamic operator boundaries.
-- Keep Alpha.5 limited to conformance and diagnostics; no new language syntax or types are introduced.
-
-## Unreleased — HK 0.2.0-alpha.4
-
-- Preserve legacy E3000 diagnostics for dynamic `+` overload failures and non-callable values, rather than misclassifying them as runtime contract violations (E3008).
-- Add regression coverage for diagnostic classification in mixed typed/dynamic programs.
-- Add positive, negative, and dynamic-boundary acceptance matrices for gradual typing.
-- Seed the fuzz corpus with typed variable/function contract and short-circuit cases; the final alpha.4 head completed the dedicated annotation-heavy fuzz workflow successfully.
-- Keep alpha.4 scoped to stabilization; no new language feature is introduced.
-
-
 # Changelog
 
-## Unreleased — HK 0.2.0-alpha.3
+## Unreleased — HK 0.2.0
 
-- Execute programs containing valid gradual type annotations after the alpha.2 static checker succeeds.
-- Store declared type contracts on individual runtime bindings, preserving dynamic unannotated bindings and independent array aliases.
-- Enforce annotated variable initialization and reassignment before writes become observable.
-- Enforce annotated function parameter contracts before entering the function body, including calls through dynamic aliases.
-- Enforce annotated return contracts on explicit returns and implicit fallthrough (`null` and `any`).
-- Add E3008 runtime contract diagnostics and regression tests for dynamic-to-typed boundaries, aliasing, and array mutation.
-- Keep typed array bindings heterogeneous: contracts constrain the binding, not array elements.
-
-
-## Unreleased — HK 0.2.0-alpha.2
-
-- Add an internal type representation and compatibility relation.
-- Add lexical type scopes and static checks for annotated variable initialization, assignment, direct function calls, return values, operators, conditions, and conservative return-path completeness.
-- Run static checking before the alpha execution gate; wholly unannotated programs remain on the dynamic 0.1.x path.
-- Add regression tests for static mismatches, return fallthrough, function shadowing, mutable parameters, and unannotated compatibility.
-- Typed programs were gated until alpha.3 runtime contract enforcement.
-
-## Unreleased — HK 0.2.0-alpha.1
-
-- Recognize `:` and `->` in the lexer.
-- Parse optional variable, parameter, and function return annotations for `number`, `string`, `bool`, `null`, `array`, and `any`.
-- Preserve annotations in dedicated AST nodes with source locations.
-- Initially gate execution of annotated programs with E2004; alpha.2 added static checking and alpha.3 removed this gate after runtime contracts were implemented.
-- Add regression tests for supported type names, typed declarations/functions, unknown types, and nested annotations.
-
-## Unreleased — HK 0.2.0 design
-
-- Select gradual typing as the 0.2.0 model.
-- Specify optional annotations for variables and named-function parameters/returns.
-- Define static checking, operator-specific runtime guards, dynamic function-call boundaries, heterogeneous array behavior, assignment-expression typing, and conservative return-path analysis.
-- Clarify short-circuit guard timing, sequential name resolution, array binding contracts, and null/any return fallthrough.
-- Add the normative design baseline in HK-TYPING-SPEC.md and the phased implementation plan.
-- Gradual typing semantics are specified in HK-TYPING-SPEC.md.
+- Add optional annotations for variables and named-function parameters and return values using `number`, `string`, `bool`, `null`, `array`, and `any`.
+- Add static type checking before runtime execution, including variable initialization/assignment, known function arguments/returns, operator operands, conditions, and conservative return-path checks.
+- Enforce runtime contracts on typed bindings, function parameters, and function returns; guard dynamic values at concrete typed boundaries.
+- Preserve dynamic behavior for unannotated bindings and dynamic function aliases.
+- Keep arrays heterogeneous; contracts apply to bindings, not array elements or shared array objects.
+- Improve runtime diagnostic provenance for parameter, return, operator, condition, array receiver, and index boundary failures.
+- Align checker scope handling with runtime lexical scopes: explicit blocks create scopes, while `if` and `while` do not add synthetic scopes.
+- Analyze `for` clauses in runtime order: initializer, condition, body, then increment.
+- Reject calls through statically known concrete non-function values with E3010; calls through `any` retain runtime callability checks.
+- Add a comprehensive gradual-typing regression matrix and typed fuzz corpus while preserving the 0.1.x compatibility suite.
 
 ## Unreleased — HK 0.1.x hardening
 
