@@ -733,7 +733,7 @@ impl Engine {
             K::Minus | K::Star | K::Slash | K::Percent => {
                 let (x, y) = match (a, b) {
                     (V::Num(x), V::Num(y)) => (x, y),
-                    (left, _) if !matches!(left, V::Num(_)) => {
+                    (left, _) if !matches!(&left, V::Num(_)) => {
                         return Err(self.type_error(
                             "Arithmetic operators require Number operands.",
                             left_position.0,
@@ -766,7 +766,7 @@ impl Engine {
             K::Gt | K::GtEq | K::Lt | K::LtEq => {
                 let (x, y) = match (a, b) {
                     (V::Num(x), V::Num(y)) => (x, y),
-                    (left, _) if !matches!(left, V::Num(_)) => {
+                    (left, _) if !matches!(&left, V::Num(_)) => {
                         return Err(self.type_error(
                             "Ordering comparisons require Number operands.",
                             left_position.0,
