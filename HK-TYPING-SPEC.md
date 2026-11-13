@@ -151,7 +151,7 @@ Values of any type may flow into an `any` destination.
 | Array `.length` | `number` |
 | Known named-function call | Declared return type, otherwise `any` |
 | Call through dynamic value (`any`) | `any`; runtime retains callability and arity checks |
-| Call through a known concrete non-function value | Static error `E3010` at the callee expression |
+| Call through a known concrete non-function value in a typed region or through an explicitly typed binding | Static error `E3010` at the callee expression |
 
 The rules for `any` are operator-specific; it is not a blanket exemption from runtime checking:
 
@@ -224,9 +224,31 @@ The grammar is unchanged: declarations in conditional and loop bodies require ex
 
 The checker resolves direct calls to named functions using the sequential declaration model. For other call expressions, it checks the callee expression:
 
-- If the callee's static type is a known concrete source type (`number`, `string`, `bool`, `null`, or `array`), the call is rejected with `E3010` at the callee expression.
-- If the callee is `any`, callability and arity remain runtime checks. This includes unannotated aliases and forward references whose function signature is not available at the call site.
+- In a typed checking region, a callee with a known concrete source type (`number`, `string`, `bool`, `null`, or `array`) is rejected with `E3010` at the callee expression.
+- A callee that is an explicitly typed binding with a known concrete type is likewise rejected with `E3010`, including when used from otherwise dynamic code.
+- In an unrelated dynamic region, a concrete-looking expression that has no declared typed provenance retains the 0.1.x runtime callability diagnostic; an `any` callee always retains runtime callability and arity checks. This includes unannotated aliases and forward references whose function signature is not available at the call site.
 - This rule does not introduce a source-level function type or change dynamic function alias semantics.
+
+
+### 7.3 Typed checking regions and dynamic compatibility
+
+Gradual typing is local to declared contracts and typed function bodies; the presence of an annotation elsewhere in a source file must not turn unrelated dynamic code into statically checked code.
+
+Strict static expression checking applies in these contexts:
+
+- The initializer of an annotated variable.
+- The body of a named function with at least one parameter or return annotation.
+- A return expression governed by a declared return contract.
+- An expression that reads or writes a binding with an explicit declared contract, or whose result depends on a statically resolved typed function with a concrete declared return type.
+- An argument expression being checked against a concrete parameter contract at a direct typed-function call boundary.
+
+Outside those contexts, ordinary unannotated declarations, expressions, conditions, and unannotated function bodies remain dynamically checked at runtime, as in 0.1.x. The checker may resolve names and signatures to find a typed boundary, but must not reject a dynamic expression solely because its operands have known literal types.
+
+For example, an unannotated function containing `1 + true` is not rejected statically merely because another declaration in the same file is annotated. If the function executes, the legacy runtime operator diagnostic is preserved. A dynamic caller still receives static E3003 when it passes an incompatible argument to a directly resolved typed function.
+
+A declared binding remains typed wherever it is used. Static checking therefore applies to expressions that depend on such a binding, even inside an otherwise unannotated function. Explicit `any` contracts remain dynamic in value compatibility but retain their declared boundary and runtime checks. Calls through aliases or other expressions whose function identity is not statically known remain dynamic; the callee's runtime contracts remain authoritative.
+
+This rule is required by the §12 compatibility guarantee: adding an unrelated annotation must not introduce a new static error in previously dynamic code.
 
 
 ## 8. Return-path analysis

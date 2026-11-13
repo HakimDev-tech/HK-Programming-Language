@@ -609,3 +609,14 @@ fn untyped_function_arity_remains_a_runtime_check_in_mixed_programs() {
     "#;
     assert_eq!(error_code(source), "E3000");
 }
+
+#[test]
+fn mixed_program_top_level_unannotated_expression_preserves_runtime_diagnostic() {
+    let source = r#"
+        let marker: bool = true;
+        let result = 1 + true;
+        print(marker);
+    "#;
+
+    assert_eq!(error_code(source), "E3000");
+}
