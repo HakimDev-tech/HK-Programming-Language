@@ -101,13 +101,13 @@ Introduce optional annotations for variables and named-function parameters/retur
 ## Phase 6 — Scope and loop-analysis conformance (alpha.6)
 
 - [x] Audit checker scope creation against runtime environment creation
-- [x] Identify the extra synthetic scopes around `if` and `while` bodies
-- [x] Identify the mismatch between static and runtime `for` clause order
-- [x] Define conservative branch analysis and conditional-declaration visibility in [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md)
-- [x] Define `for` analysis order as initializer → condition → body → increment
-- [ ] Implement scope and loop-analysis conformance without changing runtime semantics
-- [ ] Add focused regressions for branch isolation, outer contracts, conditional declarations, and loop-clause visibility
-- [ ] Preserve all V0.1.x and Alpha.1–Alpha.5 tests unchanged
+- [x] Verify declaration grammar: branch and loop declarations require explicit blocks
+- [x] Remove synthetic checker scopes around `if` and `while`; preserve explicit `S::Block` scopes
+- [x] Analyze `if` branches independently through normal block-scope entry/exit
+- [x] Analyze `for` clauses in runtime order: initializer → condition → body → increment
+- [x] Preserve loop scope across initializer, condition, body, and increment; discard it after the loop
+- [x] Add focused regressions for branch isolation, outer contracts, block lifetime, loop diagnostic order, and loop-scope lifetime
+- [x] Preserve all V0.1.x and Alpha.1–Alpha.5 tests unchanged
 - [ ] Run fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on one exact final commit
 - [ ] Review all normative documentation against the implementation
 
