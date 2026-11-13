@@ -1,6 +1,7 @@
 use hk::run;
-#[test] fn end_to_end_program(){
-    let source=r#"
+#[test]
+fn end_to_end_program() {
+    let source = r#"
         const school = "HK Academy";
         let grades = [15, 12, 17];
         fn sum(values) {
@@ -15,5 +16,8 @@ use hk::run;
         print(total);
         if (total >= 30 && true) { print("passed"); } else { print("failed"); }
     "#;
-    assert_eq!(run("integration.hk",source).unwrap(),vec!["HK Academy","44","passed"]);
+    assert_eq!(
+        run("integration.hk", source).unwrap(),
+        vec!["HK Academy", "44", "passed"]
+    );
 }

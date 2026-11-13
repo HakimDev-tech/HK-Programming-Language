@@ -14,7 +14,9 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Lexical block scopes
 - Array indexing, mutation, and .length
 - print(value)
-- Lexer, parser, and runtime diagnostics with source coordinates
+- Modular lexer, AST, parser, runtime, and diagnostic layers
+- Source excerpts and caret markers in diagnostics
+- Bounded parser/runtime nesting and iterative environment lookup
 - Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
@@ -27,7 +29,7 @@ Rust stable toolchain with Cargo.
 ## Build and test
 
 ~~~bash
-cargo fmt --all
+cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p hk -- version
@@ -65,7 +67,7 @@ greet(name);
 
 ## Runtime limits
 
-The interpreter limits active user-function calls to 64. Cyclic array references are rejected when assigning an array into another array, preventing reference-counting leaks. These are explicit 0.1.x runtime constraints, not guarantees of an optimizing/native compiler.
+The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. Cyclic array references are rejected before mutation, preventing reference-counting leaks. Environment lookup and array graph checks are iterative. These are explicit 0.1.x interpreter constraints, not guarantees of an optimizing/native compiler.
 
 ## Scope
 

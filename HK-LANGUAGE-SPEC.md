@@ -73,7 +73,7 @@ print(add(2, 3));
 
 The for initializer and increment are optional; both semicolon separators remain mandatory. An omitted condition is treated as true.
 
-Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. Duplicate parameter names are syntax errors. The interpreter limits active user-function calls to 64; exceeding this limit produces a runtime diagnostic rather than overflowing the host stack. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
+Functions have named parameters, lexical scope, positional arguments, exact arity, and recursion. Duplicate parameter names are syntax errors. The parser rejects nesting beyond 128 guarded recursive grammar steps. The interpreter limits active user-function calls to 64, expression evaluation depth to 128, statement execution depth to 128, and recursive array display depth to 64; exceeding a limit produces a runtime or parser diagnostic rather than intentionally growing the host stack without bound. A function reaching its end returns null. A bare return returns null. Top-level return is an error. The initial implementation supports named function declarations; anonymous functions and escaping closures are deferred.
 
 ## 7. Built-ins
 
@@ -81,7 +81,7 @@ Only print(value) is guaranteed. It accepts exactly one argument, writes its dis
 
 ## 8. Diagnostics and CLI
 
-Lexical, syntax, and runtime errors must not cause an uncontrolled process panic. Diagnostics include an error code, message, source name, line, and column. End-of-file errors point to the end-of-input position. Runtime errors and invalid input must be reported without uncontrolled panics.
+Lexical, syntax, and runtime errors must not cause an uncontrolled process panic. Diagnostics include an error code, message, source name, line, and column, plus the corresponding source line and a caret marker when source text is available. Columns count Unicode scalar values. End-of-file errors point to the end-of-input position. Runtime errors and invalid input must be reported without uncontrolled panics.
 
 Commands:
 - hk run <file.hk>
