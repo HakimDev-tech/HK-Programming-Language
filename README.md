@@ -15,6 +15,7 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Array indexing, mutation, and .length
 - print(value)
 - Lexer, parser, and runtime diagnostics with source coordinates
+- Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
 Progressive typing is a design goal for 0.2.0. It is not implemented in 0.1.0.
@@ -26,7 +27,7 @@ Rust stable toolchain with Cargo.
 ## Build and test
 
 ~~~bash
-cargo fmt --all
+cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p hk -- version
@@ -61,6 +62,10 @@ greet(name);
 - HK-IMPLEMENTATION-PLAN.md
 - ROADMAP.md
 - examples/
+
+## Runtime limits
+
+The interpreter limits active user-function calls to 256. Cyclic array references are rejected when assigning an array into another array, preventing reference-counting leaks. These are explicit 0.1.x runtime constraints, not guarantees of an optimizing/native compiler.
 
 ## Scope
 
