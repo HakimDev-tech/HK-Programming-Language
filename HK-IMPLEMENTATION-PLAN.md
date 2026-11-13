@@ -29,7 +29,7 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Add parser tests for valid and invalid syntax
 - [x] Confirm all existing unannotated syntax remains unchanged
 
-**Exit gate:** annotated source parses into an AST with precise source locations; execution of annotated programs is deliberately rejected with E3001 until the static checker and runtime contracts are implemented.
+**Exit gate:** annotated source parses into an AST with precise source locations; execution of annotated programs is deliberately rejected with E2004 until the static checker and runtime contracts are implemented.
 
 ## Phase 2 — Static type system (alpha.2)
 
