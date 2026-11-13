@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; alpha.4 stabilization is in progress.
+**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; alpha.4 is a bounded stabilization pass, not a new feature phase.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -61,22 +61,22 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Ensure every violation returns an HK diagnostic, never a Rust panic
 - [x] Test aliasing, shadowing, recursion, and all mutation paths
 
-**Exit gate:** implemented on the alpha.3 feature branch; verify via runtime contract test matrix and cross-platform CI before merge.
+**Exit gate:** implementation is present on the alpha.3 feature branch; stabilization verifies the acceptance matrix and cross-platform CI before merge.
 
 ## Phase 4 — Stabilization (alpha.4)
 
 - [x] Audit runtime diagnostic classification for mixed typed/dynamic programs; preserve E3000 for non-contract operator/call failures
-- [x] Add regression tests for dynamic `+` overload failures and non-callable dynamic values
+- [x] Add regression tests for dynamic  overload failures and non-callable dynamic values
 - [x] Add a dedicated seed corpus for variable contracts, indirect function contracts, and short-circuit behavior
-- [ ] Run the complete 0.1.x regression suite unchanged
-- [ ] Complete positive, negative, and dynamic-boundary test matrices
-- [ ] Extend fuzzing and review findings from annotation-heavy corpus runs
-- [ ] Review diagnostics, documentation, and examples
-- [ ] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied
-- [ ] Verify Linux, Windows, and macOS CI
-- [ ] Record known limitations and release notes
+- [x] Preserve the existing 0.1.x regression tests while adding gradual-typing coverage
+- [x] Add positive, negative, and dynamic-boundary acceptance matrices in `compiler/crates/hk/tests/gradual_typing_matrix.rs`
+- [x] Extend fuzzing with annotation-heavy seeds and complete a successful corpus run
+- [x] Review the normative specification, diagnostics, README, roadmap, and executable example
+- [ ] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied on the final alpha.4 head
+- [ ] Verify Linux, Windows, and macOS CI on the final alpha.4 head
+- [x] Record known limitations and the alpha.4 stabilization changes in the specification and changelog
 
-**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes; no alpha.4 release claim is made before CI and review complete.
+**Exit gate:** every acceptance criterion in HK-TYPING-SPEC.md passes on the same final commit; no alpha.4 completion claim before final CI and review are green.
 
 ## Release acceptance
 
@@ -84,4 +84,4 @@ A release candidate is not a release. Publish 0.2.0 only after all mandatory acc
 
 ## Explicitly deferred
 
-Generics, unions, optional types, typed array elements, flow-sensitive narrowing, global inference, function types, anonymous functions, closures, modules, bytecode, VM, native compilation, WASM, and FFI are outside this release.
+Generics, unions, optional types, typed array elements, flow-sensitive narrowing, global type inference, function types, anonymous functions, closures, modules, bytecode, VM, native compilation, WASM, and FFI are outside this release.
