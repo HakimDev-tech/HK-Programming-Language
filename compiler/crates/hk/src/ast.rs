@@ -25,12 +25,12 @@ impl E {
             | E::Assign(_, _, l, c)
             | E::Unary(_, _, l, c)
             | E::Binary(_, _, _, l, c)
-            | E::Call(_, _, l, c)
             | E::Array(_, l, c)
             | E::Index(_, _, l, c)
             | E::SetIndex(_, _, _, l, c)
             | E::Property(_, _, l, c) => (*l, *c),
             E::Null(l, c) => (*l, *c),
+            E::Call(callee, _, _, _) => callee.source_position(),
             E::Group(inner) => inner.source_position(),
         }
     }

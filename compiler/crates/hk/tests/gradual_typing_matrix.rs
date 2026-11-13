@@ -210,7 +210,7 @@ fn indirect_function_return_contract_points_to_the_return_expression() {
     let source = "fn source() { return \"bad\"; } fn take() -> number { return source(); } take();";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
-    assert_eq!(error.column, source.find("source(); } take").unwrap() + 1);
+    assert_eq!(error.column, source.rfind("source()").unwrap() + 1);
 }
 
 #[test]
