@@ -351,7 +351,7 @@ mod tests {
             "typed.hk",
             "fn outer() { if (true) { let inner: bool = true; } }",
         ).unwrap_err();
-        assert_eq!(error.code, "E3001");
+        assert_eq!(error.code, "E2004");
     }
 
 }
