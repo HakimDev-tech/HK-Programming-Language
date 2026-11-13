@@ -867,7 +867,6 @@ mod contract_tests {
         assert!(matches!(Env::get(&environment, "value"), Some(V::Num(value)) if value == 1.0));
     }
 
-
     #[test]
     fn failed_parameter_contract_does_not_enter_body_or_repeat_argument_evaluation() {
         let source = r#"
