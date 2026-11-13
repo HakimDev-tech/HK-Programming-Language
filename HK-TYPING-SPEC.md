@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification; alpha.1 parsing, alpha.2 static checking, and alpha.3 runtime contracts are implemented on feature branches. Alpha.4 acceptance matrices pass fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the current head. The final dedicated fuzz run also passed on the same head; the alpha.4 validation gate is satisfied. The PR remains unmerged pending maintainer review  
+**Status:** Normative specification. Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 is in progress, adding diagnostic provenance and expanded boundary-conformance coverage on a separate feature branch. The implementation remains unmerged and is not a stable release.  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x
@@ -198,7 +198,9 @@ Conditions of `if`, `while`, and a present `for` condition require `bool`. A kno
 
 The checker analyzes both syntactic operands of logical expressions for statically provable errors, but runtime guards and expression evaluation remain lazy: a right operand skipped by `&&` or `||` is not evaluated and cannot produce a runtime-only error. This preserves left-to-right short-circuit semantics without suppressing genuine static errors in source code.
 
-The checker resolves declarations and function signatures available at the current source position under the existing sequential declaration model. A function's own signature is visible in its body for direct recursion; later declarations are not visible earlier, and mutual recursion is not introduced. A direct call to a currently known function identifier can be checked for arity and argument compatibility. If a function value is copied into an unannotated variable, passed as a value, or otherwise called through an expression whose function identity is not statically known, the call is dynamic: its static result is `any`, and runtime callability/arity checks plus the callee's own parameter/return contracts remain authoritative.
+The checker resolves declarations and function signatures available at the current source position under the existing sequential declaration model. A function's own signature is visible in its body for direct recursion. A later declaration is not available to the checker at an earlier source position, so a call to that name is statically treated as dynamic (`any`) rather than checked against a forward signature.
+
+Runtime name lookup remains dynamic, as in the 0.1.x interpreter. Consequently, a later-declared named function can be called after its declaration has executed; mutual recursion can work through these dynamic calls. This is not static forward-reference or mutual-recursion support: the checker does not know the later signature at the earlier call site. If the resolved runtime function carries parameter or return contracts, those contracts remain enforced. A function value copied into an unannotated variable, passed as a value, or otherwise called through an expression whose function identity is not statically known is likewise a dynamic call: its static result is `any`, and runtime callability/arity checks plus the callee's own parameter/return contracts remain authoritative.
 
 Names not resolvable by the checker remain dynamic for compatibility and are diagnosed by the existing runtime when evaluated. The checker must not turn an otherwise runtime-only unresolved-name failure into an eager error in a skipped logical operand. Existing duplicate-declaration and use-before-declaration behavior must remain intact.
 
@@ -261,6 +263,20 @@ Proposed type diagnostic codes:
 | E3009 | Typed function may fall through without returning |
 
 Messages must state the expected and actual types where known and preserve source name, line, column, source excerpt, and caret. Codes are reserved for the 0.2.0 implementation and must be kept stable within the release candidate series.
+
+### 11.1 Runtime diagnostic source locations
+
+For an `E3008` contract or guard failure, the location must identify the most specific failing expression:
+- typed initialization: the typed declaration;
+- typed assignment: the assignment expression;
+- function parameter: the offending argument expression, for both direct and aliased calls;
+- explicit function return: the returned expression;
+- unary/binary/logical guard: the offending operand;
+- array operation: the invalid receiver or index expression.
+
+Call expressions use the callee expression's source position when an enclosing contract reports the call as a returned or passed expression. Operator failures that are ordinary dynamic runtime errors retain their legacy `E3000` classification and operator position. In particular, unsupported dynamic `+` overload combinations and non-callable values are not reclassified as contract violations.
+
+A skipped right operand of `&&` or `||` must not be evaluated and must not produce a runtime diagnostic. Diagnostic provenance changes must not cause expression re-evaluation or alter evaluation order.
 
 ## 12. Compatibility guarantees
 

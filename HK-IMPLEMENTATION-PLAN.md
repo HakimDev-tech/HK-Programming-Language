@@ -91,10 +91,11 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Verify function/variable shadowing, independent typed shadowed bindings, and mutual recursion behavior
 - [x] Verify failed parameter validation prevents function-body side effects and evaluates argument expressions once
 - [x] Add Alpha.5-specific fuzz seeds for argument, return, and dynamic operator boundaries
-- [ ] Complete full boundary matrix, including assignment atomicity and explicit/implicit return boundaries
+- [x] Complete boundary coverage for initialization/assignment, direct/aliased parameters, explicit/implicit returns, operator guards, conditions, array read/write receivers and indexes, and short-circuit branches
+- [x] Audit static/runtime lexical shadowing, function aliases, direct recursion, and dynamic forward/mutual recursion behavior
 - [ ] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the same final commit
 - [ ] Complete the final fuzz session on the same final commit
-- [ ] Update normative typing documentation, changelog, examples, and README to match final behavior
+- [ ] Complete final documentation review against the implementation; examples remain syntax-compatible and no new syntax is introduced
 
 **Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.
 
