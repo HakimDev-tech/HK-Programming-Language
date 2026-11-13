@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative design baseline; alpha.1 implements parsing only. Static checking and runtime contracts are not implemented  
+**Status:** Normative design baseline; alpha.1 parsing and an initial alpha.2 static checker are implemented on feature branches. Runtime contracts are not implemented  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x
