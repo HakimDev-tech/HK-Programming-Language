@@ -103,7 +103,7 @@ impl<'a> TypeChecker<'a> {
                 self.check_function_body(
                     parameters
                         .iter()
-                        .map(|name| (name.as_str(), Type::Any))
+                        .map(|name| (name.as_str(), Type::Any, None))
                         .collect(),
                     body,
                     None,
