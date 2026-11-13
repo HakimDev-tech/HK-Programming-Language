@@ -581,4 +581,26 @@ mod tests {
             vec!["84"]
         );
     }
+    #[test]
+    fn dynamic_plus_overload_failure_keeps_legacy_runtime_diagnostic() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; print(value + \"text\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3000");
+        assert!(error.message.contains("'+' expects two Numbers or two Strings"));
+    }
+
+    #[test]
+    fn non_callable_dynamic_value_keeps_legacy_runtime_diagnostic() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; value();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3000");
+        assert!(error.message.contains("Cannot call a value of type Number"));
+    }
+
 }
