@@ -231,7 +231,7 @@ impl Engine {
             S::If(c,a,b)=>{let v=self.eval(c)?;if self.boolean(v,1,1)?{return self.exec(a);}if let Some(b)=b{return self.exec(b);}}
             S::While(c,b)=>loop{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}if let Flow::Return(v)=self.exec(b)?{return Ok(Flow::Return(v));}},
             S::For(init,cond,inc,body)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=(||{if let Some(i)=init{self.exec(i)?;}loop{if let Some(c)=cond{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}}if let Flow::Return(v)=self.exec(body)?{return Ok(Flow::Return(v));}if let Some(i)=inc{self.eval(i)?;}}Ok(Flow::Next)})();self.env=old;return r;}
-            S::Return(e,l,c)=>return Ok(Flow::Return(if let Some(e)=e{self.eval(e)?}else{V::Null})),
+            S::Return(e,_l,_c)=>return Ok(Flow::Return(if let Some(e)=e{self.eval(e)?}else{V::Null})),
         }Ok(Flow::Next)
     }
     fn eval(&mut self,e:&E)->Result<V>{
@@ -245,7 +245,7 @@ impl Engine {
             E::Unary(op,e,l,c)=>{let v=self.eval(e)?;match op{K::Minus=>if let V::Num(n)=v{self.finite(-n,*l,*c)}else{Err(self.error("Unary '-' expects Number.",*l,*c))},K::Bang=>if let V::Bool(b)=v{Ok(V::Bool(!b))}else{Err(self.error("'!' expects Boolean.",*l,*c))},_=>unreachable!()}}
             E::Binary(a,op,b,l,c)=>{
                 let x=self.eval(a)?;
-                if *op==K::And{let v=self.boolean(x,*l,*c)?;if !v{return Ok(V::Bool(false));}return Ok(V::Bool(self.boolean(self.eval(b)?,*l,*c)?));}
+                if *op==K::And{let v=self.boolean(x,*l,*c)?;if !v{return Ok(V::Bool(false));}let right = self.eval(b)?; return Ok(V::Bool(self.boolean(right,*l,*c)?));}
                 if *op==K::Or{let v=self.boolean(x,*l,*c)?;if v{return Ok(V::Bool(true));}return Ok(V::Bool(self.boolean(self.eval(b)?,*l,*c)?));}
                 let y=self.eval(b)?;self.binary(x,*op,y,*l,*c)
             }
@@ -254,7 +254,7 @@ impl Engine {
                 V::Fun(fun)=>{if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;let call=Env::child(parent);for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}let old=self.env.clone();self.env=call;let r=self.exec_all(&fun.body);self.env=old;match r?{Flow::Next=>Ok(V::Null),Flow::Return(v)=>Ok(v)}}
                 v=>Err(self.error(format!("Cannot call a value of type {}.",v.ty()),*l,*c))
             }}
-            E::Index(a,i,l,c)=>{let o=self.eval(a)?;let idx=self.index(self.eval(i)?,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
+            E::Index(a,i,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
             E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let idx=self.index(self.eval(i)?,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{let mut items=items.borrow_mut();if idx>=items.len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
             E::Property(a,n,l,c)=>{let o=self.eval(a)?;if n=="length"{if let V::Arr(items)=o{return Ok(V::Num(items.borrow().len() as f64));}}Err(self.error(format!("Property '{n}' is not available on {}.",o.ty()),*l,*c))}
         }
