@@ -9,6 +9,7 @@ use super::types::Type;
 #[derive(Clone, Copy)]
 struct Binding {
     ty: Type,
+    contract: Option<Type>,
     mutable: bool,
 }
 
@@ -84,13 +85,13 @@ impl<'a> TypeChecker<'a> {
         match statement {
             S::Var(name, initializer, mutable, _, _) => {
                 self.check_expression(initializer)?;
-                self.define_binding(name, Binding { ty: Type::Any, mutable: *mutable });
+                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: *mutable });
             }
             S::TypedVar(name, annotation, initializer, mutable, line, column) => {
                 let expected = Type::from(*annotation);
                 let actual = self.check_expression(initializer)?;
                 self.require(expected, actual, "E3001", "variable initializer", *line, *column)?;
-                self.define_binding(name, Binding { ty: expected, mutable: *mutable });
+                self.define_binding(name, Binding { ty: expected, contract: Some(expected), mutable: *mutable });
             }
             S::Fn(name, parameters, body, _, _) => {
                 let signature = FunctionSignature {
@@ -98,7 +99,7 @@ impl<'a> TypeChecker<'a> {
                     return_type: None,
                 };
                 self.define_function(name, signature);
-                self.define_binding(name, Binding { ty: Type::Any, mutable: false });
+                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: false });
                 self.check_function_body(
                     parameters
                         .iter()
@@ -118,11 +119,13 @@ impl<'a> TypeChecker<'a> {
                     return_type: return_type.map(Type::from),
                 };
                 self.define_function(name, signature);
-                self.define_binding(name, Binding { ty: Type::Any, mutable: false });
+                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: false });
                 let parameter_bindings = parameters
                     .iter()
                     .zip(parameter_types.iter())
-                    .map(|(parameter, ty)| (parameter.name.as_str(), *ty))
+                    .map(|(parameter, ty)| {
+                        (parameter.name.as_str(), *ty, parameter.annotation.map(Type::from))
+                    })
                     .collect();
                 self.check_function_body(parameter_bindings, body, return_type.map(Type::from))?;
                 if let Some(ty) = return_type.map(Type::from) {
@@ -211,15 +214,15 @@ impl<'a> TypeChecker<'a> {
 
     fn check_function_body(
         &mut self,
-        parameters: Vec<(&str, Type)>,
+        parameters: Vec<(&str, Type, Option<Type>)>,
         body: &[S],
         return_type: Option<Type>,
     ) -> Result<()> {
         self.push_scope();
         let previous_return_type = self.return_type;
         self.return_type = return_type;
-        for (name, ty) in parameters {
-            self.define_binding(name, Binding { ty, mutable: true });
+        for (name, ty, contract) in parameters {
+            self.define_binding(name, Binding { ty, contract, mutable: true });
         }
         let result = self.check(body);
         self.return_type = previous_return_type;
@@ -261,8 +264,12 @@ impl<'a> TypeChecker<'a> {
                     if !binding.mutable {
                         return Err(self.error("E3002", format!("Cannot assign to constant '{name}'."), *line, *column));
                     }
-                    self.require(binding.ty, actual, "E3002", "assignment", *line, *column)?;
-                    Ok(binding.ty)
+                    if let Some(contract) = binding.contract {
+                        self.require(contract, actual, "E3002", "assignment", *line, *column)?;
+                        Ok(contract)
+                    } else {
+                        Ok(actual)
+                    }
                 } else {
                     Ok(actual)
                 }
