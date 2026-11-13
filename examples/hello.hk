@@ -1,0 +1,4 @@
+const language = "HK";
+let version = 0.1;
+print("Hello, " + language + "!");
+print(version);
