@@ -266,7 +266,10 @@ fn logical_dynamic_guards_report_the_offending_operand() {
     let right_source = "let marker: bool = true; let dynamic = 1; print(true && dynamic);";
     let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
     assert_eq!(right_error.code, "E3008");
-    assert_eq!(right_error.column, right_source.rfind("dynamic").unwrap() + 1);
+    assert_eq!(
+        right_error.column,
+        right_source.rfind("dynamic").unwrap() + 1
+    );
 }
 
 #[test]
@@ -333,5 +336,8 @@ fn mutually_recursive_functions_preserve_runtime_contracts() {
         }
         print(even(6));
     "#;
-    assert_eq!(run("gradual-typing-matrix.hk", source).unwrap(), vec!["true"]);
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["true"]
+    );
 }

@@ -883,10 +883,9 @@ mod contract_tests {
         let tokens = crate::lexer::Lexer::new("contract-test.hk", source)
             .scan()
             .unwrap();
-        let statements =
-            crate::parser::Parser::new(tokens, "contract-test.hk", source)
-                .parse()
-                .unwrap();
+        let statements = crate::parser::Parser::new(tokens, "contract-test.hk", source)
+            .parse()
+            .unwrap();
         crate::type_checker::TypeChecker::new("contract-test.hk", source)
             .check(&statements)
             .unwrap();
