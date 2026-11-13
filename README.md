@@ -14,13 +14,15 @@ HK is an experimental general-purpose programming language. The 0.1.0 milestone 
 - Lexical block scopes
 - Array indexing, mutation, and .length
 - print(value)
-- Modular lexer, AST, parser, runtime, and diagnostic layers
+- Optional gradual type annotations (`number`, `string`, `bool`, `null`, `array`, `any`) on the 0.2.0 feature branch
+- Static type checking before execution and runtime contract checks at typed boundaries
+- Modular lexer, AST, parser, type checker, runtime, and diagnostic layers
 - Source excerpts and caret markers in diagnostics
 - Bounded parser/runtime nesting and iterative environment lookup
 - Duplicate parameter validation, controlled recursion limit, and cyclic-array rejection
 - CLI: hk run, hk version, hk help
 
-Progressive typing is a design target for 0.2.0 and is not implemented yet. The proposed semantics and acceptance criteria are documented in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md).
+HK 0.2.0 gradual typing is implemented through alpha.3 on a feature branch: optional annotations, pre-execution static checking, and runtime contracts for typed bindings and function boundaries. This work is not yet merged or a stable release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
 
 ## Requirements
 
@@ -60,7 +62,7 @@ greet(name);
 ## Documentation
 
 - HK-LANGUAGE-SPEC.md (0.1.x behavior)
-- HK-TYPING-SPEC.md (0.2.0 design; not implemented)
+- HK-TYPING-SPEC.md (0.2.0 gradual typing specification and implementation status)
 - HK-ARCHITECTURE.md
 - HK-IMPLEMENTATION-PLAN.md
 - ROADMAP.md
@@ -72,7 +74,7 @@ The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression 
 
 ## Scope
 
-0.1.0 does not include progressive/static typing, modules, package management, bytecode, native compilation, WebAssembly, concurrency, or native FFI.
+The 0.1.x baseline is dynamically typed. The 0.2.0 gradual-typing work is still in alpha and has not been merged as a stable release. Modules, package management, bytecode, native compilation, WebAssembly, concurrency, and native FFI remain out of scope for 0.1.x.
 
 ## License
 
