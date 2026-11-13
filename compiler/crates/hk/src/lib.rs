@@ -6,12 +6,15 @@ pub mod diagnostics;
 mod lexer;
 mod parser;
 mod runtime;
+mod type_checker;
+mod types;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
 /// Tokenizes, parses, and executes a complete HK source file.
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
+    type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     if let Some((line, column, message)) = first_type_annotation(&statements) {
         return Err(HkError::new(
             "E2004",
@@ -361,4 +364,58 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, "E2004");
     }
+    #[test]
+    fn rejects_incompatible_typed_variable_initializers() {
+        let error = run("typed.hk", "let age: number = \"eighteen\";").unwrap_err();
+        assert_eq!(error.code, "E3001");
+        assert!(error.message.contains("expected number, found string"));
+    }
+
+    #[test]
+    fn rejects_incompatible_direct_function_arguments() {
+        let error = run(
+            "typed.hk",
+            "fn increment(value: number) -> number { return value + 1; } increment(\"1\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3003");
+    }
+
+    #[test]
+    fn rejects_incompatible_typed_function_returns() {
+        let error = run(
+            "typed.hk",
+            "fn label() -> string { return 42; }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3004");
+    }
+
+    #[test]
+    fn rejects_non_boolean_typed_conditions() {
+        let error = run("typed.hk", "let enabled: number = 1; if (enabled) { print(enabled); }")
+            .unwrap_err();
+        assert_eq!(error.code, "E3006");
+    }
+
+    #[test]
+    fn rejects_typed_functions_that_may_fall_through() {
+        let error = run(
+            "typed.hk",
+            "fn maybe(flag: bool) -> number { if (flag) { return 1; } }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3009");
+    }
+
+    #[test]
+    fn accepts_statically_valid_annotations_but_keeps_execution_gated() {
+        let error = run(
+            "typed.hk",
+            "fn add(a: number, b: number) -> number { return a + b; } let total: number = add(2, 3);",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E2004");
+    }
+
 }
