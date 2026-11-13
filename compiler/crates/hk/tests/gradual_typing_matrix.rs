@@ -341,3 +341,78 @@ fn mutually_recursive_functions_preserve_runtime_contracts() {
         vec!["true"]
     );
 }
+
+#[test]
+fn arithmetic_and_ordering_guards_report_bad_left_and_right_operands() {
+    let operators = ["-", "*", "/", "%", "<", ">", "<=", ">="];
+    for operator in operators {
+        let left_source = format!(
+            "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(dynamic {operator} value);"
+        );
+        let left_error = run("gradual-typing-matrix.hk", &left_source).unwrap_err();
+        assert_eq!(left_error.code, "E3008", "operator: {operator}");
+        assert_eq!(
+            left_error.column,
+            left_source.rfind("dynamic").unwrap() + 1,
+            "operator: {operator}"
+        );
+
+        let right_source = format!(
+            "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(value {operator} dynamic);"
+        );
+        let right_error = run("gradual-typing-matrix.hk", &right_source).unwrap_err();
+        assert_eq!(right_error.code, "E3008", "operator: {operator}");
+        assert_eq!(
+            right_error.column,
+            right_source.rfind("dynamic").unwrap() + 1,
+            "operator: {operator}"
+        );
+    }
+}
+
+#[test]
+fn unary_not_dynamic_guard_reports_the_operand() {
+    let source = "let marker: bool = true; let dynamic = 1; print(!dynamic);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn dynamic_while_and_for_conditions_report_the_condition() {
+    let while_source = "let marker: bool = true; let dynamic = 1; while (dynamic) {}";
+    let while_error = run("gradual-typing-matrix.hk", while_source).unwrap_err();
+    assert_eq!(while_error.code, "E3008");
+    assert_eq!(while_error.column, while_source.rfind("dynamic").unwrap() + 1);
+
+    let for_source = "let marker: bool = true; let dynamic = 1; for (; dynamic; ) {}";
+    let for_error = run("gradual-typing-matrix.hk", for_source).unwrap_err();
+    assert_eq!(for_error.code, "E3008");
+    assert_eq!(for_error.column, for_source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn dynamic_array_write_guards_report_receiver_and_index() {
+    let receiver_source =
+        "let marker: bool = true; let dynamic = 1; dynamic[0] = 2;";
+    let receiver_error = run("gradual-typing-matrix.hk", receiver_source).unwrap_err();
+    assert_eq!(receiver_error.code, "E3008");
+    assert_eq!(
+        receiver_error.column,
+        receiver_source.rfind("dynamic").unwrap() + 1
+    );
+
+    let index_source =
+        "let marker: bool = true; let values = [1]; let dynamic = \"bad\"; values[dynamic] = 2;";
+    let index_error = run("gradual-typing-matrix.hk", index_source).unwrap_err();
+    assert_eq!(index_error.code, "E3008");
+    assert_eq!(
+        index_error.column,
+        index_source.rfind("dynamic").unwrap() + 1
+    );
+}
+
+#[test]
+fn typed_null_return_rejects_non_null_values_statically() {
+    assert_eq!(error_code("fn invalid() -> null { return 1; }"), "E3004");
+}
