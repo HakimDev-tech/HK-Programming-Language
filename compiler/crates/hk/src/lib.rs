@@ -108,6 +108,19 @@ mod tests {
         let corpus=["@", "&", "|", "print(", "fn f( {", "let = ;", "[[[", "if(true){", "\\\"unterminated", "1 + * 2;", "((((((((("];
         for source in corpus{assert!(std::panic::catch_unwind(||run("fuzz.hk",source)).is_ok(),"panicked on {source:?}");}
     }
+
+    #[test] fn generated_source_inputs_never_panic(){
+        let alphabet=b"abcdefghijklmnopqrstuvwxyz0123456789{}[]();,+-*/=!&|. \\n\\t\\\"";
+        let mut state=0x9e3779b97f4a7c15u64;
+        for length in 0..96usize{
+            let mut source=String::new();
+            for _ in 0..length{
+                state^=state<<13;state^=state>>7;state^=state<<17;
+                source.push(alphabet[(state as usize)%alphabet.len()] as char);
+            }
+            assert!(std::panic::catch_unwind(||run("generated.hk",&source)).is_ok(),"panic on generated input {source:?}");
+        }
+    }
     #[test] fn strings_support_only_documented_escapes(){
         assert_eq!(run("test.hk",r#"print("a\\nb");"#).unwrap(),vec!["a\\nb"]);
         assert_eq!(run("test.hk",r#"print("a\nb");"#).unwrap(),vec!["a\nb"]);
