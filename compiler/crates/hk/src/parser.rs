@@ -25,7 +25,8 @@ impl Parser {
         self.expect(K::RParen,"Expected ')' after parameters.")?;self.expect(K::LBrace,"Expected '{' before function body.")?;
         let b=self.block_body()?;Ok(S::Fn(n.text,p,b,n.line,n.col))
     }
-    fn stmt(&mut self)->Result<S>{
+    fn stmt(&mut self)->Result<S>{self.with_depth(|p|p.stmt_inner())}
+    fn stmt_inner(&mut self)->Result<S>{
         if self.take(K::If){self.expect(K::LParen,"Expected '(' after if.")?;let c=self.expr()?;self.expect(K::RParen,"Expected ')' after condition.")?;let a=Box::new(self.body()?);let b=if self.take(K::Else){Some(Box::new(self.body()?))}else{None};return Ok(S::If(c,a,b));}
         if self.take(K::While){self.expect(K::LParen,"Expected '(' after while.")?;let c=self.expr()?;self.expect(K::RParen,"Expected ')' after condition.")?;return Ok(S::While(c,Box::new(self.body()?)));}
         if self.take(K::For){
