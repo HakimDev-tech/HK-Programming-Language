@@ -452,3 +452,74 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
         vec!["true"]
     );
 }
+
+
+#[test]
+fn alpha6_if_branches_preserve_outer_contracts_without_leaking_declarations() {
+    assert_eq!(
+        error_code("let count: number = 1; if (true) count = \"bad\";"),
+        "E3002"
+    );
+
+    // The then-branch declaration must not affect static analysis of else.
+    let isolated = r#"
+        if (true) let branch: number = 1;
+        else { branch = "bad"; }
+    "#;
+    assert!(run("alpha6-scope.hk", isolated).is_ok());
+
+    // The declaration executes at runtime, but is not definite after the if.
+    // The failure must therefore remain a runtime error, not a static E3005.
+    assert_eq!(
+        error_code("if (true) let branch: number = 1; print(branch + \"text\");"),
+        "E3000"
+    );
+}
+
+#[test]
+fn alpha6_while_body_matches_runtime_scope_and_does_not_promote_declarations() {
+    assert_eq!(
+        error_code("let count: number = 1; while (false) count = \"bad\";"),
+        "E3002"
+    );
+
+    // The body may execute zero times; its declaration is not definite after it.
+    assert_eq!(
+        error_code("while (false) let branch: number = 1; print(branch + \"text\");"),
+        "E3000"
+    );
+}
+
+#[test]
+fn alpha6_for_increment_is_checked_after_the_body() {
+    let unbraced_body = r#"
+        for (
+            let index: number = 0;
+            index < 1;
+            index = index + (step - "bad")
+        )
+            let step: number = 1;
+    "#;
+    assert_eq!(error_code(unbraced_body), "E3005");
+
+    // An explicit block has its own scope, so its declaration is not visible
+    // to the increment. Runtime name lookup remains authoritative.
+    let block_body = r#"
+        for (
+            let index: number = 0;
+            index < 1;
+            index = index + (step - "bad")
+        ) {
+            let step: number = 1;
+        }
+    "#;
+    assert_eq!(error_code(block_body), "E3000");
+}
+
+#[test]
+fn alpha6_for_initializer_scope_ends_after_the_loop() {
+    assert_eq!(
+        error_code("for (let index: number = 0; false; ) {} print(index);"),
+        "E3000"
+    );
+}
