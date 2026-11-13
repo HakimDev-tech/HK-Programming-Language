@@ -219,10 +219,18 @@ impl Engine {
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
             S::TypedVar(_, _, _, _, l, c) => {
-                return Err(self.error("Type annotations are parsed but not executable in HK 0.2.0-alpha.1.", *l, *c));
+                return Err(self.error(
+                    "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.",
+                    *l,
+                    *c,
+                ));
             }
             S::TypedFn(_, _, _, _, l, c) => {
-                return Err(self.error("Typed functions are parsed but not executable in HK 0.2.0-alpha.1.", *l, *c));
+                return Err(self.error(
+                    "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.",
+                    *l,
+                    *c,
+                ));
             }
             S::Var(n, e, m, l, c) => {
                 let v = self.eval(e)?;
