@@ -36,13 +36,16 @@ fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
                     if let Some(found) = first_type_annotation(std::slice::from_ref(branch.as_ref())) { return Some(found); }
                 }
             }
-            S::While(_, body) | S::For(_, _, _, body) => {
+            S::While(_, body) => {
                 if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) { return Some(found); }
             }
-            S::For(Some(initializer), _, _, _) => {
-                if let Some(found) = first_type_annotation(std::slice::from_ref(initializer.as_ref())) { return Some(found); }
+            S::For(initializer, _, _, body) => {
+                if let Some(initializer) = initializer {
+                    if let Some(found) = first_type_annotation(std::slice::from_ref(initializer.as_ref())) { return Some(found); }
+                }
+                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) { return Some(found); }
             }
-            S::Var(_, _, _, _, _) | S::Expr(_) | S::Return(_, _, _) | S::For(None, _, _, _) => {}
+            S::Var(_, _, _, _, _) | S::Expr(_) | S::Return(_, _, _) => {}
         }
     }
     None
