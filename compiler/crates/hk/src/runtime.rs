@@ -288,7 +288,7 @@ impl Engine {
                 }));
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), f, false)
+                    .define(n.clone(), f, false, None)
                     .map_err(|x| self.error(x, *l, *c))?;
             }
             S::Expr(e) => {
