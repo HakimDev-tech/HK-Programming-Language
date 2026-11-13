@@ -453,7 +453,6 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
     );
 }
 
-
 #[test]
 fn alpha6_if_branches_rely_on_explicit_block_scopes() {
     assert_eq!(
