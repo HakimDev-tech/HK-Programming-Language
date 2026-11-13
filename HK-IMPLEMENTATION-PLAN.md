@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** V0.2.0-alpha.1 frontend syntax in progress; static checking and runtime contracts are not implemented.
+**Status:** Alpha.1 syntax and the initial alpha.2 static checker are implemented on feature branches; runtime contracts remain unimplemented.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -29,12 +29,14 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Add parser tests for valid and invalid syntax
 - [x] Confirm all existing unannotated syntax remains unchanged
 
-**Exit gate:** annotated source parses into an AST with precise source locations; execution of annotated programs is deliberately rejected with E2004 until the static checker and runtime contracts are implemented.
+**Alpha.1 gate:** annotated source parses into an AST with source locations; execution is gated with E2004.
+
+**Alpha.2 gate:** the initial checker runs before the execution gate, rejects known static mismatches, and leaves wholly unannotated programs on the dynamic 0.1.x path. Runtime guards and typed execution remain deferred.
 
 ## Phase 2 — Static type system (alpha.2)
 
 - [ ] Add the source-level type representation and compatibility helpers
-- [ ] Implement lexical type scopes consistent with runtime scopes
+- [x] Implement lexical type scopes consistent with runtime scopes
 - [ ] Check variable initializers and assignments
 - [ ] Check unary and binary operators
 - [ ] Check Boolean conditions and preserve short-circuit behavior
