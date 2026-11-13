@@ -26,6 +26,7 @@ pub(crate) struct TypeChecker<'a> {
     functions: Vec<HashMap<String, FunctionSignature>>,
     return_type: Option<Type>,
     strict: bool,
+    strict_context: bool,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -37,6 +38,7 @@ impl<'a> TypeChecker<'a> {
             functions: vec![HashMap::new()],
             return_type: None,
             strict: false,
+            strict_context: false,
         }
     }
 
@@ -180,7 +182,12 @@ impl<'a> TypeChecker<'a> {
                         )
                     })
                     .collect();
-                self.check_function_body(parameter_bindings, body, return_type.map(Type::from), true)?;
+                self.check_function_body(
+                    parameter_bindings,
+                    body,
+                    return_type.map(Type::from),
+                    true,
+                )?;
                 if let Some(ty) = return_type.map(Type::from) {
                     if ty != Type::Any && ty != Type::Null && !guarantees_return(body) {
                         let (line, column) = statement.source_position();
@@ -238,10 +245,18 @@ impl<'a> TypeChecker<'a> {
                     }
                     if let Some(condition) = condition {
                         let strict_condition = self.strict || self.expression_is_typed(condition);
-                        let actual = self.check_expression_with_strict(condition, strict_condition)?;
+                        let actual =
+                            self.check_expression_with_strict(condition, strict_condition)?;
                         if strict_condition {
                             let (line, column) = condition.source_position();
-                            self.require(Type::Bool, actual, "E3006", "for condition", line, column)?;
+                            self.require(
+                                Type::Bool,
+                                actual,
+                                "E3006",
+                                "for condition",
+                                line,
+                                column,
+                            )?;
                         }
                     }
                     // Runtime executes the body before the increment. Analyze in
@@ -257,7 +272,10 @@ impl<'a> TypeChecker<'a> {
             }
             S::Return(expression, line, column) => {
                 let actual = if let Some(expression) = expression {
-                    self.check_expression_with_strict(expression, self.return_type.is_some() || self.strict)?
+                    self.check_expression_with_strict(
+                        expression,
+                        self.return_type.is_some() || self.strict,
+                    )?
                 } else {
                     Type::Null
                 };
@@ -285,8 +303,10 @@ impl<'a> TypeChecker<'a> {
         self.push_scope();
         let previous_return_type = self.return_type;
         let previous_strict = self.strict;
+        let previous_strict_context = self.strict_context;
         self.return_type = return_type;
         self.strict = strict;
+        self.strict_context = strict;
         for (name, ty, contract) in parameters {
             self.define_binding(
                 name,
@@ -300,6 +320,7 @@ impl<'a> TypeChecker<'a> {
         let result = self.check(body);
         self.return_type = previous_return_type;
         self.strict = previous_strict;
+        self.strict_context = previous_strict_context;
         self.pop_scope();
         result
     }
@@ -327,17 +348,23 @@ impl<'a> TypeChecker<'a> {
 
     fn check_expression_with_strict(&mut self, expression: &E, strict: bool) -> Result<Type> {
         let previous = self.strict;
+        let previous_context = self.strict_context;
         self.strict = strict;
+        self.strict_context = strict;
         let result = self.check_expression(expression);
         self.strict = previous;
+        self.strict_context = previous_context;
         result
     }
 
     fn expression_is_typed(&self, expression: &E) -> bool {
         match expression {
-            E::Var(name, _, _) => self.binding(name).is_some_and(|binding| binding.contract.is_some()),
+            E::Var(name, _, _) => self
+                .binding(name)
+                .is_some_and(|binding| binding.contract.is_some()),
             E::Assign(name, value, _, _) => {
-                self.binding(name).is_some_and(|binding| binding.contract.is_some())
+                self.binding(name)
+                    .is_some_and(|binding| binding.contract.is_some())
                     || self.expression_is_typed(value)
             }
             E::Unary(_, operand, _, _) | E::Group(operand) => self.expression_is_typed(operand),
@@ -346,12 +373,21 @@ impl<'a> TypeChecker<'a> {
             }
             E::Call(callee, arguments, _, _) => {
                 let typed_direct_call = if let E::Var(name, _, _) = callee.as_ref() {
-                    self.function(name).is_some_and(|signature| signature.typed)
-                } else { false };
-                typed_direct_call || self.expression_is_typed(callee)
-                    || arguments.iter().any(|argument| self.expression_is_typed(argument))
+                    self.function(name)
+                        .and_then(|signature| signature.return_type)
+                        .is_some_and(|return_type| return_type != Type::Any)
+                } else {
+                    false
+                };
+                typed_direct_call
+                    || self.expression_is_typed(callee)
+                    || arguments
+                        .iter()
+                        .any(|argument| self.expression_is_typed(argument))
             }
-            E::Array(elements, _, _) => elements.iter().any(|element| self.expression_is_typed(element)),
+            E::Array(elements, _, _) => elements
+                .iter()
+                .any(|element| self.expression_is_typed(element)),
             E::Index(receiver, index, _, _) => {
                 self.expression_is_typed(receiver) || self.expression_is_typed(index)
             }
@@ -367,7 +403,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_expression(&mut self, expression: &E) -> Result<Type> {
         let previous = self.strict;
-        self.strict = self.strict || self.expression_is_typed(expression);
+        self.strict = self.strict || self.strict_context || self.expression_is_typed(expression);
         let result = self.check_expression_inner(expression);
         self.strict = previous;
         result
@@ -385,7 +421,8 @@ impl<'a> TypeChecker<'a> {
                 .unwrap_or(Type::Any)),
             E::Assign(name, value, line, column) => {
                 let contract = self.binding(name).and_then(|binding| binding.contract);
-                let actual = self.check_expression_with_strict(value, contract.is_some() || self.strict)?;
+                let actual =
+                    self.check_expression_with_strict(value, contract.is_some() || self.strict)?;
                 if let Some(binding) = self.binding(name) {
                     if !binding.mutable {
                         return Err(self.error(
@@ -441,64 +478,64 @@ impl<'a> TypeChecker<'a> {
                     }
                     K::Minus | K::Star | K::Slash | K::Percent => {
                         if self.strict {
-                        self.require(
-                            Type::Number,
-                            left_type,
-                            "E3005",
-                            "left arithmetic operand",
-                            *line,
-                            *column,
-                        )?;
-                        self.require(
-                            Type::Number,
-                            right_type,
-                            "E3005",
-                            "right arithmetic operand",
-                            *line,
-                            *column,
-                        )?;
+                            self.require(
+                                Type::Number,
+                                left_type,
+                                "E3005",
+                                "left arithmetic operand",
+                                *line,
+                                *column,
+                            )?;
+                            self.require(
+                                Type::Number,
+                                right_type,
+                                "E3005",
+                                "right arithmetic operand",
+                                *line,
+                                *column,
+                            )?;
                         }
                         Ok(Type::Number)
                     }
                     K::Gt | K::GtEq | K::Lt | K::LtEq => {
                         if self.strict {
-                        self.require(
-                            Type::Number,
-                            left_type,
-                            "E3005",
-                            "left comparison operand",
-                            *line,
-                            *column,
-                        )?;
-                        self.require(
-                            Type::Number,
-                            right_type,
-                            "E3005",
-                            "right comparison operand",
-                            *line,
-                            *column,
-                        )?;
+                            self.require(
+                                Type::Number,
+                                left_type,
+                                "E3005",
+                                "left comparison operand",
+                                *line,
+                                *column,
+                            )?;
+                            self.require(
+                                Type::Number,
+                                right_type,
+                                "E3005",
+                                "right comparison operand",
+                                *line,
+                                *column,
+                            )?;
                         }
                         Ok(Type::Bool)
                     }
                     K::And | K::Or => {
                         if self.strict {
-                        self.require(
-                            Type::Bool,
-                            left_type,
-                            "E3005",
-                            "left logical operand",
-                            *line,
-                            *column,
-                        )?;
-                        self.require(
-                            Type::Bool,
-                            right_type,
-                            "E3005",
-                            "right logical operand",
-                            *line,
-                            *column,
-                        )?;
+                            self.require(
+                                Type::Bool,
+                                left_type,
+                                "E3005",
+                                "left logical operand",
+                                *line,
+                                *column,
+                            )?;
+                            self.require(
+                                Type::Bool,
+                                right_type,
+                                "E3005",
+                                "right logical operand",
+                                *line,
+                                *column,
+                            )?;
                         }
                         Ok(Type::Bool)
                     }
@@ -529,7 +566,7 @@ impl<'a> TypeChecker<'a> {
                             ));
                         }
                         for (argument, expected) in arguments.iter().zip(signature.parameters) {
-                            let actual = self.check_expression_with_strict(argument, expected != Type::Any || self.strict)?;
+                            let actual = self.check_expression_with_strict(argument, expected != Type::Any || self.strict_context)?;
                             let (arg_line, arg_column) = argument.source_position();
                             self.require(
                                 expected,
@@ -545,8 +582,11 @@ impl<'a> TypeChecker<'a> {
                 }
                 let callee_type = self.check_expression(callee)?;
                 let typed_binding_callee = if let E::Var(name, _, _) = callee.as_ref() {
-                    self.binding(name).is_some_and(|binding| binding.contract.is_some())
-                } else { false };
+                    self.binding(name)
+                        .is_some_and(|binding| binding.contract.is_some())
+                } else {
+                    false
+                };
                 if callee_type != Type::Any && (self.strict || typed_binding_callee) {
                     let (callee_line, callee_column) = callee.source_position();
                     return Err(self.error(

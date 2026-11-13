@@ -585,7 +585,10 @@ fn mixed_program_unannotated_short_circuit_remains_lazy() {
         print(false && (1 + true));
         print(true || (1 + true));
     "#;
-    assert_eq!(run("mixed-dynamic.hk", source).unwrap(), vec!["false", "true"]);
+    assert_eq!(
+        run("mixed-dynamic.hk", source).unwrap(),
+        vec!["false", "true"]
+    );
 }
 
 #[test]
