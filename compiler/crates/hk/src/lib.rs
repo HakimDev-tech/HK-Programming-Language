@@ -21,18 +21,34 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
 fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
     for statement in statements {
         match statement {
-            S::TypedVar(_, _, _, _, line, column) => {
+            S::TypedVar(_, ty, _, _, line, column) => {
                 return Some((
                     *line,
                     *column,
-                    "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.".into(),
+                    format!(
+                        "Type annotations (including '{ty:?}') are parsed but not executable in HK 0.2.0-alpha.1."
+                    ),
                 ));
             }
-            S::TypedFn(_, _, _, _, line, column) => {
+            S::TypedFn(_, params, return_type, _, line, column) => {
+                let parameter_contracts = params
+                    .iter()
+                    .filter_map(|parameter| {
+                        parameter
+                            .annotation
+                            .map(|ty| format!("{}: {ty:?}", parameter.name))
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let return_contract = return_type
+                    .map(|ty| format!("{ty:?}"))
+                    .unwrap_or_else(|| "unannotated".into());
                 return Some((
                     *line,
                     *column,
-                    "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.".into(),
+                    format!(
+                        "Typed functions (parameters [{parameter_contracts}], return {return_contract}) are parsed but not executable in HK 0.2.0-alpha.1."
+                    ),
                 ));
             }
             S::Fn(_, _, body, _, _) | S::Block(body) => {
