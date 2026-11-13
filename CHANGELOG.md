@@ -4,7 +4,8 @@
 
 - Select gradual typing as the 0.2.0 model.
 - Specify optional annotations for variables and named-function parameters/returns.
-- Define static checking, runtime guards for dynamic-to-typed boundaries, heterogeneous array behavior, and conservative return-path analysis.
+- Define static checking, operator-specific runtime guards, dynamic function-call boundaries, heterogeneous array behavior, assignment-expression typing, and conservative return-path analysis.
+- Clarify short-circuit guard timing, sequential name resolution, array binding contracts, and null/any return fallthrough.
 - Add the normative design baseline in HK-TYPING-SPEC.md and the phased implementation plan.
 - No 0.2.0 runtime or language feature is implemented by this documentation change.
 
