@@ -404,10 +404,8 @@ impl Engine {
                 return r;
             }
             S::Return(e, line, col) => {
-                let (return_line, return_column) = e
-                    .as_ref()
-                    .map(E::source_position)
-                    .unwrap_or((*line, *col));
+                let (return_line, return_column) =
+                    e.as_ref().map(E::source_position).unwrap_or((*line, *col));
                 return Ok(Flow::Return(
                     if let Some(e) = e {
                         self.eval(e)?
@@ -416,7 +414,7 @@ impl Engine {
                     },
                     return_line,
                     return_column,
-                ))
+                ));
             }
         }
         Ok(Flow::Next)
@@ -580,11 +578,7 @@ impl Engine {
                     })
                 } else {
                     let (receiver_line, receiver_column) = a.source_position();
-                    Err(self.type_error(
-                        "Indexing requires Array.",
-                        receiver_line,
-                        receiver_column,
-                    ))
+                    Err(self.type_error("Indexing requires Array.", receiver_line, receiver_column))
                 }
             }
             E::SetIndex(a, i, r, l, c) => {
@@ -629,7 +623,10 @@ impl Engine {
                         other => {
                             let (receiver_line, receiver_column) = a.source_position();
                             Err(self.type_error(
-                                format!("Property 'length' requires Array, received {}.", other.ty()),
+                                format!(
+                                    "Property 'length' requires Array, received {}.",
+                                    other.ty()
+                                ),
                                 receiver_line,
                                 receiver_column,
                             ))
@@ -645,8 +642,7 @@ impl Engine {
         }
     }
     fn eval_binary_chain(&mut self, expression: &E) -> Result<V> {
-        let mut operations: Vec<(K, &E, (usize, usize), (usize, usize), usize, usize)> =
-            Vec::new();
+        let mut operations: Vec<(K, &E, (usize, usize), (usize, usize), usize, usize)> = Vec::new();
         let mut cursor = expression;
         while let E::Binary(left, operator, right, line, column) = cursor {
             operations.push((
