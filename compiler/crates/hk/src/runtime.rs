@@ -594,14 +594,14 @@ impl Engine {
             E::Property(a, n, l, c) => {
                 let value = self.eval(a)?;
                 if n == "length" {
-                    if let V::Arr(items) = value {
-                        return Ok(V::Num(items.borrow().len() as f64));
-                    }
-                    return Err(self.type_error(
-                        format!("Property 'length' requires Array, received {}.", value.ty()),
-                        *l,
-                        *c,
-                    ));
+                    return match value {
+                        V::Arr(items) => Ok(V::Num(items.borrow().len() as f64)),
+                        other => Err(self.type_error(
+                            format!("Property 'length' requires Array, received {}.", other.ty()),
+                            *l,
+                            *c,
+                        )),
+                    };
                 }
                 Err(self.error(
                     format!("Property '{n}' is not available on {}.", value.ty()),
