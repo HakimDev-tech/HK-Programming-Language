@@ -589,7 +589,9 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code, "E3000");
-        assert!(error.message.contains("'+' expects two Numbers or two Strings"));
+        assert!(error
+            .message
+            .contains("'+' expects two Numbers or two Strings"));
     }
 
     #[test]
@@ -602,5 +604,4 @@ mod tests {
         assert_eq!(error.code, "E3000");
         assert!(error.message.contains("Cannot call a value of type Number"));
     }
-
 }
