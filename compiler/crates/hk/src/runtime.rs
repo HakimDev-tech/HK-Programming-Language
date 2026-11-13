@@ -1,5 +1,6 @@
-use super::ast::{E, S};
+use super::ast::{Param, E, S};
 use super::lexer::{Lit, K};
+use super::types::Type;
 use super::{HkError, Result};
 use std::{
     cell::RefCell,
@@ -10,7 +11,8 @@ use std::{
 #[derive(Clone)]
 struct Fun {
     name: String,
-    params: Vec<String>,
+    params: Vec<Param>,
+    return_type: Option<Type>,
     body: Vec<S>,
     env: Weak<RefCell<Env>>,
 }
@@ -79,6 +81,35 @@ impl V {
         }
     }
 }
+fn value_matches(expected: Type, value: &V) -> bool {
+    match expected {
+        Type::Any => true,
+        Type::Number => matches!(value, V::Num(_)),
+        Type::String => matches!(value, V::Str(_)),
+        Type::Bool => matches!(value, V::Bool(_)),
+        Type::Null => matches!(value, V::Null),
+        Type::Array => matches!(value, V::Arr(_)),
+    }
+}
+
+fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Result<(), String> {
+    if value_matches(expected, value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Runtime type contract violation during {boundary}: expected {expected}, found {}.",
+            match value {
+                V::Num(_) => "number",
+                V::Str(_) => "string",
+                V::Bool(_) => "bool",
+                V::Null => "null",
+                V::Arr(_) => "array",
+                V::Fun(_) | V::Print => "function",
+            }
+        ))
+    }
+}
+
 fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usize>) -> bool {
     let mut pending = vec![value.clone()];
     while let Some(current) = pending.pop() {
@@ -95,10 +126,19 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
     false
 }
 
+#[derive(Debug)]
+enum EnvError {
+    Duplicate(String),
+    Constant(String),
+    Undefined(String),
+    Contract(String),
+}
+
 #[derive(Default)]
 struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
+    contracts: HashMap<String, Type>,
     parent: Option<Rc<RefCell<Env>>>,
 }
 impl Env {
@@ -108,9 +148,22 @@ impl Env {
             ..Self::default()
         }))
     }
-    fn define(&mut self, n: String, v: V, m: bool) -> std::result::Result<(), String> {
+    fn define(
+        &mut self,
+        n: String,
+        v: V,
+        m: bool,
+        contract: Option<Type>,
+        boundary: &str,
+    ) -> std::result::Result<(), EnvError> {
         if self.values.contains_key(&n) {
-            return Err(format!("'{n}' is already declared in this scope."));
+            return Err(EnvError::Duplicate(format!(
+                "'{n}' is already declared in this scope."
+            )));
+        }
+        if let Some(expected) = contract {
+            ensure_contract(expected, &v, boundary).map_err(EnvError::Contract)?;
+            self.contracts.insert(n.clone(), expected);
         }
         if !m {
             self.constants.insert(n.clone());
@@ -132,29 +185,50 @@ impl Env {
         }
         None
     }
-    fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), String> {
+    fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), EnvError> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (exists, is_const, parent) = {
+            let (exists, is_const, contract, parent) = {
                 let env = scope.borrow();
                 (
                     env.values.contains_key(n),
                     env.constants.contains(n),
+                    env.contracts.get(n).copied(),
                     env.parent.clone(),
                 )
             };
             if exists {
                 if is_const {
-                    return Err(format!("Cannot reassign constant '{n}'."));
+                    return Err(EnvError::Constant(format!(
+                        "Cannot reassign constant '{n}'."
+                    )));
+                }
+                if let Some(expected) = contract {
+                    ensure_contract(expected, &v, "assignment").map_err(EnvError::Contract)?;
                 }
                 scope.borrow_mut().values.insert(n.into(), v);
                 return Ok(());
             }
             current = parent;
         }
-        Err(format!("Undefined variable '{n}'."))
+        Err(EnvError::Undefined(format!("Undefined variable '{n}'.")))
     }
 }
+type SourcePosition = (usize, usize);
+
+#[derive(Clone, Copy)]
+struct BinaryPositions {
+    operator: SourcePosition,
+    left: SourcePosition,
+    right: SourcePosition,
+}
+
+struct BinaryOperation<'a> {
+    operator: K,
+    right: &'a E,
+    positions: BinaryPositions,
+}
+
 enum Flow {
     Next,
     Return(V, usize, usize),
@@ -164,12 +238,13 @@ struct Engine {
     output: Vec<String>,
     source: String,
     source_text: String,
+    typed_mode: bool,
     call_depth: usize,
     eval_depth: usize,
     exec_depth: usize,
 }
 impl Engine {
-    fn new(source: &str, source_text: &str) -> Self {
+    fn new(source: &str, source_text: &str, typed_mode: bool) -> Self {
         let e = Rc::new(RefCell::new(Env::default()));
         e.borrow_mut().values.insert("print".into(), V::Print);
         Self {
@@ -177,6 +252,7 @@ impl Engine {
             output: vec![],
             source: source.into(),
             source_text: source_text.into(),
+            typed_mode,
             call_depth: 0,
             eval_depth: 0,
             exec_depth: 0,
@@ -184,6 +260,21 @@ impl Engine {
     }
     fn error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3000", msg, &self.source, line, col, &self.source_text)
+    }
+    fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+        HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
+    }
+    fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
+        match error {
+            EnvError::Contract(message) => self.contract_error(message, line, column),
+            EnvError::Duplicate(message)
+            | EnvError::Constant(message)
+            | EnvError::Undefined(message) => self.error(message, line, column),
+        }
+    }
+    fn type_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+        let code = if self.typed_mode { "E3008" } else { "E3000" };
+        HkError::new(code, msg, &self.source, line, col, &self.source_text)
     }
     fn run(&mut self, ss: &[S]) -> Result<()> {
         for s in ss {
@@ -218,24 +309,57 @@ impl Engine {
     }
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
+            S::TypedVar(name, annotation, initializer, mutable, line, column) => {
+                let value = self.eval(initializer)?;
+                self.env
+                    .borrow_mut()
+                    .define(
+                        name.clone(),
+                        value,
+                        *mutable,
+                        Some(Type::from(*annotation)),
+                        "variable initialization",
+                    )
+                    .map_err(|error| self.env_error(error, *line, *column))?;
+            }
+            S::TypedFn(name, parameters, return_type, body, line, column) => {
+                let function = V::Fun(Rc::new(Fun {
+                    name: name.clone(),
+                    params: parameters.clone(),
+                    return_type: return_type.map(Type::from),
+                    body: body.clone(),
+                    env: Rc::downgrade(&self.env),
+                }));
+                self.env
+                    .borrow_mut()
+                    .define(name.clone(), function, false, None, "function declaration")
+                    .map_err(|error| self.env_error(error, *line, *column))?;
+            }
             S::Var(n, e, m, l, c) => {
                 let v = self.eval(e)?;
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), v, *m)
-                    .map_err(|x| self.error(x, *l, *c))?;
+                    .define(n.clone(), v, *m, None, "variable initialization")
+                    .map_err(|error| self.env_error(error, *l, *c))?;
             }
             S::Fn(n, p, b, l, c) => {
                 let f = V::Fun(Rc::new(Fun {
                     name: n.clone(),
-                    params: p.clone(),
+                    params: p
+                        .iter()
+                        .map(|name| Param {
+                            name: name.clone(),
+                            annotation: None,
+                        })
+                        .collect(),
+                    return_type: None,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
                 }));
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), f, false)
-                    .map_err(|x| self.error(x, *l, *c))?;
+                    .define(n.clone(), f, false, None, "function declaration")
+                    .map_err(|error| self.env_error(error, *l, *c))?;
             }
             S::Expr(e) => {
                 self.eval(e)?;
@@ -295,15 +419,17 @@ impl Engine {
                 return r;
             }
             S::Return(e, line, col) => {
+                let (return_line, return_column) =
+                    e.as_ref().map(E::source_position).unwrap_or((*line, *col));
                 return Ok(Flow::Return(
                     if let Some(e) = e {
                         self.eval(e)?
                     } else {
                         V::Null
                     },
-                    *line,
-                    *col,
-                ))
+                    return_line,
+                    return_column,
+                ));
             }
         }
         Ok(Flow::Next)
@@ -333,7 +459,7 @@ impl Engine {
                 .ok_or_else(|| self.error(format!("Undefined variable '{n}'."), *l, *c)),
             E::Assign(n, e, l, c) => {
                 let v = self.eval(e)?;
-                Env::set(&self.env, n, v.clone()).map_err(|x| self.error(x, *l, *c))?;
+                Env::set(&self.env, n, v.clone()).map_err(|error| self.env_error(error, *l, *c))?;
                 Ok(v)
             }
             E::Group(e) => self.eval(e),
@@ -351,14 +477,24 @@ impl Engine {
                         if let V::Num(n) = v {
                             self.finite(-n, *l, *c)
                         } else {
-                            Err(self.error("Unary '-' expects Number.", *l, *c))
+                            let (operand_line, operand_column) = e.source_position();
+                            Err(self.type_error(
+                                "Unary '-' expects Number.",
+                                operand_line,
+                                operand_column,
+                            ))
                         }
                     }
                     K::Bang => {
                         if let V::Bool(b) = v {
                             Ok(V::Bool(!b))
                         } else {
-                            Err(self.error("'!' expects Boolean.", *l, *c))
+                            let (operand_line, operand_column) = e.source_position();
+                            Err(self.type_error(
+                                "'!' expects Boolean.",
+                                operand_line,
+                                operand_column,
+                            ))
                         }
                     }
                     _ => unreachable!(),
@@ -367,9 +503,11 @@ impl Engine {
             E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
                 let f = self.eval(callee)?;
-                let mut vs = vec![];
-                for a in args {
-                    vs.push(self.eval(a)?);
+                let mut vs = Vec::with_capacity(args.len());
+                for argument in args {
+                    let value = self.eval(argument)?;
+                    let (argument_line, argument_column) = argument.source_position();
+                    vs.push((value, argument_line, argument_column));
                 }
                 match f {
                     V::Print => {
@@ -380,7 +518,7 @@ impl Engine {
                                 *c,
                             ));
                         }
-                        self.output.push(vs[0].show());
+                        self.output.push(vs[0].0.show());
                         Ok(V::Null)
                     }
                     V::Fun(fun) => {
@@ -407,10 +545,20 @@ impl Engine {
                             self.error("Function environment is no longer available.", *l, *c)
                         })?;
                         let call = Env::child(parent);
-                        for (n, v) in fun.params.iter().zip(vs) {
+                        for (parameter, (value, argument_line, argument_column)) in
+                            fun.params.iter().zip(vs)
+                        {
                             call.borrow_mut()
-                                .define(n.clone(), v, true)
-                                .map_err(|x| self.error(x, *l, *c))?;
+                                .define(
+                                    parameter.name.clone(),
+                                    value,
+                                    true,
+                                    parameter.annotation.map(Type::from),
+                                    "function parameter",
+                                )
+                                .map_err(|error| {
+                                    self.env_error(error, argument_line, argument_column)
+                                })?;
                         }
                         let old = self.env.clone();
                         self.env = call;
@@ -418,10 +566,16 @@ impl Engine {
                         let r = self.exec_all(&fun.body);
                         self.call_depth -= 1;
                         self.env = old;
-                        match r? {
-                            Flow::Next => Ok(V::Null),
-                            Flow::Return(v, _, _) => Ok(v),
+                        let (value, return_line, return_column) = match r? {
+                            Flow::Next => (V::Null, *l, *c),
+                            Flow::Return(value, line, column) => (value, line, column),
+                        };
+                        if let Some(expected) = fun.return_type {
+                            ensure_contract(expected, &value, "function return").map_err(
+                                |message| self.contract_error(message, return_line, return_column),
+                            )?;
                         }
+                        Ok(value)
                     }
                     v => {
                         Err(self.error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
@@ -431,19 +585,22 @@ impl Engine {
             E::Index(a, i, l, c) => {
                 let o = self.eval(a)?;
                 let index_value = self.eval(i)?;
-                let idx = self.index(index_value, *l, *c)?;
+                let (index_line, index_column) = i.source_position();
+                let idx = self.index(index_value, index_line, index_column)?;
                 if let V::Arr(items) = o {
                     items.borrow().get(idx).cloned().ok_or_else(|| {
                         self.error(format!("Array index {idx} is out of bounds."), *l, *c)
                     })
                 } else {
-                    Err(self.error("Indexing requires Array.", *l, *c))
+                    let (receiver_line, receiver_column) = a.source_position();
+                    Err(self.type_error("Indexing requires Array.", receiver_line, receiver_column))
                 }
             }
             E::SetIndex(a, i, r, l, c) => {
                 let o = self.eval(a)?;
                 let index_value = self.eval(i)?;
-                let idx = self.index(index_value, *l, *c)?;
+                let (index_line, index_column) = i.source_position();
+                let idx = self.index(index_value, index_line, index_column)?;
                 let v = self.eval(r)?;
                 if let V::Arr(items) = o {
                     if idx >= items.borrow().len() {
@@ -465,18 +622,34 @@ impl Engine {
                     items[idx] = v.clone();
                     Ok(v)
                 } else {
-                    Err(self.error("Indexed assignment requires Array.", *l, *c))
+                    let (receiver_line, receiver_column) = a.source_position();
+                    Err(self.type_error(
+                        "Indexed assignment requires Array.",
+                        receiver_line,
+                        receiver_column,
+                    ))
                 }
             }
             E::Property(a, n, l, c) => {
-                let o = self.eval(a)?;
+                let value = self.eval(a)?;
                 if n == "length" {
-                    if let V::Arr(items) = o {
-                        return Ok(V::Num(items.borrow().len() as f64));
-                    }
+                    return match value {
+                        V::Arr(items) => Ok(V::Num(items.borrow().len() as f64)),
+                        other => {
+                            let (receiver_line, receiver_column) = a.source_position();
+                            Err(self.type_error(
+                                format!(
+                                    "Property 'length' requires Array, received {}.",
+                                    other.ty()
+                                ),
+                                receiver_line,
+                                receiver_column,
+                            ))
+                        }
+                    };
                 }
                 Err(self.error(
-                    format!("Property '{n}' is not available on {}.", o.ty()),
+                    format!("Property '{n}' is not available on {}.", value.ty()),
                     *l,
                     *c,
                 ))
@@ -484,45 +657,72 @@ impl Engine {
         }
     }
     fn eval_binary_chain(&mut self, expression: &E) -> Result<V> {
-        let mut operations: Vec<(K, &E, usize, usize)> = Vec::new();
+        let mut operations = Vec::new();
         let mut cursor = expression;
         while let E::Binary(left, operator, right, line, column) = cursor {
-            operations.push((*operator, right.as_ref(), *line, *column));
+            operations.push(BinaryOperation {
+                operator: *operator,
+                right: right.as_ref(),
+                positions: BinaryPositions {
+                    operator: (*line, *column),
+                    left: left.source_position(),
+                    right: right.source_position(),
+                },
+            });
             cursor = left.as_ref();
         }
 
         let mut value = self.eval(cursor)?;
-        for (operator, right, line, column) in operations.into_iter().rev() {
-            match operator {
+        for operation in operations.into_iter().rev() {
+            match operation.operator {
                 K::And => {
-                    if !self.boolean(value, line, column)? {
+                    if !self.boolean(
+                        value,
+                        operation.positions.left.0,
+                        operation.positions.left.1,
+                    )? {
                         value = V::Bool(false);
                     } else {
-                        let right_value = self.eval(right)?;
-                        value = V::Bool(self.boolean(right_value, line, column)?);
+                        let right_value = self.eval(operation.right)?;
+                        value = V::Bool(self.boolean(
+                            right_value,
+                            operation.positions.right.0,
+                            operation.positions.right.1,
+                        )?);
                     }
                 }
                 K::Or => {
-                    if self.boolean(value, line, column)? {
+                    if self.boolean(
+                        value,
+                        operation.positions.left.0,
+                        operation.positions.left.1,
+                    )? {
                         value = V::Bool(true);
                     } else {
-                        let right_value = self.eval(right)?;
-                        value = V::Bool(self.boolean(right_value, line, column)?);
+                        let right_value = self.eval(operation.right)?;
+                        value = V::Bool(self.boolean(
+                            right_value,
+                            operation.positions.right.0,
+                            operation.positions.right.1,
+                        )?);
                     }
                 }
                 _ => {
-                    let right_value = self.eval(right)?;
-                    value = self.binary(value, operator, right_value, line, column)?;
+                    let right_value = self.eval(operation.right)?;
+                    value =
+                        self.binary(value, operation.operator, right_value, operation.positions)?;
                 }
             }
         }
         Ok(value)
     }
 
-    fn binary(&self, a: V, op: K, b: V, l: usize, c: usize) -> Result<V> {
+    fn binary(&self, a: V, op: K, b: V, positions: BinaryPositions) -> Result<V> {
         match op {
             K::Plus => match (a, b) {
-                (V::Num(x), V::Num(y)) => self.finite(x + y, l, c),
+                (V::Num(x), V::Num(y)) => {
+                    self.finite(x + y, positions.operator.0, positions.operator.1)
+                }
                 (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
                 (x, y) => Err(self.error(
                     format!(
@@ -530,18 +730,34 @@ impl Engine {
                         x.ty(),
                         y.ty()
                     ),
-                    l,
-                    c,
+                    positions.operator.0,
+                    positions.operator.1,
                 )),
             },
             K::Minus | K::Star | K::Slash | K::Percent => {
-                let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
-                    (x, y)
-                } else {
-                    return Err(self.error("Arithmetic operators require Number operands.", l, c));
+                let (x, y) = match (a, b) {
+                    (V::Num(x), V::Num(y)) => (x, y),
+                    (left, _) if !matches!(&left, V::Num(_)) => {
+                        return Err(self.type_error(
+                            "Arithmetic operators require Number operands.",
+                            positions.left.0,
+                            positions.left.1,
+                        ));
+                    }
+                    (_, _) => {
+                        return Err(self.type_error(
+                            "Arithmetic operators require Number operands.",
+                            positions.right.0,
+                            positions.right.1,
+                        ));
+                    }
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
-                    return Err(self.error("Division or modulo by zero.", l, c));
+                    return Err(self.error(
+                        "Division or modulo by zero.",
+                        positions.operator.0,
+                        positions.operator.1,
+                    ));
                 }
                 self.finite(
                     match op {
@@ -551,15 +767,27 @@ impl Engine {
                         K::Percent => x % y,
                         _ => unreachable!(),
                     },
-                    l,
-                    c,
+                    positions.operator.0,
+                    positions.operator.1,
                 )
             }
             K::Gt | K::GtEq | K::Lt | K::LtEq => {
-                let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
-                    (x, y)
-                } else {
-                    return Err(self.error("Ordering comparisons require Number operands.", l, c));
+                let (x, y) = match (a, b) {
+                    (V::Num(x), V::Num(y)) => (x, y),
+                    (left, _) if !matches!(&left, V::Num(_)) => {
+                        return Err(self.type_error(
+                            "Ordering comparisons require Number operands.",
+                            positions.left.0,
+                            positions.left.1,
+                        ));
+                    }
+                    (_, _) => {
+                        return Err(self.type_error(
+                            "Ordering comparisons require Number operands.",
+                            positions.right.0,
+                            positions.right.1,
+                        ));
+                    }
                 };
                 Ok(V::Bool(match op {
                     K::Gt => x > y,
@@ -585,7 +813,7 @@ impl Engine {
         if let V::Bool(b) = v {
             Ok(b)
         } else {
-            Err(self.error(
+            Err(self.type_error(
                 format!("Condition must be Boolean, received {}.", v.ty()),
                 l,
                 c,
@@ -600,7 +828,7 @@ impl Engine {
                 Err(self.error("Array index must be a non-negative integer.", l, c))
             }
         } else {
-            Err(self.error("Array index must be Number.", l, c))
+            Err(self.type_error("Array index must be Number.", l, c))
         }
     }
 }
@@ -609,8 +837,100 @@ pub(super) fn execute(
     source_name: &str,
     source_text: &str,
     statements: &[S],
+    typed_mode: bool,
 ) -> Result<Vec<String>> {
-    let mut engine = Engine::new(source_name, source_text);
+    let mut engine = Engine::new(source_name, source_text, typed_mode);
     engine.run(statements)?;
     Ok(engine.output)
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+
+    #[test]
+    fn failed_contract_assignment_preserves_the_previous_binding_value() {
+        let environment = Rc::new(RefCell::new(Env::default()));
+        environment
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Num(1.0),
+                true,
+                Some(Type::Number),
+                "test initialization",
+            )
+            .unwrap();
+
+        let error = Env::set(&environment, "value", V::Str("invalid".into())).unwrap_err();
+        assert!(matches!(error, EnvError::Contract(_)));
+        assert!(matches!(Env::get(&environment, "value"), Some(V::Num(value)) if value == 1.0));
+    }
+
+    #[test]
+    fn failed_parameter_contract_does_not_enter_body_or_repeat_argument_evaluation() {
+        let source = r#"
+            let counter = 0;
+            let values = ["first", "second"];
+            fn take(value: number) -> number {
+                print("entered");
+                return value;
+            }
+            let operation = take;
+            operation(values[counter = counter + 1]);
+        "#;
+        let tokens = crate::lexer::Lexer::new("contract-test.hk", source)
+            .scan()
+            .unwrap();
+        let statements = crate::parser::Parser::new(tokens, "contract-test.hk", source)
+            .parse()
+            .unwrap();
+        crate::type_checker::TypeChecker::new("contract-test.hk", source)
+            .check(&statements)
+            .unwrap();
+
+        let mut engine = Engine::new("contract-test.hk", source, true);
+        let error = engine.run(&statements).unwrap_err();
+
+        assert_eq!(error.code, "E3008");
+        assert!(engine.output.is_empty(), "function body must not run");
+        assert!(matches!(
+            Env::get(&engine.env, "counter"),
+            Some(V::Num(value)) if value == 1.0
+        ));
+    }
+
+    #[test]
+    fn shadowed_bindings_keep_independent_runtime_contracts() {
+        let parent = Rc::new(RefCell::new(Env::default()));
+        parent
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Num(1.0),
+                true,
+                Some(Type::Number),
+                "test initialization",
+            )
+            .unwrap();
+
+        let child = Env::child(parent.clone());
+        child
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Str("child".into()),
+                true,
+                Some(Type::String),
+                "test initialization",
+            )
+            .unwrap();
+
+        assert!(Env::set(&child, "value", V::Str("updated".into())).is_ok());
+        assert!(matches!(Env::get(&parent, "value"), Some(V::Num(1.0))));
+        assert!(matches!(
+            Env::get(&child, "value"),
+            Some(V::Str(value)) if value == "updated"
+        ));
+    }
 }

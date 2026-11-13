@@ -1,17 +1,44 @@
 //! HK 0.1.x reference interpreter.
 //! Dependency-free tree-walking implementation.
 mod ast;
+use ast::S;
 pub mod diagnostics;
 mod lexer;
 mod parser;
 mod runtime;
+mod type_checker;
+mod types;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
 /// Tokenizes, parses, and executes a complete HK source file.
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
-    runtime::execute(source_name, source, &statements)
+    let typed_mode = has_type_annotations(&statements);
+    if typed_mode {
+        type_checker::TypeChecker::new(source_name, source).check(&statements)?;
+    }
+    runtime::execute(source_name, source, &statements, typed_mode)
+}
+
+fn has_type_annotations(statements: &[S]) -> bool {
+    statements.iter().any(|statement| match statement {
+        S::TypedVar(..) | S::TypedFn(..) => true,
+        S::Fn(_, _, body, _, _) | S::Block(body) => has_type_annotations(body),
+        S::If(_, then_branch, else_branch) => {
+            has_type_annotations(std::slice::from_ref(then_branch.as_ref()))
+                || else_branch.as_ref().is_some_and(|branch| {
+                    has_type_annotations(std::slice::from_ref(branch.as_ref()))
+                })
+        }
+        S::While(_, body) => has_type_annotations(std::slice::from_ref(body.as_ref())),
+        S::For(initializer, _, _, body) => {
+            initializer.as_ref().is_some_and(|statement| {
+                has_type_annotations(std::slice::from_ref(statement.as_ref()))
+            }) || has_type_annotations(std::slice::from_ref(body.as_ref()))
+        }
+        S::Var(..) | S::Expr(..) | S::Return(..) => false,
+    })
 }
 
 #[cfg(test)]
@@ -228,5 +255,353 @@ mod tests {
     fn strings_support_only_documented_escapes() {
         assert_eq!(run("test.hk", r#"print("a\\nb");"#).unwrap(), vec!["a\\nb"]);
         assert_eq!(run("test.hk", r#"print("a\nb");"#).unwrap(), vec!["a\nb"]);
+    }
+    #[test]
+    fn executes_annotated_variable_declarations() {
+        assert_eq!(
+            run("typed.hk", "let age: number = 18; print(age);").unwrap(),
+            vec!["18"]
+        );
+    }
+
+    #[test]
+    fn executes_typed_function_parameters_and_return_annotations() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn add(a: number, b: number) -> number { return a + b; } print(add(2, 3));",
+            )
+            .unwrap(),
+            vec!["5"]
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_type_names_during_parsing() {
+        let error = run("typed.hk", "let age: integer = 18;").unwrap_err();
+        assert_eq!(error.code, "E2003");
+        assert!(error.message.contains("Unknown type"));
+    }
+
+    #[test]
+    fn executes_all_supported_type_names() {
+        let cases = [
+            ("number", "1"),
+            ("string", "\"value\""),
+            ("bool", "true"),
+            ("null", "null"),
+            ("array", "[]"),
+            ("any", "null"),
+        ];
+        for (ty, initializer) in cases {
+            let source = format!("let value: {ty} = {initializer};");
+            assert!(run("typed.hk", &source).is_ok(), "failed for type {ty}");
+        }
+    }
+
+    #[test]
+    fn executes_nested_typed_syntax() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn outer() -> number { if (true) { let inner: bool = true; return 7; } return 0; } print(outer());",
+            )
+            .unwrap(),
+            vec!["7"]
+        );
+    }
+    #[test]
+    fn rejects_incompatible_typed_variable_initializers() {
+        let error = run("typed.hk", "let age: number = \"eighteen\";").unwrap_err();
+        assert_eq!(error.code, "E3001");
+        assert!(error.message.contains("expected number, found string"));
+    }
+
+    #[test]
+    fn rejects_incompatible_direct_function_arguments() {
+        let error = run(
+            "typed.hk",
+            "fn increment(value: number) -> number { return value + 1; } increment(\"1\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3003");
+    }
+
+    #[test]
+    fn rejects_incompatible_typed_function_returns() {
+        let error = run("typed.hk", "fn label() -> string { return 42; }").unwrap_err();
+        assert_eq!(error.code, "E3004");
+    }
+
+    #[test]
+    fn rejects_non_boolean_typed_conditions() {
+        let error = run(
+            "typed.hk",
+            "let enabled: number = 1; if (enabled) { print(enabled); }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3006");
+    }
+
+    #[test]
+    fn rejects_typed_functions_that_may_fall_through() {
+        let error = run(
+            "typed.hk",
+            "fn maybe(flag: bool) -> number { if (flag) { return 1; } }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3009");
+    }
+
+    #[test]
+    fn executes_statically_valid_annotated_programs() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn add(a: number, b: number) -> number { return a + b; } let total: number = add(2, 3); print(total);",
+            )
+            .unwrap(),
+            vec!["5"]
+        );
+    }
+
+    #[test]
+    fn preserves_dynamic_behavior_for_unannotated_programs() {
+        let output = run(
+            "dynamic.hk",
+            "fn latent() { return 1 + \"text\"; } print(\"still dynamic\");",
+        )
+        .unwrap();
+        assert_eq!(output, vec!["still dynamic"]);
+    }
+
+    #[test]
+    fn respects_local_variable_shadowing_of_known_functions() {
+        let error = run(
+            "typed.hk",
+            "fn calculate(value: number) -> number { return value; } { let calculate = 1; calculate(); }",
+        )
+        .unwrap_err();
+        assert!(error.message.contains("Cannot call a value of type Number"));
+    }
+
+    #[test]
+    fn typed_function_parameters_remain_assignable() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn update(value: number) -> number { value = 2; return value; } print(update(1));",
+            )
+            .unwrap(),
+            vec!["2"]
+        );
+    }
+    #[test]
+    fn rejects_incompatible_typed_variable_assignments() {
+        let error = run("typed.hk", "let count: number = 1; count = \"wrong\";").unwrap_err();
+        assert_eq!(error.code, "E3002");
+    }
+
+    #[test]
+    fn accepts_null_and_any_return_fallthrough_contracts() {
+        for signature in ["-> null", "-> any"] {
+            let source = format!("fn maybe() {signature} {{}} print(maybe());");
+            assert_eq!(run("typed.hk", &source).unwrap(), vec!["null"]);
+        }
+    }
+
+    #[test]
+    fn rejects_known_incompatible_arithmetic_operands() {
+        let error = run("typed.hk", "let result: number = 1 + \"text\";").unwrap_err();
+        assert_eq!(error.code, "E3005");
+    }
+    #[test]
+    fn runtime_guards_dynamic_typed_variable_initializers() {
+        let error = run(
+            "typed.hk",
+            "let dynamic = \"wrong\"; let value: number = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("expected number, found string"));
+    }
+
+    #[test]
+    fn runtime_guards_assignments_to_typed_bindings() {
+        let error = run(
+            "typed.hk",
+            "let value: number = 1; let dynamic = \"wrong\"; value = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("assignment"));
+    }
+
+    #[test]
+    fn runtime_guards_typed_parameters_through_dynamic_function_aliases() {
+        let error = run(
+            "typed.hk",
+            "fn square(value: number) -> number { return value * value; } let operation = square; operation(\"wrong\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("function parameter"));
+    }
+
+    #[test]
+    fn runtime_guards_typed_function_returns_from_dynamic_expressions() {
+        let error = run(
+            "typed.hk",
+            "fn dynamic() { return \"wrong\"; } fn typed() -> number { return dynamic(); } typed();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("function return"));
+    }
+
+    #[test]
+    fn runtime_contracts_survive_function_aliasing() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "fn square(value: number) -> number { return value * value; } let operation = square; print(operation(4));",
+            )
+            .unwrap(),
+            vec!["16"]
+        );
+    }
+
+    #[test]
+    fn typed_array_bindings_do_not_constrain_array_elements_or_aliases() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "let raw = [1]; let values: array = raw; raw[0] = \"changed\"; print(values[0]);",
+            )
+            .unwrap(),
+            vec!["changed"]
+        );
+    }
+
+    #[test]
+    fn failed_typed_assignment_does_not_replace_the_previous_value() {
+        let error = run(
+            "typed.hk",
+            "let value: number = 1; let dynamic = \"wrong\"; value = dynamic;",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+    }
+
+    #[test]
+    fn typed_const_still_rejects_reassignment() {
+        let error = run("typed.hk", "const value: number = 1; value = 2;").unwrap_err();
+        assert_eq!(error.code, "E3002");
+    }
+
+    #[test]
+    fn runtime_contracts_check_null_exactly() {
+        let error = run("typed.hk", "let value: null = 1;").unwrap_err();
+        assert_eq!(error.code, "E3001");
+        let error = run("typed.hk", "let dynamic = 1; let value: null = dynamic;").unwrap_err();
+        assert_eq!(error.code, "E3008");
+    }
+    #[test]
+    fn runtime_guards_any_values_in_boolean_conditions() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let condition = 1; if (condition) { print(1); }",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("Condition must be Boolean"));
+    }
+
+    #[test]
+    fn runtime_guards_any_values_in_arithmetic_operands() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = \"bad\"; print(value - 1);",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error
+            .message
+            .contains("Arithmetic operators require Number"));
+    }
+
+    #[test]
+    fn runtime_guards_any_array_receivers_and_property_access() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; print(value[0]);",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; print(value.length);",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+    }
+
+    #[test]
+    fn short_circuit_skips_dynamic_runtime_type_guards() {
+        assert_eq!(
+            run(
+                "typed.hk",
+                "let marker: bool = true; let value = 1; print(false && value); print(true || value);",
+            )
+            .unwrap(),
+            vec!["false", "true"]
+        );
+    }
+    #[test]
+    fn runtime_guards_dynamic_null_function_returns() {
+        let error = run(
+            "typed.hk",
+            "fn dynamic() { return 1; } fn nullable() -> null { return dynamic(); } nullable();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("expected null, found number"));
+    }
+
+    #[test]
+    fn unannotated_runtime_type_errors_keep_legacy_diagnostic_codes() {
+        let error = run("dynamic.hk", "if (1) { print(1); }").unwrap_err();
+        assert_eq!(error.code, "E3000");
+    }
+    #[test]
+    fn documented_gradual_typing_example_executes() {
+        let source = include_str!("../../../../examples/gradual_typing.hk");
+        assert_eq!(
+            run("examples/gradual_typing.hk", source).unwrap(),
+            vec!["84"]
+        );
+    }
+    #[test]
+    fn dynamic_plus_overload_failure_keeps_legacy_runtime_diagnostic() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; print(value + \"text\");",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3000");
+        assert!(error
+            .message
+            .contains("'+' expects two Numbers or two Strings"));
+    }
+
+    #[test]
+    fn non_callable_dynamic_value_keeps_legacy_runtime_diagnostic() {
+        let error = run(
+            "typed.hk",
+            "let marker: bool = true; let value = 1; value();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3000");
+        assert!(error.message.contains("Cannot call a value of type Number"));
     }
 }

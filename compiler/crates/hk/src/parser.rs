@@ -1,4 +1,4 @@
-use super::ast::{E, S};
+use super::ast::{Param, TypeName, E, S};
 use super::lexer::{Lit, Token, K};
 use super::{HkError, Result};
 use std::collections::HashSet;
@@ -44,19 +44,30 @@ impl Parser {
     }
     fn var(&mut self, m: bool) -> Result<S> {
         let n = self.id("Expected variable name.")?;
-        self.expect(K::Eq, "Expected '=' after variable name.")?;
+        let annotation = if self.take(K::Colon) {
+            Some(self.type_name()?)
+        } else {
+            None
+        };
+        self.expect(
+            K::Eq,
+            "Expected '=' after variable name and optional type annotation.",
+        )?;
         let e = self.expr()?;
         self.expect(K::Semi, "Expected ';' after declaration.")?;
-        Ok(S::Var(n.text, e, m, n.line, n.col))
+        Ok(match annotation {
+            Some(ty) => S::TypedVar(n.text, ty, e, m, n.line, n.col),
+            None => S::Var(n.text, e, m, n.line, n.col),
+        })
     }
     fn function(&mut self) -> Result<S> {
         let n = self.id("Expected function name.")?;
         self.expect(K::LParen, "Expected '(' after function name.")?;
-        let mut p = vec![];
+        let mut params = vec![];
         let mut names = HashSet::new();
         if !self.check(K::RParen) {
             loop {
-                if p.len() >= 255 {
+                if params.len() >= 255 {
                     return Err(self.error("Too many parameters."));
                 }
                 let param = self.id("Expected parameter name.")?;
@@ -70,16 +81,65 @@ impl Parser {
                         &self.source_text,
                     ));
                 }
-                p.push(param.text);
+                let annotation = if self.take(K::Colon) {
+                    Some(self.type_name()?)
+                } else {
+                    None
+                };
+                params.push(Param {
+                    name: param.text,
+                    annotation,
+                });
                 if !self.take(K::Comma) {
                     break;
                 }
             }
         }
         self.expect(K::RParen, "Expected ')' after parameters.")?;
+        let return_type = if self.take(K::Arrow) {
+            Some(self.type_name()?)
+        } else {
+            None
+        };
         self.expect(K::LBrace, "Expected '{' before function body.")?;
-        let b = self.block_body()?;
-        Ok(S::Fn(n.text, p, b, n.line, n.col))
+        let body = self.block_body()?;
+        let has_annotations =
+            return_type.is_some() || params.iter().any(|p| p.annotation.is_some());
+        if has_annotations {
+            Ok(S::TypedFn(n.text, params, return_type, body, n.line, n.col))
+        } else {
+            Ok(S::Fn(
+                n.text,
+                params.into_iter().map(|p| p.name).collect(),
+                body,
+                n.line,
+                n.col,
+            ))
+        }
+    }
+
+    fn type_name(&mut self) -> Result<TypeName> {
+        if self.check(K::Null) {
+            self.advance();
+            return Ok(TypeName::Null);
+        }
+        let token = self.id("Expected a type name (number, string, bool, null, array, or any).")?;
+        match token.text.as_str() {
+            "number" => Ok(TypeName::Number),
+            "string" => Ok(TypeName::String),
+            "bool" => Ok(TypeName::Bool),
+            "null" => Ok(TypeName::Null),
+            "array" => Ok(TypeName::Array),
+            "any" => Ok(TypeName::Any),
+            _ => Err(HkError::new(
+                "E2003",
+                format!("Unknown type '{}'.", token.text),
+                &self.name,
+                token.line,
+                token.col,
+                &self.source_text,
+            )),
+        }
     }
     fn stmt(&mut self) -> Result<S> {
         self.with_depth(|p| p.stmt_inner())

@@ -7,7 +7,7 @@
 **Paradigm:** Imperative  
 **Typing:** Dynamic in 0.1.0; progressive typing is planned for 0.2.0.
 
-This document defines the intended observable behavior of HK 0.1.0. It is the language contract; implementation changes must preserve it or update this document and its tests.
+This document defines the intended observable behavior of HK 0.1.0 only. It is the 0.1.x language contract; implementation changes must preserve it or update this document and its tests. The separate [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) describes the proposed 0.2.0 gradual-typing design, which is not implemented yet.
 
 ## 1. Goals and source model
 

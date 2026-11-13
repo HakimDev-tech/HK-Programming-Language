@@ -1,0 +1,3 @@
+fn source() { return "invalid"; }
+fn take() -> number { return source(); }
+take();

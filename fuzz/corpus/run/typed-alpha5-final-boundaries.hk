@@ -1,0 +1,6 @@
+let marker: bool = true;
+fn take(value: number) -> number { return value; }
+let operation = take;
+let dynamic = 1;
+print(true || dynamic);
+operation(dynamic);
