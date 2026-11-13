@@ -126,14 +126,16 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
     false
 }
 
-#[derive(Default)]
+#[derive(Debug)]
 enum EnvError {
     Duplicate(String),
     Constant(String),
     Undefined(String),
     Contract(String),
+
 }
 
+#[derive(Default)]
 struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
