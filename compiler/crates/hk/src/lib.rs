@@ -155,6 +155,17 @@ mod tests {
         assert!(error.message.contains("nesting depth"));
     }
     #[test]
+    fn deep_left_associative_expression_returns_a_diagnostic() {
+        let expression = std::iter::repeat("1")
+            .take(300)
+            .collect::<Vec<_>>()
+            .join(" + ");
+        let source = format!("print({expression});");
+        let error = run("deep.hk", &source).unwrap_err();
+        assert!(error.message.contains("expression evaluation depth"));
+    }
+
+    #[test]
     fn deeply_nested_blocks_return_a_diagnostic() {
         let source = format!("{}print(1);{}", "{".repeat(300), "}".repeat(300));
         let error = run("deep.hk", &source).unwrap_err();
