@@ -23,10 +23,10 @@ impl fmt::Display for HkError {
 impl std::error::Error for HkError {}
 type Result<T> = std::result::Result<T, HkError>;
 
-struct Lexer<'a> { source: &'a str, chars: Vec<char>, start: usize, current: usize, line: usize, col: usize, start_line: usize, start_col: usize, name: &'a str }
+struct Lexer<'a> { chars: Vec<char>, start: usize, current: usize, line: usize, col: usize, start_line: usize, start_col: usize, name: &'a str }
 impl<'a> Lexer<'a> {
     fn new(name: &'a str, source: &'a str) -> Self {
-        Self { source, chars: source.chars().collect(), start: 0, current: 0, line: 1, col: 1, start_line: 1, start_col: 1, name }
+        Self { chars: source.chars().collect(), start: 0, current: 0, line: 1, col: 1, start_line: 1, start_col: 1, name }
     }
     fn scan(mut self) -> Result<Vec<Token>> {
         let mut out = Vec::new();
@@ -106,6 +106,18 @@ enum E {
     Assign(String,Box<E>,usize,usize), Unary(K,Box<E>,usize,usize), Binary(Box<E>,K,Box<E>,usize,usize),
     Group(Box<E>), Call(Box<E>,Vec<E>,usize,usize), Array(Vec<E>,usize,usize),
     Index(Box<E>,Box<E>,usize,usize), SetIndex(Box<E>,Box<E>,Box<E>,usize,usize), Property(Box<E>,String,usize,usize),
+}
+impl E {
+    fn source_position(&self)->(usize,usize) {
+        match self {
+            E::Lit(_,l,c)|E::Bool(_,l,c)|E::Var(_,l,c)|E::Assign(_,_,l,c)|
+            E::Unary(_,_,l,c)|E::Binary(_,_,_,l,c)|E::Call(_,_,l,c)|
+            E::Array(_,l,c)|E::Index(_,_,l,c)|E::SetIndex(_,_,_,l,c)|
+            E::Property(_,_,l,c) => (*l,*c),
+            E::Null(l,c) => (*l,*c),
+            E::Group(inner) => inner.source_position(),
+        }
+    }
 }
 #[derive(Clone, Debug)]
 enum S {
@@ -215,13 +227,13 @@ impl Env {
     fn get(e:&Rc<RefCell<Self>>,n:&str)->Option<V>{let(v,p)={let x=e.borrow();(x.values.get(n).cloned(),x.parent.clone())};v.or_else(||p.and_then(|p|Self::get(&p,n)))}
     fn set(e:&Rc<RefCell<Self>>,n:&str,v:V)->std::result::Result<(),String>{let(exists,c,p)={let x=e.borrow();(x.values.contains_key(n),x.constants.contains(n),x.parent.clone())};if exists{if c{return Err(format!("Cannot reassign constant '{n}'."));}e.borrow_mut().values.insert(n.into(),v);return Ok(());}if let Some(p)=p{return Self::set(&p,n,v);}Err(format!("Undefined variable '{n}'."))}
 }
-enum Flow { Next, Return(V) }
+enum Flow { Next, Return(V, usize, usize) }
 struct Engine { env:Rc<RefCell<Env>>, output:Vec<String>, source:String }
 impl Engine {
     fn new(source:&str)->Self{let e=Rc::new(RefCell::new(Env::default()));e.borrow_mut().values.insert("print".into(),V::Print);Self{env:e,output:vec![],source:source.into()}}
     fn error(&self,msg:impl Into<String>,line:usize,col:usize)->HkError{HkError{code:"E3000",message:msg.into(),source:self.source.clone(),line,column:col}}
-    fn run(&mut self,ss:&[S])->Result<()>{for s in ss{if let Flow::Return(_)=self.exec(s)?{return Err(self.error("'return' is only valid inside a function.",1,1));}}Ok(())}
-    fn exec_all(&mut self,ss:&[S])->Result<Flow>{for s in ss{match self.exec(s)?{Flow::Next=>{},r@Flow::Return(_)=>return Ok(r)}}Ok(Flow::Next)}
+    fn run(&mut self,ss:&[S])->Result<()>{for s in ss{if let Flow::Return(_,line,col)=self.exec(s)?{return Err(self.error("'return' is only valid inside a function.",line,col));}}Ok(())}
+    fn exec_all(&mut self,ss:&[S])->Result<Flow>{for s in ss{match self.exec(s)?{Flow::Next=>{},r@Flow::Return(..)=>return Ok(r)}}Ok(Flow::Next)}
     fn exec(&mut self,s:&S)->Result<Flow>{
         match s{
             S::Var(n,e,m,l,c)=>{let v=self.eval(e)?;self.env.borrow_mut().define(n.clone(),v,*m).map_err(|x|self.error(x,*l,*c))?;}
@@ -229,12 +241,13 @@ impl Engine {
             S::Expr(e)=>{self.eval(e)?;}
             S::Block(b)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=self.exec_all(b);self.env=old;return r;}
             S::If(c,a,b)=>{let v=self.eval(c)?;if self.boolean(v,1,1)?{return self.exec(a);}if let Some(b)=b{return self.exec(b);}}
-            S::While(c,b)=>loop{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}if let Flow::Return(v)=self.exec(b)?{return Ok(Flow::Return(v));}},
+            S::While(c,b)=>loop{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}if let Flow::Return(v,line,col)=self.exec(b)?{return Ok(Flow::Return(v,line,col));}},
             S::For(init,cond,inc,body)=>{let old=self.env.clone();self.env=Env::child(old.clone());let r=(||{if let Some(i)=init{self.exec(i)?;}loop{if let Some(c)=cond{let v=self.eval(c)?;if !self.boolean(v,1,1)?{break;}}if let Flow::Return(v)=self.exec(body)?{return Ok(Flow::Return(v));}if let Some(i)=inc{self.eval(i)?;}}Ok(Flow::Next)})();self.env=old;return r;}
-            S::Return(e,_l,_c)=>return Ok(Flow::Return(if let Some(e)=e{self.eval(e)?}else{V::Null})),
+            S::Return(e,line,col)=>return Ok(Flow::Return(if let Some(e)=e{self.eval(e)?}else{V::Null},*line,*col)),
         }Ok(Flow::Next)
     }
     fn eval(&mut self,e:&E)->Result<V>{
+        let _source_position = e.source_position();
         match e{
             E::Lit(Lit::Number(n),_,_)=>Ok(V::Num(*n)),E::Lit(Lit::String(s),_,_)=>Ok(V::Str(s.clone())),
             E::Bool(b,_,_)=>Ok(V::Bool(*b)),E::Null(_,_)=>Ok(V::Null),
@@ -251,7 +264,7 @@ impl Engine {
             }
             E::Call(callee,args,l,c)=>{let f=self.eval(callee)?;let mut vs=vec![];for a in args{vs.push(self.eval(a)?);}match f{
                 V::Print=>{if vs.len()!=1{return Err(self.error(format!("print() expects one argument, received {}.",vs.len()),*l,*c));}self.output.push(vs[0].show());Ok(V::Null)}
-                V::Fun(fun)=>{if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;let call=Env::child(parent);for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}let old=self.env.clone();self.env=call;let r=self.exec_all(&fun.body);self.env=old;match r?{Flow::Next=>Ok(V::Null),Flow::Return(v)=>Ok(v)}}
+                V::Fun(fun)=>{if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;let call=Env::child(parent);for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}let old=self.env.clone();self.env=call;let r=self.exec_all(&fun.body);self.env=old;match r?{Flow::Next=>Ok(V::Null),Flow::Return(v,_,_)=>Ok(v)}}
                 v=>Err(self.error(format!("Cannot call a value of type {}.",v.ty()),*l,*c))
             }}
             E::Index(a,i,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
