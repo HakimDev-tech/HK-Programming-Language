@@ -309,7 +309,7 @@ impl Engine {
                 v=>Err(self.error(format!("Cannot call a value of type {}.",v.ty()),*l,*c))
             }}
             E::Index(a,i,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;if let V::Arr(items)=o{items.borrow().get(idx).cloned().ok_or_else(||self.error(format!("Array index {idx} is out of bounds."),*l,*c))}else{Err(self.error("Indexing requires Array.",*l,*c))}}
-            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{let identity=Rc::as_ptr(&items) as usize;if contains_array_reference(&v,identity,&mut HashSet::new()){return Err(self.error("Cyclic array references are not supported in HK 0.1.x.",*l,*c));}let mut items=items.borrow_mut();if idx>=items.len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
+            E::SetIndex(a,i,r,l,c)=>{let o=self.eval(a)?;let index_value=self.eval(i)?;let idx=self.index(index_value,*l,*c)?;let v=self.eval(r)?;if let V::Arr(items)=o{if idx>=items.borrow().len(){return Err(self.error(format!("Array index {idx} is out of bounds."),*l,*c));}let identity=Rc::as_ptr(&items) as usize;if contains_array_reference(&v,identity,&mut HashSet::new()){return Err(self.error("Cyclic array references are not supported in HK 0.1.x.",*l,*c));}let mut items=items.borrow_mut();items[idx]=v.clone();Ok(v)}else{Err(self.error("Indexed assignment requires Array.",*l,*c))}}
             E::Property(a,n,l,c)=>{let o=self.eval(a)?;if n=="length"{if let V::Arr(items)=o{return Ok(V::Num(items.borrow().len() as f64));}}Err(self.error(format!("Property '{n}' is not available on {}.",o.ty()),*l,*c))}
         }
     }
@@ -374,5 +374,33 @@ mod tests {
     #[test] fn for_loop_scope_does_not_leak(){
         let error=run("test.hk","for(let i=0;i<1;i=i+1){}print(i);").unwrap_err();
         assert!(error.message.contains("Undefined variable"));
+    }
+    #[test] fn invalid_assignment_reports_operator_position(){
+        let error=run("test.hk","(1)=2;").unwrap_err();
+        assert_eq!(error.code,"E2002");
+        assert_eq!((error.line,error.column),(1,4));
+    }
+    #[test] fn unknown_single_logical_operator_is_lexical_error(){
+        let error=run("test.hk","print(true & false);").unwrap_err();
+        assert_eq!(error.code,"E1001");
+    }
+    #[test] fn unterminated_string_is_lexical_error(){
+        let error=run("test.hk","print(\"unfinished);").unwrap_err();
+        assert_eq!(error.code,"E1004");
+    }
+    #[test] fn array_bounds_are_checked_for_reads_and_writes(){
+        assert!(run("test.hk","let a=[1];print(a[1]);").unwrap_err().message.contains("out of bounds"));
+        assert!(run("test.hk","let a=[1];a[1]=2;").unwrap_err().message.contains("out of bounds"));
+    }
+    #[test] fn arrays_compare_by_identity(){
+        assert_eq!(run("test.hk","let a=[1];let b=a;let c=[1];print(a==b);print(a==c);").unwrap(),vec!["true","false"]);
+    }
+    #[test] fn duplicate_declarations_in_one_scope_are_rejected(){
+        let error=run("test.hk","let value=1;let value=2;").unwrap_err();
+        assert!(error.message.contains("already declared"));
+    }
+    #[test] fn strings_support_only_documented_escapes(){
+        assert_eq!(run("test.hk",r#"print("a\\nb");"#).unwrap(),vec!["a\\nb"]);
+        assert_eq!(run("test.hk",r#"print("a\nb");"#).unwrap(),vec!["a\nb"]);
     }
 }
