@@ -773,7 +773,7 @@ mod contract_tests {
         )
         .unwrap_err();
         assert!(matches!(error, EnvError::Contract(_)));
-        assert!(matches!(Env::get(&environment, "value"), Some(V::Num(1.0))));
+        assert!(matches!(Env::get(&environment, "value"), Some(V::Num(value)) if value == 1.0));
     }
 
     #[test]
