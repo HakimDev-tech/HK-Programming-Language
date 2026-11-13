@@ -573,4 +573,13 @@ mod tests {
         let error = run("dynamic.hk", "if (1) { print(1); }").unwrap_err();
         assert_eq!(error.code, "E3000");
     }
+    #[test]
+    fn documented_gradual_typing_example_executes() {
+        let source = include_str!("../../../../examples/gradual_typing.hk");
+        assert_eq!(
+            run("examples/gradual_typing.hk", source).unwrap(),
+            vec!["84"]
+        );
+    }
+
 }
