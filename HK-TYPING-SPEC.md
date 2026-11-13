@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification. Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 is in progress, adding diagnostic provenance and expanded boundary-conformance coverage on a separate feature branch. The implementation remains unmerged and is not a stable release.  
+**Status:** Normative specification. Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 diagnostic provenance and expanded boundary-conformance coverage are implemented and validated on a separate feature branch. The implementation remains unmerged and is not a stable release.  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x

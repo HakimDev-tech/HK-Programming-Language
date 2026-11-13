@@ -1,6 +1,6 @@
 # HK 0.2.0 — Alpha.5 Boundary Conformance Specification
 
-**Status:** Normative implementation target for Alpha.5; diagnostic-provenance work is in progress on `feat/v0.2-alpha5-boundary-conformance`. The acceptance gates remain open.
+**Status:** Normative acceptance specification. Alpha.5 implementation and acceptance gates are complete on `feat/v0.2-alpha5-boundary-conformance`; the PR remains open, draft, and unmerged. This is not a stable release.
 **Baseline:** Alpha.4 stabilization head `8445732178148ae7295509d5630622ec2547dbf5`.
 **Target:** Improve conformance, diagnostics, and regression coverage at static/dynamic boundaries without expanding the language surface.
 

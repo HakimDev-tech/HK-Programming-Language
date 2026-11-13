@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation and acceptance coverage are complete on the feature branch; the final-head CI and fuzz gates are being verified before review.
+**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on the feature branch. PR #10 remains open and unmerged for review.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
