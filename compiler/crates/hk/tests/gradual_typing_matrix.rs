@@ -453,66 +453,72 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
     );
 }
 
+
 #[test]
-fn alpha6_if_branches_preserve_outer_contracts_without_leaking_declarations() {
+fn alpha6_if_branches_rely_on_explicit_block_scopes() {
     assert_eq!(
-        error_code("let count: number = 1; if (true) count = \"bad\";"),
+        error_code("let count: number = 1; if (true) { count = \"bad\"; }"),
         "E3002"
     );
 
-    // The then-branch declaration must not affect static analysis of else.
+    // A signature declared in the then-block must not leak into the else-block.
     let isolated = r#"
-        if (true) let branch: number = 1;
-        else { branch = "bad"; }
+        if (true) {
+            fn convert(value: number) -> number { return value; }
+        } else {
+            convert("bad");
+        }
     "#;
     assert!(run("alpha6-scope.hk", isolated).is_ok());
 
-    // The declaration executes at runtime, but is not definite after the if.
-    // The failure must therefore remain a runtime error, not a static E3005.
+    // A block-local declaration is not visible after the conditional.
     assert_eq!(
-        error_code("if (true) let branch: number = 1; print(branch + \"text\");"),
+        error_code("if (true) { let branch: number = 1; } print(branch);"),
         "E3000"
     );
 }
 
 #[test]
-fn alpha6_while_body_matches_runtime_scope_and_does_not_promote_declarations() {
+fn alpha6_while_body_preserves_outer_contracts_and_block_lifetime() {
     assert_eq!(
-        error_code("let count: number = 1; while (false) count = \"bad\";"),
+        error_code("let count: number = 1; while (false) { count = \"bad\"; }"),
         "E3002"
     );
 
-    // The body may execute zero times; its declaration is not definite after it.
+    // The loop body is not guaranteed to execute, and its explicit block scope
+    // ends before the statement following the loop.
     assert_eq!(
-        error_code("while (false) let branch: number = 1; print(branch + \"text\");"),
+        error_code("while (false) { let branch: number = 1; } print(branch);"),
         "E3000"
     );
 }
 
 #[test]
 fn alpha6_for_increment_is_checked_after_the_body() {
-    let unbraced_body = r#"
+    // Both the body and increment contain static errors. The body's initializer
+    // must be diagnosed first because runtime reaches the body before increment.
+    let source = r#"
         for (
             let index: number = 0;
             index < 1;
-            index = index + (step - "bad")
-        )
-            let step: number = 1;
+            index = index + ("bad" - 1)
+        ) {
+            let invalid: number = "bad";
+        }
     "#;
-    assert_eq!(error_code(unbraced_body), "E3005");
+    assert_eq!(error_code(source), "E3001");
 
-    // An explicit block has its own scope, so its declaration is not visible
-    // to the increment. Runtime name lookup remains authoritative.
-    let block_body = r#"
+    // A block-local body declaration is not visible to the increment.
+    let block_scope = r#"
         for (
             let index: number = 0;
             index < 1;
-            index = index + (step - "bad")
+            index = index + step
         ) {
             let step: number = 1;
         }
     "#;
-    assert_eq!(error_code(block_body), "E3000");
+    assert_eq!(error_code(block_scope), "E3000");
 }
 
 #[test]
