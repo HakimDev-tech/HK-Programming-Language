@@ -71,7 +71,7 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Preserve the existing 0.1.x regression tests while adding gradual-typing coverage
 - [x] Add positive, negative, and dynamic-boundary acceptance matrices in `compiler/crates/hk/tests/gradual_typing_matrix.rs`
 - [x] Extend fuzzing with annotation-heavy seeds and complete a successful corpus run on the preceding stabilization head
-- [ ] Complete the dedicated fuzz run on the final alpha.4 head
+- [x] Complete the dedicated fuzz run on the final alpha.4 head
 - [x] Review the normative specification, diagnostics, README, roadmap, and executable example
 - [x] Run fmt, tests, Clippy with warnings denied, and rustdoc with warnings denied on the final alpha.4 head
 - [x] Verify Linux, Windows, and macOS CI on the final alpha.4 head
