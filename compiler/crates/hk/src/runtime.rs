@@ -724,7 +724,9 @@ impl Engine {
     fn binary(&self, a: V, op: K, b: V, positions: BinaryPositions) -> Result<V> {
         match op {
             K::Plus => match (a, b) {
-                (V::Num(x), V::Num(y)) => self.finite(x + y, positions.operator.0, positions.operator.1),
+                (V::Num(x), V::Num(y)) => {
+                    self.finite(x + y, positions.operator.0, positions.operator.1)
+                }
                 (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
                 (x, y) => Err(self.error(
                     format!(
@@ -755,7 +757,11 @@ impl Engine {
                     }
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
-                    return Err(self.error("Division or modulo by zero.", positions.operator.0, positions.operator.1));
+                    return Err(self.error(
+                        "Division or modulo by zero.",
+                        positions.operator.0,
+                        positions.operator.1,
+                    ));
                 }
                 self.finite(
                     match op {
