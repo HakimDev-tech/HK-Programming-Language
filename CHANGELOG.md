@@ -1,3 +1,10 @@
+## Unreleased — HK 0.2.0-alpha.6
+
+- Align static checker scope handling with the runtime: `if` and `while` do not create synthetic scopes; explicit blocks retain their lexical scopes.
+- Analyze C-style `for` clauses in runtime order: initializer, condition, body, then increment.
+- Add regression coverage for branch-local declarations and function signatures, outer typed contracts, block lifetime, loop diagnostic order, and loop initializer scope.
+- Preserve the existing grammar, runtime implementation, and 0.1.x dynamic behavior; no new syntax or types are introduced.
+
 ## Unreleased — HK 0.2.0-alpha.5
 
 - Report runtime parameter-contract violations at the offending argument expression.
