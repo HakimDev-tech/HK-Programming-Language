@@ -118,3 +118,5 @@ impl Engine {
     fn index(&self,v:V,l:usize,c:usize)->Result<usize>{if let V::Num(n)=v{if n>=0.0&&n.fract()==0.0&&n<(usize::MAX as f64){Ok(n as usize)}else{Err(self.error("Array index must be a non-negative integer.",l,c))}}else{Err(self.error("Array index must be Number.",l,c))}}
 }
 
+
+pub(super) fn execute(source_name:&str,source_text:&str,statements:&[S])->Result<Vec<String>>{let mut engine=Engine::new(source_name,source_text);engine.run(statements)?;Ok(engine.output)}
