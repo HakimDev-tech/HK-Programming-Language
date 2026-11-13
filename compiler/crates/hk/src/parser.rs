@@ -119,6 +119,10 @@ impl Parser {
     }
 
     fn type_name(&mut self) -> Result<TypeName> {
+        if self.check(K::Null) {
+            self.advance();
+            return Ok(TypeName::Null);
+        }
         let token = self.id("Expected a type name (number, string, bool, null, array, or any).")?;
         match token.text.as_str() {
             "number" => Ok(TypeName::Number),
