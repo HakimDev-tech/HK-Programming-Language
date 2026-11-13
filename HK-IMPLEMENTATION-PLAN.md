@@ -95,7 +95,7 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Audit static/runtime lexical shadowing, function aliases, direct recursion, and dynamic forward/mutual recursion behavior
 - [ ] Run final fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the same final commit
 - [ ] Complete the final fuzz session on the same final commit
-- [ ] Complete final documentation review against the implementation; examples remain syntax-compatible and no new syntax is introduced
+- [x] Review the normative typing spec, Alpha.5 spec, README, roadmap, changelog, implementation plan, and gradual-typing example against the current behavior
 
 **Exit gate:** all requirements in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) pass on one exact final commit. Alpha.5 is not a release candidate.
 

@@ -1,6 +1,7 @@
-// HK 0.2.0 gradual typing — alpha.3
+// HK 0.2.0 gradual typing — alpha.5
 // Unannotated bindings remain dynamic. Contracts are enforced when values
 // cross into annotated bindings or annotated function parameters/returns.
+// Runtime contract diagnostics identify the offending source expression.
 
 fn double(value: number) -> number {
     return value * 2;
