@@ -17,4 +17,4 @@ Each release requires acceptance criteria, regression tests, documentation, and 
 
 ## 0.2.x scope note
 
-The 0.2.0 target is gradual typing, not a general-purpose inference engine. Unannotated bindings remain dynamically typed (`any`). Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; this is not yet a stable or merged release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
+The 0.2.0 target is gradual typing, not a general-purpose inference engine. Unannotated bindings remain dynamically typed (`any`). Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on feature branches; alpha.4 is a bounded stabilization pass with regression, positive, negative, dynamic-boundary, and fuzz-corpus coverage. This is not yet a stable or merged release. See [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) and [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md).
