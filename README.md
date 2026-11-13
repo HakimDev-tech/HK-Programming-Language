@@ -65,7 +65,7 @@ greet(name);
 
 ## Runtime limits
 
-The interpreter limits active user-function calls to 256. Cyclic array references are rejected when assigning an array into another array, preventing reference-counting leaks. These are explicit 0.1.x runtime constraints, not guarantees of an optimizing/native compiler.
+The interpreter limits active user-function calls to 64. Cyclic array references are rejected when assigning an array into another array, preventing reference-counting leaks. These are explicit 0.1.x runtime constraints, not guarantees of an optimizing/native compiler.
 
 ## Scope
 
