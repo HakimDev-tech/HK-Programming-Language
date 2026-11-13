@@ -156,7 +156,7 @@ impl Parser {
         if self.take(K::Eq){let t=self.prev().clone();let v=self.assign()?;return match e{
             E::Var(n,_,_)=>Ok(E::Assign(n,Box::new(v),t.line,t.col)),
             E::Index(o,i,l,c)=>Ok(E::SetIndex(o,i,Box::new(v),l,c)),
-            _=>Err(self.err("Invalid assignment target."))};}
+            _=>Err(self.error("Invalid assignment target."))};}
         Ok(e)
     }
     fn or(&mut self)->Result<E>{let mut e=self.and()?;while self.take(K::Or){let t=self.prev().clone();e=E::Binary(Box::new(e),K::Or,Box::new(self.and()?),t.line,t.col);}Ok(e)}
@@ -179,8 +179,8 @@ impl Parser {
         let t=self.advance().clone();
         match t.kind{
             K::True=>Ok(E::Bool(true,t.line,t.col)),K::False=>Ok(E::Bool(false,t.line,t.col)),K::Null=>Ok(E::Null(t.line,t.col)),
-            K::Number=>if let Some(Lit::Number(n))=t.literal{Ok(E::Lit(Lit::Number(n),t.line,t.col))}else{Err(self.err("Invalid number token."))},
-            K::String=>if let Some(Lit::String(s))=t.literal{Ok(E::Lit(Lit::String(s),t.line,t.col))}else{Err(self.err("Invalid string token."))},
+            K::Number=>if let Some(Lit::Number(n))=t.literal{Ok(E::Lit(Lit::Number(n),t.line,t.col))}else{Err(self.error("Invalid number token."))},
+            K::String=>if let Some(Lit::String(s))=t.literal{Ok(E::Lit(Lit::String(s),t.line,t.col))}else{Err(self.error("Invalid string token."))},
             K::Id=>Ok(E::Var(t.text,t.line,t.col)),
             K::LParen=>{let e=self.expr()?;self.expect(K::RParen,"Expected ')' after expression.")?;Ok(E::Group(Box::new(e)))},
             K::LBracket=>{let mut a=vec![];if !self.check(K::RBracket){loop{a.push(self.expr()?);if !self.take(K::Comma){break;}}}self.expect(K::RBracket,"Expected ']' after array.")?;Ok(E::Array(a,t.line,t.col))},
