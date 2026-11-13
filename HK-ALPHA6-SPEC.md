@@ -34,27 +34,26 @@ The checker must model the existing runtime rules:
 - A branch or loop body that is itself an explicit block creates the block scope through the normal `S::Block` rule.
 - No synthetic scope may be introduced solely because a statement is used as a control-flow body.
 
-### 3.2 Conditional declarations
+### 3.2 Conditional declarations and existing grammar
 
-The runtime executes only the selected `if` branch and may execute a `while` body zero or more times. Declarations in these bodies are therefore not guaranteed to have executed after the control-flow statement.
+The current parser accepts declarations (`let`, `const`, and function declarations) only in declaration contexts: program/function/block bodies and the `for` initializer. An unbraced `if`, `while`, or `for` body is parsed as a statement and cannot directly contain a declaration.
 
-To remain conservative without adding definite-assignment analysis:
+Therefore:
 
-- Analyze each `if` branch from the same incoming static environment.
-- Do not promote declarations introduced only inside a conditional branch into definite bindings after the `if`.
-- Analyze a `while` body against the incoming environment, but do not promote declarations introduced only in the loop body into definite bindings after the loop.
-- Within a branch/body, declarations are visible according to the current lexical scope and explicit block structure.
-- Names not definitely available after a control-flow statement retain the existing dynamic/unresolved static treatment (`any`). Runtime lookup remains authoritative and may still report an undefined name.
-- Assignments to bindings that existed before the branch/body must be checked against their existing contracts.
-- Do not add flow-sensitive narrowing, definite-assignment diagnostics, or a new duplicate-declaration diagnostic in Alpha.6.
+- Declarations inside conditional or loop bodies occur inside explicit `S::Block` scopes.
+- Such block-local declarations are not visible after the block, regardless of whether the block is used as an `if` branch or loop body.
+- The checker must not invent a second scope around that explicit block.
+- Assignments to bindings declared before the branch/body must be checked against their existing contracts.
+- Alpha.6 must not change the grammar to permit unbraced declarations.
+- Do not add flow-sensitive narrowing, definite-assignment diagnostics, or a new duplicate-declaration diagnostic.
 
-This is a conservative static approximation. It does not change the runtime fact that a declaration executed in an unbraced branch/body is installed in the current runtime environment.
+The conservative behavior follows directly from the existing lexical block model; no new definite-assignment system is required.
 
 ### 3.3 Branch isolation
 
-The checker must not let declarations from the `then` branch contaminate analysis of the `else` branch, or vice versa. Each branch is checked from an equivalent copy/snapshot of the incoming static environment. Existing outer bindings remain visible and retain their contracts.
+The `then` and `else` branches must be checked independently. Explicit block scopes must be entered and exited through the normal `S::Block` handling, so declarations and function signatures in one branch cannot leak into the other branch or the enclosing scope. Existing outer bindings remain visible and retain their contracts.
 
-For declarations that collide with an existing binding in the same runtime scope, the checker must not invent a new shadowing scope. Existing runtime duplicate-declaration behavior remains authoritative; Alpha.6 must not silently treat such a declaration as a valid nested shadow.
+Because declarations are not legal directly as unbraced branch statements, Alpha.6 must not add synthetic declaration scopes or special-case declaration promotion for unbraced branches.
 
 ## 4. Normative `for` analysis order
 
@@ -71,7 +70,7 @@ Additional rules:
 
 - An omitted condition is an unconditional loop and has no condition expression to check.
 - An explicit block body creates and exits its own block scope before the increment is analyzed.
-- An unbraced body is analyzed in the loop scope; declarations introduced directly by that body may therefore be visible to the increment, consistent with runtime execution order.
+- Under the current grammar, declarations in a loop body require an explicit block. That block scope ends before the increment is analyzed, so its declarations are not visible to the increment.
 - The loop scope and all declarations within it are discarded after the loop.
 - This ordering is a static source-analysis order. It must not execute source expressions or alter runtime evaluation.
 
@@ -110,7 +109,7 @@ Do not introduce a general control-flow graph, SSA, flow-sensitive narrowing, or
 - An explicit block branch creates exactly one additional lexical scope.
 - Declarations in the `then` branch do not leak into static analysis of the `else` branch.
 - Declarations introduced only in a branch are not considered definitely available after the `if`.
-- A branch declaration must not be treated as a valid nested shadow when runtime would encounter a same-scope duplicate.
+- A declaration in an explicit branch block may shadow an outer binding exactly as the runtime block scope permits.
 - A typed assignment to an outer binding inside either branch is statically checked against the outer contract.
 
 ### 7.2 While loops
@@ -125,7 +124,7 @@ Do not introduce a general control-flow graph, SSA, flow-sensitive narrowing, or
 
 - Initializer declarations are visible in condition, body, and increment.
 - The body is analyzed before the increment.
-- An unbraced body declaration is visible to the increment when the runtime would execute the body before reaching the increment.
+- The increment is analyzed after the body, so a body diagnostic takes precedence over an increment diagnostic when both are statically invalid.
 - A declaration inside an explicit block body is not visible to the increment.
 - Loop-scope declarations are not visible after the loop.
 - Omitted initializer, condition, and increment combinations remain valid according to the existing grammar.
