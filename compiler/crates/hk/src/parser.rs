@@ -1,4 +1,4 @@
-use super::ast::{E, Param, S, TypeName};
+use super::ast::{Param, TypeName, E, S};
 use super::lexer::{Lit, Token, K};
 use super::{HkError, Result};
 use std::collections::HashSet;
@@ -106,14 +106,7 @@ impl Parser {
         let has_annotations =
             return_type.is_some() || params.iter().any(|p| p.annotation.is_some());
         if has_annotations {
-            Ok(S::TypedFn(
-                n.text,
-                params,
-                return_type,
-                body,
-                n.line,
-                n.col,
-            ))
+            Ok(S::TypedFn(n.text, params, return_type, body, n.line, n.col))
         } else {
             Ok(S::Fn(
                 n.text,
