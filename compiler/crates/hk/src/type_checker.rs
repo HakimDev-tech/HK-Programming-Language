@@ -288,7 +288,7 @@ impl<'a> TypeChecker<'a> {
         &self,
         expected: Type,
         actual: Type,
-        code: &str,
+        code: &'static str,
         context: &str,
         line: usize,
         column: usize,
