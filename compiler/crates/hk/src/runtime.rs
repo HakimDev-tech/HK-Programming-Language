@@ -52,7 +52,7 @@ impl Engine {
     fn error(&self,msg:impl Into<String>,line:usize,col:usize)->HkError{HkError::new("E3000",msg,&self.source,line,col,&self.source_text)}
     fn run(&mut self,ss:&[S])->Result<()>{for s in ss{if let Flow::Return(_,line,col)=self.exec(s)?{return Err(self.error("'return' is only valid inside a function.",line,col));}}Ok(())}
     fn exec_all(&mut self,ss:&[S])->Result<Flow>{for s in ss{match self.exec(s)?{Flow::Next=>{},r@Flow::Return(..)=>return Ok(r)}}Ok(Flow::Next)}
-    fn exec(&mut self,s:&S)->Result<Flow>{if self.exec_depth>=128{return Err(self.error("Maximum statement execution depth (128) exceeded.",1,1));}self.exec_depth+=1;let result=self.exec_inner(s);self.exec_depth-=1;result}
+    fn exec(&mut self,s:&S)->Result<Flow>{if self.exec_depth>=128{let (line,column)=s.source_position();return Err(self.error("Maximum statement execution depth (128) exceeded.",line,column));}self.exec_depth+=1;let result=self.exec_inner(s);self.exec_depth-=1;result}
     fn exec_inner(&mut self,s:&S)->Result<Flow>{
         match s{
             S::Var(n,e,m,l,c)=>{let v=self.eval(e)?;self.env.borrow_mut().define(n.clone(),v,*m).map_err(|x|self.error(x,*l,*c))?;}
