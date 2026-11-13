@@ -746,3 +746,67 @@ pub(super) fn execute(
     engine.run(statements)?;
     Ok(engine.output)
 }
+
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+
+    #[test]
+    fn failed_contract_assignment_preserves_the_previous_binding_value() {
+        let environment = Rc::new(RefCell::new(Env::default()));
+        environment
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Num(1.0),
+                true,
+                Some(Type::Number),
+                "test initialization",
+            )
+            .unwrap();
+
+        let error = Env::set(
+            &environment,
+            "value",
+            V::Str("invalid".into()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, EnvError::Contract(_)));
+        assert!(matches!(Env::get(&environment, "value"), Some(V::Num(1.0))));
+    }
+
+    #[test]
+    fn shadowed_bindings_keep_independent_runtime_contracts() {
+        let parent = Rc::new(RefCell::new(Env::default()));
+        parent
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Num(1.0),
+                true,
+                Some(Type::Number),
+                "test initialization",
+            )
+            .unwrap();
+
+        let child = Env::child(parent.clone());
+        child
+            .borrow_mut()
+            .define(
+                "value".into(),
+                V::Str("child".into()),
+                true,
+                Some(Type::String),
+                "test initialization",
+            )
+            .unwrap();
+
+        assert!(Env::set(&child, "value", V::Str("updated".into())).is_ok());
+        assert!(matches!(Env::get(&parent, "value"), Some(V::Num(1.0))));
+        assert!(matches!(
+            Env::get(&child, "value"),
+            Some(V::Str(value)) if value == "updated"
+        ));
+    }
+}
