@@ -1,6 +1,7 @@
 //! HK 0.1.x reference interpreter.
 //! Dependency-free tree-walking implementation.
 mod ast;
+use ast::S;
 pub mod diagnostics;
 mod lexer;
 mod parser;
@@ -11,7 +12,40 @@ pub(crate) type Result<T> = std::result::Result<T, HkError>;
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
+    if let Some((line, column, message)) = first_type_annotation(&statements) {
+        return Err(HkError::new("E3001", message, source_name, line, column, source));
+    }
     runtime::execute(source_name, source, &statements)
+}
+
+fn first_type_annotation(statements: &[S]) -> Option<(usize, usize, String)> {
+    for statement in statements {
+        match statement {
+            S::TypedVar(_, _, _, _, line, column) => {
+                return Some((*line, *column, "Type annotations are parsed but not executable in HK 0.2.0-alpha.1.".into()));
+            }
+            S::TypedFn(_, _, _, _, line, column) => {
+                return Some((*line, *column, "Typed functions are parsed but not executable in HK 0.2.0-alpha.1.".into()));
+            }
+            S::Fn(_, _, body, _, _) | S::Block(body) => {
+                if let Some(found) = first_type_annotation(body) { return Some(found); }
+            }
+            S::If(_, then_branch, else_branch) => {
+                if let Some(found) = first_type_annotation(std::slice::from_ref(then_branch.as_ref())) { return Some(found); }
+                if let Some(branch) = else_branch {
+                    if let Some(found) = first_type_annotation(std::slice::from_ref(branch.as_ref())) { return Some(found); }
+                }
+            }
+            S::While(_, body) | S::For(_, _, _, body) => {
+                if let Some(found) = first_type_annotation(std::slice::from_ref(body.as_ref())) { return Some(found); }
+            }
+            S::For(Some(initializer), _, _, _) => {
+                if let Some(found) = first_type_annotation(std::slice::from_ref(initializer.as_ref())) { return Some(found); }
+            }
+            S::Var(_, _, _, _, _) | S::Expr(_) | S::Return(_, _, _) | S::For(None, _, _, _) => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -229,4 +263,47 @@ mod tests {
         assert_eq!(run("test.hk", r#"print("a\\nb");"#).unwrap(), vec!["a\\nb"]);
         assert_eq!(run("test.hk", r#"print("a\nb");"#).unwrap(), vec!["a\nb"]);
     }
+    #[test]
+    fn parses_variable_type_annotations_without_executing_them() {
+        let error = run("typed.hk", "let age: number = 18;").unwrap_err();
+        assert_eq!(error.code, "E3001");
+        assert!(error.message.contains("parsed but not executable"));
+        assert_eq!((error.line, error.column), (1, 1));
+    }
+
+    #[test]
+    fn parses_typed_function_parameters_and_return_annotations() {
+        let error = run(
+            "typed.hk",
+            "fn add(a: number, b: number) -> number { return a + b; }",
+        ).unwrap_err();
+        assert_eq!(error.code, "E3001");
+        assert!(error.message.contains("Typed functions"));
+    }
+
+    #[test]
+    fn rejects_unknown_type_names_during_parsing() {
+        let error = run("typed.hk", "let age: integer = 18;").unwrap_err();
+        assert_eq!(error.code, "E2003");
+        assert!(error.message.contains("Unknown type"));
+    }
+
+    #[test]
+    fn parses_all_supported_type_names() {
+        for ty in ["number", "string", "bool", "null", "array", "any"] {
+            let source = format!("let value: {ty} = null;");
+            let error = run("typed.hk", &source).unwrap_err();
+            assert_eq!(error.code, "E3001", "failed for type {ty}");
+        }
+    }
+
+    #[test]
+    fn rejects_typed_syntax_nested_before_runtime_execution() {
+        let error = run(
+            "typed.hk",
+            "fn outer() { if (true) { let inner: bool = true; } }",
+        ).unwrap_err();
+        assert_eq!(error.code, "E3001");
+    }
+
 }
