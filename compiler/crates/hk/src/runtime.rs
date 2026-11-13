@@ -404,14 +404,18 @@ impl Engine {
                 return r;
             }
             S::Return(e, line, col) => {
+                let (return_line, return_column) = e
+                    .as_ref()
+                    .map(E::source_position)
+                    .unwrap_or((*line, *col));
                 return Ok(Flow::Return(
                     if let Some(e) = e {
                         self.eval(e)?
                     } else {
                         V::Null
                     },
-                    *line,
-                    *col,
+                    return_line,
+                    return_column,
                 ))
             }
         }
@@ -460,14 +464,24 @@ impl Engine {
                         if let V::Num(n) = v {
                             self.finite(-n, *l, *c)
                         } else {
-                            Err(self.type_error("Unary '-' expects Number.", *l, *c))
+                            let (operand_line, operand_column) = e.source_position();
+                            Err(self.type_error(
+                                "Unary '-' expects Number.",
+                                operand_line,
+                                operand_column,
+                            ))
                         }
                     }
                     K::Bang => {
                         if let V::Bool(b) = v {
                             Ok(V::Bool(!b))
                         } else {
-                            Err(self.type_error("'!' expects Boolean.", *l, *c))
+                            let (operand_line, operand_column) = e.source_position();
+                            Err(self.type_error(
+                                "'!' expects Boolean.",
+                                operand_line,
+                                operand_column,
+                            ))
                         }
                     }
                     _ => unreachable!(),
@@ -476,9 +490,11 @@ impl Engine {
             E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
                 let f = self.eval(callee)?;
-                let mut vs = vec![];
-                for a in args {
-                    vs.push(self.eval(a)?);
+                let mut vs = Vec::with_capacity(args.len());
+                for argument in args {
+                    let value = self.eval(argument)?;
+                    let (argument_line, argument_column) = argument.source_position();
+                    vs.push((value, argument_line, argument_column));
                 }
                 match f {
                     V::Print => {
@@ -489,7 +505,7 @@ impl Engine {
                                 *c,
                             ));
                         }
-                        self.output.push(vs[0].show());
+                        self.output.push(vs[0].0.show());
                         Ok(V::Null)
                     }
                     V::Fun(fun) => {
@@ -516,7 +532,9 @@ impl Engine {
                             self.error("Function environment is no longer available.", *l, *c)
                         })?;
                         let call = Env::child(parent);
-                        for (parameter, value) in fun.params.iter().zip(vs) {
+                        for (parameter, (value, argument_line, argument_column)) in
+                            fun.params.iter().zip(vs)
+                        {
                             call.borrow_mut()
                                 .define(
                                     parameter.name.clone(),
@@ -525,7 +543,9 @@ impl Engine {
                                     parameter.annotation.map(Type::from),
                                     "function parameter",
                                 )
-                                .map_err(|error| self.env_error(error, *l, *c))?;
+                                .map_err(|error| {
+                                    self.env_error(error, argument_line, argument_column)
+                                })?;
                         }
                         let old = self.env.clone();
                         self.env = call;
@@ -552,19 +572,26 @@ impl Engine {
             E::Index(a, i, l, c) => {
                 let o = self.eval(a)?;
                 let index_value = self.eval(i)?;
-                let idx = self.index(index_value, *l, *c)?;
+                let (index_line, index_column) = i.source_position();
+                let idx = self.index(index_value, index_line, index_column)?;
                 if let V::Arr(items) = o {
                     items.borrow().get(idx).cloned().ok_or_else(|| {
                         self.error(format!("Array index {idx} is out of bounds."), *l, *c)
                     })
                 } else {
-                    Err(self.type_error("Indexing requires Array.", *l, *c))
+                    let (receiver_line, receiver_column) = a.source_position();
+                    Err(self.type_error(
+                        "Indexing requires Array.",
+                        receiver_line,
+                        receiver_column,
+                    ))
                 }
             }
             E::SetIndex(a, i, r, l, c) => {
                 let o = self.eval(a)?;
                 let index_value = self.eval(i)?;
-                let idx = self.index(index_value, *l, *c)?;
+                let (index_line, index_column) = i.source_position();
+                let idx = self.index(index_value, index_line, index_column)?;
                 let v = self.eval(r)?;
                 if let V::Arr(items) = o {
                     if idx >= items.borrow().len() {
@@ -586,7 +613,12 @@ impl Engine {
                     items[idx] = v.clone();
                     Ok(v)
                 } else {
-                    Err(self.type_error("Indexed assignment requires Array.", *l, *c))
+                    let (receiver_line, receiver_column) = a.source_position();
+                    Err(self.type_error(
+                        "Indexed assignment requires Array.",
+                        receiver_line,
+                        receiver_column,
+                    ))
                 }
             }
             E::Property(a, n, l, c) => {
@@ -594,11 +626,14 @@ impl Engine {
                 if n == "length" {
                     return match value {
                         V::Arr(items) => Ok(V::Num(items.borrow().len() as f64)),
-                        other => Err(self.type_error(
-                            format!("Property 'length' requires Array, received {}.", other.ty()),
-                            *l,
-                            *c,
-                        )),
+                        other => {
+                            let (receiver_line, receiver_column) = a.source_position();
+                            Err(self.type_error(
+                                format!("Property 'length' requires Array, received {}.", other.ty()),
+                                receiver_line,
+                                receiver_column,
+                            ))
+                        }
                     };
                 }
                 Err(self.error(
@@ -610,42 +645,77 @@ impl Engine {
         }
     }
     fn eval_binary_chain(&mut self, expression: &E) -> Result<V> {
-        let mut operations: Vec<(K, &E, usize, usize)> = Vec::new();
+        let mut operations: Vec<(K, &E, (usize, usize), (usize, usize), usize, usize)> =
+            Vec::new();
         let mut cursor = expression;
         while let E::Binary(left, operator, right, line, column) = cursor {
-            operations.push((*operator, right.as_ref(), *line, *column));
+            operations.push((
+                *operator,
+                right.as_ref(),
+                left.source_position(),
+                right.source_position(),
+                *line,
+                *column,
+            ));
             cursor = left.as_ref();
         }
 
         let mut value = self.eval(cursor)?;
-        for (operator, right, line, column) in operations.into_iter().rev() {
+        for (operator, right, left_position, right_position, line, column) in
+            operations.into_iter().rev()
+        {
             match operator {
                 K::And => {
-                    if !self.boolean(value, line, column)? {
+                    if !self.boolean(value, left_position.0, left_position.1)? {
                         value = V::Bool(false);
                     } else {
                         let right_value = self.eval(right)?;
-                        value = V::Bool(self.boolean(right_value, line, column)?);
+                        value = V::Bool(self.boolean(
+                            right_value,
+                            right_position.0,
+                            right_position.1,
+                        )?);
                     }
                 }
                 K::Or => {
-                    if self.boolean(value, line, column)? {
+                    if self.boolean(value, left_position.0, left_position.1)? {
                         value = V::Bool(true);
                     } else {
                         let right_value = self.eval(right)?;
-                        value = V::Bool(self.boolean(right_value, line, column)?);
+                        value = V::Bool(self.boolean(
+                            right_value,
+                            right_position.0,
+                            right_position.1,
+                        )?);
                     }
                 }
                 _ => {
                     let right_value = self.eval(right)?;
-                    value = self.binary(value, operator, right_value, line, column)?;
+                    value = self.binary(
+                        value,
+                        operator,
+                        right_value,
+                        line,
+                        column,
+                        left_position,
+                        right_position,
+                    )?;
                 }
             }
         }
         Ok(value)
     }
 
-    fn binary(&self, a: V, op: K, b: V, l: usize, c: usize) -> Result<V> {
+    fn binary(
+        &self,
+        a: V,
+        op: K,
+        b: V,
+        l: usize,
+        c: usize,
+        left_position: (usize, usize),
+        right_position: (usize, usize),
+    ) -> Result<V> {
         match op {
             K::Plus => match (a, b) {
                 (V::Num(x), V::Num(y)) => self.finite(x + y, l, c),
@@ -661,14 +731,22 @@ impl Engine {
                 )),
             },
             K::Minus | K::Star | K::Slash | K::Percent => {
-                let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
-                    (x, y)
-                } else {
-                    return Err(self.type_error(
-                        "Arithmetic operators require Number operands.",
-                        l,
-                        c,
-                    ));
+                let (x, y) = match (a, b) {
+                    (V::Num(x), V::Num(y)) => (x, y),
+                    (left, _) if !matches!(left, V::Num(_)) => {
+                        return Err(self.type_error(
+                            "Arithmetic operators require Number operands.",
+                            left_position.0,
+                            left_position.1,
+                        ));
+                    }
+                    (_, right) => {
+                        return Err(self.type_error(
+                            "Arithmetic operators require Number operands.",
+                            right_position.0,
+                            right_position.1,
+                        ));
+                    }
                 };
                 if (op == K::Slash || op == K::Percent) && y == 0.0 {
                     return Err(self.error("Division or modulo by zero.", l, c));
@@ -686,14 +764,22 @@ impl Engine {
                 )
             }
             K::Gt | K::GtEq | K::Lt | K::LtEq => {
-                let (x, y) = if let (V::Num(x), V::Num(y)) = (a, b) {
-                    (x, y)
-                } else {
-                    return Err(self.type_error(
-                        "Ordering comparisons require Number operands.",
-                        l,
-                        c,
-                    ));
+                let (x, y) = match (a, b) {
+                    (V::Num(x), V::Num(y)) => (x, y),
+                    (left, _) if !matches!(left, V::Num(_)) => {
+                        return Err(self.type_error(
+                            "Ordering comparisons require Number operands.",
+                            left_position.0,
+                            left_position.1,
+                        ));
+                    }
+                    (_, right) => {
+                        return Err(self.type_error(
+                            "Ordering comparisons require Number operands.",
+                            right_position.0,
+                            right_position.1,
+                        ));
+                    }
                 };
                 Ok(V::Bool(match op {
                     K::Gt => x > y,

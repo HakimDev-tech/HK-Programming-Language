@@ -195,3 +195,53 @@ fn typed_function_return_analysis_handles_nested_blocks_and_both_branches() {
         "E3009"
     );
 }
+
+#[test]
+fn indirect_function_parameter_contract_points_to_the_argument() {
+    let source =
+        "fn take(value: number) -> number { return value; } let operation = take; operation(\"bad\");";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.find("\"bad\"").unwrap() + 1);
+}
+
+#[test]
+fn indirect_function_return_contract_points_to_the_return_expression() {
+    let source =
+        "fn source() { return \"bad\"; } fn take() -> number { return source(); } take();";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.find("source(); } take").unwrap() + 1);
+}
+
+#[test]
+fn unary_dynamic_guard_points_to_the_operand() {
+    let source = "let marker: bool = true; let value = \"bad\"; print(-value);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("value").unwrap() + 1);
+}
+
+#[test]
+fn binary_dynamic_guard_points_to_the_offending_operand() {
+    let source = "let marker: bool = true; let value = 1; print(value - \"bad\");";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.find("\"bad\"").unwrap() + 1);
+}
+
+#[test]
+fn dynamic_array_index_guard_points_to_the_index_expression() {
+    let source = "let marker: bool = true; let values = [1]; print(values[\"bad\"]);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.find("\"bad\"").unwrap() + 1);
+}
+
+#[test]
+fn dynamic_array_receiver_guard_points_to_the_receiver() {
+    let source = "let marker: bool = true; let value = 1; print(value.length);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("value").unwrap() + 1);
+}
