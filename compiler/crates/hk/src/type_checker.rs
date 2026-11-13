@@ -44,7 +44,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn error(&self, code: &str, message: impl Into<String>, line: usize, column: usize) -> HkError {
+    fn error(&self, code: &'static str, message: impl Into<String>, line: usize, column: usize) -> HkError {
         HkError::new(code, message, self.source_name, line, column, self.source)
     }
 
