@@ -294,7 +294,7 @@ impl Engine {
                 V::Print=>{if vs.len()!=1{return Err(self.error(format!("print() expects one argument, received {}.",vs.len()),*l,*c));}self.output.push(vs[0].show());Ok(V::Null)}
                 V::Fun(fun)=>{
                     if vs.len()!=fun.params.len(){return Err(self.error(format!("Function '{}' expects {} arguments, received {}.",fun.name,fun.params.len(),vs.len()),*l,*c));}
-                    if self.call_depth>=256{return Err(self.error("Maximum function call depth (256) exceeded.",*l,*c));}
+                    if self.call_depth>=64{return Err(self.error("Maximum function call depth (256) exceeded.",*l,*c));}
                     let parent=fun.env.upgrade().ok_or_else(||self.error("Function environment is no longer available.",*l,*c))?;
                     let call=Env::child(parent);
                     for(n,v)in fun.params.iter().zip(vs){call.borrow_mut().define(n.clone(),v,true).map_err(|x|self.error(x,*l,*c))?;}
