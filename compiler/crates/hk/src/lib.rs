@@ -557,4 +557,21 @@ mod tests {
             vec!["false", "true"]
         );
     }
+    #[test]
+    fn runtime_guards_dynamic_null_function_returns() {
+        let error = run(
+            "typed.hk",
+            "fn dynamic() { return 1; } fn nullable() -> null { return dynamic(); } nullable();",
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "E3008");
+        assert!(error.message.contains("expected null, found number"));
+    }
+
+    #[test]
+    fn unannotated_runtime_type_errors_keep_legacy_diagnostic_codes() {
+        let error = run("dynamic.hk", "if (1) { print(1); }").unwrap_err();
+        assert_eq!(error.code, "E3000");
+    }
+
 }
