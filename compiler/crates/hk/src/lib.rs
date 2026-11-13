@@ -444,7 +444,7 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code, "E3008");
-        assert!(error.message.contains("initialization"));
+        assert!(error.message.contains("function parameter"));
     }
 
     #[test]
