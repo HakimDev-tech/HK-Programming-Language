@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1 syntax and the initial alpha.2 static checker are implemented on feature branches; runtime contracts remain unimplemented.
+**Status:** Alpha.1 syntax, alpha.2 static checking, and alpha.3 runtime contracts are implemented on a feature branch; cross-platform CI and review remain release gates.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). This plan must follow that specification. A semantic change requires updating the specification and tests before implementation.
 
@@ -29,37 +29,39 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Add parser tests for valid and invalid syntax
 - [x] Confirm all existing unannotated syntax remains unchanged
 
-**Alpha.1 gate:** annotated source parses into an AST with source locations; execution is gated with E2004.
+**Alpha.1 gate:** satisfied — annotated source parses into an AST with source locations.
 
-**Alpha.2 gate:** the initial checker runs before the execution gate, rejects known static mismatches, and leaves wholly unannotated programs on the dynamic 0.1.x path. Runtime guards and typed execution remain deferred.
+**Alpha.2 gate:** satisfied — static checking runs before execution and rejects known mismatches; wholly unannotated programs retain the dynamic 0.1.x path.
+
+**Alpha.3 gate:** satisfied in implementation — valid annotated programs execute; dynamic values are checked at typed binding and function boundaries.
 
 ## Phase 2 — Static type system (alpha.2)
 
-- [ ] Add the source-level type representation and compatibility helpers
+- [x] Add the source-level type representation and compatibility helpers
 - [x] Implement lexical type scopes consistent with runtime scopes
-- [ ] Check variable initializers and assignments
-- [ ] Check unary and binary operators
-- [ ] Check Boolean conditions and preserve short-circuit behavior
-- [ ] Track named function signatures, including self-recursion
-- [ ] Check statically known function arguments and return expressions
-- [ ] Implement conservative typed-function return-path analysis
-- [ ] Add stable E3001–E3009 diagnostics
-- [ ] Ensure static errors occur before any runtime output or side effect
+- [x] Check variable initializers and assignments
+- [x] Check unary and binary operators
+- [x] Check Boolean conditions and preserve short-circuit behavior
+- [x] Track named function signatures, including self-recursion
+- [x] Check statically known function arguments and return expressions
+- [x] Implement conservative typed-function return-path analysis
+- [x] Add stable E3001–E3009 diagnostics
+- [x] Ensure static errors occur before any runtime output or side effect
 
 **Exit gate:** all statically provable type violations are rejected before execution; dynamic expressions remain dynamic.
 
-## Phase 3 — Runtime contracts (beta)
+## Phase 3 — Runtime contracts (alpha.3)
 
-- [ ] Store declared type metadata on runtime bindings
-- [ ] Centralize initialization and assignment contract checks
-- [ ] Store parameter and return contract metadata on functions
-- [ ] Guard dynamic arguments before function body execution
-- [ ] Guard dynamic return values before they escape the function
-- [ ] Guard dynamic values used in concrete typed contexts
-- [ ] Ensure every violation returns an HK diagnostic, never a Rust panic
-- [ ] Test aliasing, shadowing, recursion, and all mutation paths
+- [x] Store declared type metadata on runtime bindings
+- [x] Centralize initialization and assignment contract checks
+- [x] Store parameter and return contract metadata on functions
+- [x] Guard dynamic arguments before function body execution
+- [x] Guard dynamic return values before they escape the function
+- [x] Guard dynamic values used in concrete typed contexts
+- [x] Ensure every violation returns an HK diagnostic, never a Rust panic
+- [x] Test aliasing, shadowing, recursion, and all mutation paths
 
-**Exit gate:** no dynamic value can cross a concrete typed boundary unchecked.
+**Exit gate:** implemented on the alpha.3 feature branch; verify via runtime contract test matrix and cross-platform CI before merge.
 
 ## Phase 4 — Stabilization and release candidate
 
