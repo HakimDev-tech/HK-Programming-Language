@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — HK 0.2.0-alpha.2
+
+- Add an internal type representation and compatibility relation.
+- Add lexical type scopes and static checks for annotated variable initialization, assignment, direct function calls, return values, operators, conditions, and conservative return-path completeness.
+- Run static checking before the alpha execution gate; wholly unannotated programs remain on the dynamic 0.1.x path.
+- Add regression tests for static mismatches, return fallthrough, function shadowing, mutable parameters, and unannotated compatibility.
+- Typed programs remain non-executable until runtime contract enforcement is implemented.
+
 ## Unreleased — HK 0.2.0-alpha.1
 
 - Recognize `:` and `->` in the lexer.
