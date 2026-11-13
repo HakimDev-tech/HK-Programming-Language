@@ -16,7 +16,7 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Define static compatibility and dynamic boundary rules
 - [x] Define array behavior and return-path policy
 - [x] Define architecture, diagnostics, acceptance criteria, and non-goals
-- [ ] Review the specification against every 0.1.x semantic edge case before coding
+- [x] Review and clarify dynamic operator guards, short-circuit evaluation, function aliases, sequential name resolution, assignment-expression typing, array aliasing, and null/any return behavior
 
 ## Phase 1 — Frontend syntax (alpha.1)
 
