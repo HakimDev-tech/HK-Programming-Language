@@ -215,6 +215,9 @@ impl Engine {
     fn error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3000", msg, &self.source, line, col, &self.source_text)
     }
+    fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+        HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
+    }
     fn run(&mut self, ss: &[S]) -> Result<()> {
         for s in ss {
             if let Flow::Return(_, line, col) = self.exec(s)? {
@@ -458,10 +461,15 @@ impl Engine {
                             self.error("Function environment is no longer available.", *l, *c)
                         })?;
                         let call = Env::child(parent);
-                        for (n, v) in fun.params.iter().zip(vs) {
+                        for (parameter, value) in fun.params.iter().zip(vs) {
                             call.borrow_mut()
-                                .define(n.clone(), v, true)
-                                .map_err(|x| self.error(x, *l, *c))?;
+                                .define(
+                                    parameter.name.clone(),
+                                    value,
+                                    true,
+                                    parameter.annotation.map(Type::from),
+                                )
+                                .map_err(|message| self.contract_error(message, *l, *c))?;
                         }
                         let old = self.env.clone();
                         self.env = call;
@@ -469,10 +477,16 @@ impl Engine {
                         let r = self.exec_all(&fun.body);
                         self.call_depth -= 1;
                         self.env = old;
-                        match r? {
-                            Flow::Next => Ok(V::Null),
-                            Flow::Return(v, _, _) => Ok(v),
+                        let (value, return_line, return_column) = match r? {
+                            Flow::Next => (V::Null, *l, *c),
+                            Flow::Return(value, line, column) => (value, line, column),
+                        };
+                        if let Some(expected) = fun.return_type {
+                            ensure_contract(expected, &value, "function return").map_err(
+                                |message| self.contract_error(message, return_line, return_column),
+                            )?;
                         }
+                        Ok(value)
                     }
                     v => {
                         Err(self.error(format!("Cannot call a value of type {}.", v.ty()), *l, *c))
