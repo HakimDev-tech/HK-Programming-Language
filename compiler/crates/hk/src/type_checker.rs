@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{E, S};
-use crate::lexer::{K, Lit};
+use crate::lexer::{Lit, K};
 use crate::{HkError, Result};
 
 use super::types::Type;
@@ -66,7 +66,10 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn binding(&self, name: &str) -> Option<Binding> {
-        self.scopes.iter().rev().find_map(|scope| scope.get(name).copied())
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(name).copied())
     }
 
     fn function(&self, name: &str) -> Option<FunctionSignature> {
@@ -85,13 +88,34 @@ impl<'a> TypeChecker<'a> {
         match statement {
             S::Var(name, initializer, mutable, _, _) => {
                 self.check_expression(initializer)?;
-                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: *mutable });
+                self.define_binding(
+                    name,
+                    Binding {
+                        ty: Type::Any,
+                        contract: None,
+                        mutable: *mutable,
+                    },
+                );
             }
             S::TypedVar(name, annotation, initializer, mutable, line, column) => {
                 let expected = Type::from(*annotation);
                 let actual = self.check_expression(initializer)?;
-                self.require(expected, actual, "E3001", "variable initializer", *line, *column)?;
-                self.define_binding(name, Binding { ty: expected, contract: Some(expected), mutable: *mutable });
+                self.require(
+                    expected,
+                    actual,
+                    "E3001",
+                    "variable initializer",
+                    *line,
+                    *column,
+                )?;
+                self.define_binding(
+                    name,
+                    Binding {
+                        ty: expected,
+                        contract: Some(expected),
+                        mutable: *mutable,
+                    },
+                );
             }
             S::Fn(name, parameters, body, _, _) => {
                 let signature = FunctionSignature {
@@ -99,7 +123,14 @@ impl<'a> TypeChecker<'a> {
                     return_type: None,
                 };
                 self.define_function(name, signature);
-                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: false });
+                self.define_binding(
+                    name,
+                    Binding {
+                        ty: Type::Any,
+                        contract: None,
+                        mutable: false,
+                    },
+                );
                 self.check_function_body(
                     parameters
                         .iter()
@@ -119,12 +150,23 @@ impl<'a> TypeChecker<'a> {
                     return_type: return_type.map(Type::from),
                 };
                 self.define_function(name, signature);
-                self.define_binding(name, Binding { ty: Type::Any, contract: None, mutable: false });
+                self.define_binding(
+                    name,
+                    Binding {
+                        ty: Type::Any,
+                        contract: None,
+                        mutable: false,
+                    },
+                );
                 let parameter_bindings = parameters
                     .iter()
                     .zip(parameter_types.iter())
                     .map(|(parameter, ty)| {
-                        (parameter.name.as_str(), *ty, parameter.annotation.map(Type::from))
+                        (
+                            parameter.name.as_str(),
+                            *ty,
+                            parameter.annotation.map(Type::from),
+                        )
                     })
                     .collect();
                 self.check_function_body(parameter_bindings, body, return_type.map(Type::from))?;
@@ -222,7 +264,14 @@ impl<'a> TypeChecker<'a> {
         let previous_return_type = self.return_type;
         self.return_type = return_type;
         for (name, ty, contract) in parameters {
-            self.define_binding(name, Binding { ty, contract, mutable: true });
+            self.define_binding(
+                name,
+                Binding {
+                    ty,
+                    contract,
+                    mutable: true,
+                },
+            );
         }
         let result = self.check(body);
         self.return_type = previous_return_type;
@@ -257,12 +306,20 @@ impl<'a> TypeChecker<'a> {
             E::Lit(Lit::String(_), _, _) => Ok(Type::String),
             E::Bool(_, _, _) => Ok(Type::Bool),
             E::Null(_, _) => Ok(Type::Null),
-            E::Var(name, _, _) => Ok(self.binding(name).map(|binding| binding.ty).unwrap_or(Type::Any)),
+            E::Var(name, _, _) => Ok(self
+                .binding(name)
+                .map(|binding| binding.ty)
+                .unwrap_or(Type::Any)),
             E::Assign(name, value, line, column) => {
                 let actual = self.check_expression(value)?;
                 if let Some(binding) = self.binding(name) {
                     if !binding.mutable {
-                        return Err(self.error("E3002", format!("Cannot assign to constant '{name}'."), *line, *column));
+                        return Err(self.error(
+                            "E3002",
+                            format!("Cannot assign to constant '{name}'."),
+                            *line,
+                            *column,
+                        ));
                     }
                     if let Some(contract) = binding.contract {
                         self.require(contract, actual, "E3002", "assignment", *line, *column)?;
@@ -276,7 +333,11 @@ impl<'a> TypeChecker<'a> {
             }
             E::Unary(operator, operand, line, column) => {
                 let actual = self.check_expression(operand)?;
-                let expected = if *operator == K::Bang { Type::Bool } else { Type::Number };
+                let expected = if *operator == K::Bang {
+                    Type::Bool
+                } else {
+                    Type::Number
+                };
                 self.require(expected, actual, "E3005", "unary operand", *line, *column)?;
                 Ok(expected)
             }
@@ -292,7 +353,12 @@ impl<'a> TypeChecker<'a> {
                         } else if left_type == Type::String && right_type == Type::String {
                             Ok(Type::String)
                         } else {
-                            Err(self.error("E3005", format!("'+' cannot combine {left_type} and {right_type}."), *line, *column))
+                            Err(self.error(
+                                "E3005",
+                                format!("'+' cannot combine {left_type} and {right_type}."),
+                                *line,
+                                *column,
+                            ))
                         }
                     }
                     K::Minus | K::Star | K::Slash | K::Percent => {
