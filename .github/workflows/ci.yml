@@ -8,8 +8,8 @@ permissions:
   contents: read
 jobs:
   rust:
-    name: Rust (${{ matrix.os }}})
-    runs-on: ${{ matrix.os }}}
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
