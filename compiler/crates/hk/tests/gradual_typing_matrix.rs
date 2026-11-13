@@ -438,7 +438,10 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
     let right_source = "let marker: bool = true; let dynamic = 1; print(false || dynamic);";
     let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
     assert_eq!(right_error.code, "E3008");
-    assert_eq!(right_error.column, right_source.rfind("dynamic").unwrap() + 1);
+    assert_eq!(
+        right_error.column,
+        right_source.rfind("dynamic").unwrap() + 1
+    );
 
     assert_eq!(
         run(
