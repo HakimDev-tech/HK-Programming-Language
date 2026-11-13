@@ -566,7 +566,10 @@ impl<'a> TypeChecker<'a> {
                             ));
                         }
                         for (argument, expected) in arguments.iter().zip(signature.parameters) {
-                            let actual = self.check_expression_with_strict(argument, expected != Type::Any || self.strict_context)?;
+                            let actual = self.check_expression_with_strict(
+                                argument,
+                                expected != Type::Any || self.strict_context,
+                            )?;
                             let (arg_line, arg_column) = argument.source_position();
                             self.require(
                                 expected,

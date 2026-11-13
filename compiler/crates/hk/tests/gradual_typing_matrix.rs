@@ -609,4 +609,3 @@ fn untyped_function_arity_remains_a_runtime_check_in_mixed_programs() {
     "#;
     assert_eq!(error_code(source), "E3000");
 }
-
