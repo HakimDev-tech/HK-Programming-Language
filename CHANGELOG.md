@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — HK 0.2.0-alpha.1
+
+- Recognize `:` and `->` in the lexer.
+- Parse optional variable, parameter, and function return annotations for `number`, `string`, `bool`, `null`, `array`, and `any`.
+- Preserve annotations in dedicated AST nodes with source locations.
+- Reject execution of annotated programs with E3001 until static checking and runtime contracts are available.
+- Add regression tests for supported type names, typed declarations/functions, unknown types, and nested annotations.
+
 ## Unreleased — HK 0.2.0 design
 
 - Select gradual typing as the 0.2.0 model.
@@ -7,7 +15,7 @@
 - Define static checking, operator-specific runtime guards, dynamic function-call boundaries, heterogeneous array behavior, assignment-expression typing, and conservative return-path analysis.
 - Clarify short-circuit guard timing, sequential name resolution, array binding contracts, and null/any return fallthrough.
 - Add the normative design baseline in HK-TYPING-SPEC.md and the phased implementation plan.
-- No 0.2.0 runtime or language feature is implemented by this documentation change.
+- The type checker and runtime contract enforcement remain unimplemented.
 
 ## Unreleased — HK 0.1.x hardening
 
