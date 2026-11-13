@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — HK 0.2.0 design
+
+- Select gradual typing as the 0.2.0 model.
+- Specify optional annotations for variables and named-function parameters/returns.
+- Define static checking, runtime guards for dynamic-to-typed boundaries, heterogeneous array behavior, and conservative return-path analysis.
+- Add the normative design baseline in HK-TYPING-SPEC.md and the phased implementation plan.
+- No 0.2.0 runtime or language feature is implemented by this documentation change.
+
 ## Unreleased — HK 0.1.x hardening
 
 - Split the interpreter into lexer, AST, parser, runtime, and diagnostics modules.
@@ -9,7 +17,7 @@
 - Expand malformed-input, deep-nesting, and generated-source regression coverage.
 - Enforce rustfmt checks and cross-platform CI on Linux, Windows, and macOS.
 
-## Unreleased
+## Unreleased — HK 0.1.0 baseline
 
 - Establish HK 0.1.0 language specification and architecture.
 - Add initial Rust lexer, parser, interpreter, runtime, CLI, examples, and tests.
