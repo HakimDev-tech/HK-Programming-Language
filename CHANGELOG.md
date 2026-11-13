@@ -2,7 +2,10 @@
 
 - Preserve legacy E3000 diagnostics for dynamic `+` overload failures and non-callable values, rather than misclassifying them as runtime contract violations (E3008).
 - Add regression coverage for diagnostic classification in mixed typed/dynamic programs.
-- Seed the fuzz corpus with typed variable/function contract and short-circuit cases.
+- Add positive, negative, and dynamic-boundary acceptance matrices for gradual typing.
+- Seed the fuzz corpus with typed variable/function contract and short-circuit cases; complete a successful annotation-heavy fuzz run.
+- Keep alpha.4 scoped to stabilization; no new language feature is introduced.
+
 
 # Changelog
 
