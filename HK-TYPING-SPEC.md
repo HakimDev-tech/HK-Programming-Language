@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification; alpha.1 parsing, alpha.2 static checking, and alpha.3 runtime contracts are implemented on feature branches. Alpha.4 acceptance matrices pass fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the current head. The final dedicated fuzz run remains in progress; alpha.4 is not yet closed  
+**Status:** Normative specification; alpha.1 parsing, alpha.2 static checking, and alpha.3 runtime contracts are implemented on feature branches. Alpha.4 acceptance matrices pass fmt, workspace tests, Clippy, rustdoc, and Linux/Windows/macOS CI on the current head. The final dedicated fuzz run also passed on the same head; the alpha.4 validation gate is satisfied. The PR remains unmerged pending maintainer review  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x
