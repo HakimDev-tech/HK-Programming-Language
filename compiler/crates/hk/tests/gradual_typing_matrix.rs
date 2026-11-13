@@ -246,3 +246,92 @@ fn dynamic_array_receiver_guard_points_to_the_receiver() {
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("value").unwrap() + 1);
 }
+
+#[test]
+fn binary_dynamic_guard_reports_a_bad_left_operand() {
+    let source =
+        "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(dynamic - value);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn logical_dynamic_guards_report_the_offending_operand() {
+    let left_source = "let marker: bool = true; let dynamic = 1; print(dynamic && true);";
+    let left_error = run("gradual-typing-matrix.hk", left_source).unwrap_err();
+    assert_eq!(left_error.code, "E3008");
+    assert_eq!(left_error.column, left_source.rfind("dynamic").unwrap() + 1);
+
+    let right_source = "let marker: bool = true; let dynamic = 1; print(true && dynamic);";
+    let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
+    assert_eq!(right_error.code, "E3008");
+    assert_eq!(right_error.column, right_source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn dynamic_array_index_receiver_guard_reports_the_receiver() {
+    let source = "let marker: bool = true; let dynamic = 1; print(dynamic[0]);";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+    assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
+}
+
+#[test]
+fn nested_variable_shadowing_hides_outer_function_signature() {
+    let source =
+        "fn convert(value: number) -> number { return value; } { let convert = 1; convert(); }";
+    let error = run("gradual-typing-matrix.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3000");
+    assert!(error.message.contains("Cannot call a value of type Number"));
+}
+
+#[test]
+fn nested_function_shadowing_uses_its_own_signature_and_contract() {
+    let source = r#"
+        fn convert(value: number) -> number { return value; }
+        {
+            fn convert(value: string) -> string { return value; }
+            print(convert("inner"));
+        }
+        print(convert(2));
+    "#;
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["inner", "2"]
+    );
+}
+
+#[test]
+fn shadowed_typed_bindings_keep_independent_static_and_runtime_contracts() {
+    let source = r#"
+        let value: number = 1;
+        {
+            let value: string = "inner";
+            value = "updated";
+            print(value);
+        }
+        value = 2;
+        print(value);
+    "#;
+    assert_eq!(
+        run("gradual-typing-matrix.hk", source).unwrap(),
+        vec!["updated", "2"]
+    );
+}
+
+#[test]
+fn mutually_recursive_functions_preserve_runtime_contracts() {
+    let source = r#"
+        fn even(value: number) -> bool {
+            if (value == 0) { return true; }
+            return odd(value - 1);
+        }
+        fn odd(value: number) -> bool {
+            if (value == 0) { return false; }
+            return even(value - 1);
+        }
+        print(even(6));
+    "#;
+    assert_eq!(run("gradual-typing-matrix.hk", source).unwrap(), vec!["true"]);
+}

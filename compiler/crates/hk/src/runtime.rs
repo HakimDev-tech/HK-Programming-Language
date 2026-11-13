@@ -867,6 +867,41 @@ mod contract_tests {
         assert!(matches!(Env::get(&environment, "value"), Some(V::Num(value)) if value == 1.0));
     }
 
+
+    #[test]
+    fn failed_parameter_contract_does_not_enter_body_or_repeat_argument_evaluation() {
+        let source = r#"
+            let counter = 0;
+            let values = ["first", "second"];
+            fn take(value: number) -> number {
+                print("entered");
+                return value;
+            }
+            let operation = take;
+            operation(values[counter = counter + 1]);
+        "#;
+        let tokens = crate::lexer::Lexer::new("contract-test.hk", source)
+            .scan()
+            .unwrap();
+        let statements =
+            crate::parser::Parser::new(tokens, "contract-test.hk", source)
+                .parse()
+                .unwrap();
+        crate::type_checker::TypeChecker::new("contract-test.hk", source)
+            .check(&statements)
+            .unwrap();
+
+        let mut engine = Engine::new("contract-test.hk", source, true);
+        let error = engine.run(&statements).unwrap_err();
+
+        assert_eq!(error.code, "E3008");
+        assert!(engine.output.is_empty(), "function body must not run");
+        assert!(matches!(
+            Env::get(&engine.env, "counter"),
+            Some(V::Num(value)) if value == 1.0
+        ));
+    }
+
     #[test]
     fn shadowed_bindings_keep_independent_runtime_contracts() {
         let parent = Rc::new(RefCell::new(Env::default()));
