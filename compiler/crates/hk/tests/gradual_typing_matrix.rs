@@ -188,10 +188,7 @@ fn typed_function_return_analysis_handles_nested_blocks_and_both_branches() {
         print(choose(true));
     "#;
 
-    assert_eq!(
-        run("gradual-typing-matrix.hk", valid).unwrap(),
-        vec!["1"]
-    );
+    assert_eq!(run("gradual-typing-matrix.hk", valid).unwrap(), vec!["1"]);
 
     assert_eq!(
         error_code("fn choose(flag: bool) -> number { if (flag) { return 1; } }"),
