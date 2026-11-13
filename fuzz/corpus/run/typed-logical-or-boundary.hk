@@ -1,0 +1,4 @@
+let marker: bool = true;
+let dynamic = 1;
+print(false || dynamic);
+print(true || dynamic);
