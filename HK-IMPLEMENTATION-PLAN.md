@@ -1,6 +1,6 @@
 # HK 0.2.0 — Implementation Plan
 
-**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on its feature branch. PR #10 remains open and unmerged. Alpha.6 is specified as a scope and loop-analysis conformance increment; implementation has not started.
+**Status:** Alpha.1–Alpha.3 are implemented; Alpha.4 stabilization is validated. Alpha.5 boundary-conformance implementation, acceptance coverage, cross-platform CI, and final fuzz validation are complete on its feature branch. PR #10 remains open and unmerged. Alpha.6 scope and loop-analysis conformance is implemented on its feature branch. The code passed fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on code commit `3ff25e4`; documentation synchronization is now being revalidated on the exact final head.
 
 The normative gradual-typing contract is in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). Phase-specific acceptance contracts are documented in [HK-ALPHA5-SPEC.md](HK-ALPHA5-SPEC.md) and [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md). A semantic change requires updating the specification and tests before implementation.
 
@@ -108,8 +108,9 @@ Introduce optional annotations for variables and named-function parameters/retur
 - [x] Preserve loop scope across initializer, condition, body, and increment; discard it after the loop
 - [x] Add focused regressions for branch isolation, outer contracts, block lifetime, loop diagnostic order, and loop-scope lifetime
 - [x] Preserve all V0.1.x and Alpha.1–Alpha.5 tests unchanged
-- [ ] Run fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on one exact final commit
-- [ ] Review all normative documentation against the implementation
+- [x] Run fmt, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and fuzzing on code commit `3ff25e4` (CI run `43513851494`; fuzz run `43513851361`)
+- [x] Review the normative typing spec, Alpha.6 spec, README, roadmap, changelog, implementation plan, and existing gradual-typing example
+- [ ] Revalidate CI and fuzzing on the final documentation-synchronized commit
 
 **Exit gate:** all requirements in [HK-ALPHA6-SPEC.md](HK-ALPHA6-SPEC.md) pass on one exact final commit. Alpha.6 is a checker-conformance increment, not a release candidate.
 
