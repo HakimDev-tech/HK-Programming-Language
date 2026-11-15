@@ -2,7 +2,7 @@ use super::ast::{Param, E, S};
 use super::lexer::{Lit, K};
 use super::types::Type;
 use super::{HkError, Result};
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use super::environment::{Env, EnvError};
 use super::value::{contains_array_reference, ensure_contract, Fun, FunctionBody, MathFn, V};
