@@ -140,6 +140,7 @@ struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
     contracts: HashMap<String, Type>,
+    function_names: HashSet<String>,
     parent: Option<Rc<RefCell<Env>>>,
 }
 impl Env {
@@ -171,6 +172,29 @@ impl Env {
         }
         self.values.insert(n, v);
         Ok(())
+    }
+    fn define_function(&mut self, name: String, value: V) -> std::result::Result<(), EnvError> {
+        self.define(name.clone(), value, false, None, "function declaration")?;
+        self.function_names.insert(name);
+        Ok(())
+    }
+    fn is_function_binding(e: &Rc<RefCell<Self>>, n: &str) -> bool {
+        let mut current = Some(e.clone());
+        while let Some(scope) = current {
+            let (exists, is_function, parent) = {
+                let env = scope.borrow();
+                (
+                    env.values.contains_key(n),
+                    env.function_names.contains(n),
+                    env.parent.clone(),
+                )
+            };
+            if exists {
+                return is_function;
+            }
+            current = parent;
+        }
+        false
     }
     fn has_contract(e: &Rc<RefCell<Self>>, n: &str) -> bool {
         let mut current = Some(e.clone());
@@ -352,7 +376,7 @@ impl Engine {
                 }));
                 self.env
                     .borrow_mut()
-                    .define(name.clone(), function, false, None, "function declaration")
+                    .define_function(name.clone(), function)
                     .map_err(|error| self.env_error(error, *line, *column))?;
             }
             S::Var(n, e, m, l, c) => {
@@ -379,7 +403,7 @@ impl Engine {
                 }));
                 self.env
                     .borrow_mut()
-                    .define(n.clone(), f, false, None, "function declaration")
+                    .define_function(n.clone(), f)
                     .map_err(|error| self.env_error(error, *l, *c))?;
             }
             S::Expr(e) => {
@@ -562,9 +586,34 @@ impl Engine {
             E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
                 let f = self.eval(callee)?;
+                let direct_named_call = if let E::Var(name, _, _) = callee.as_ref() {
+                    Env::is_function_binding(&self.env, name)
+                } else {
+                    false
+                };
+                let parameter_contracts = match &f {
+                    V::Fun(function) if direct_named_call => Some(
+                        function
+                            .params
+                            .iter()
+                            .map(|parameter| parameter.annotation.map(Type::from))
+                            .collect::<Vec<_>>(),
+                    ),
+                    _ => None,
+                };
                 let mut vs = Vec::with_capacity(args.len());
-                for argument in args {
-                    let value = self.eval(argument)?;
+                for (index, argument) in args.iter().enumerate() {
+                    let previous_typed_context = self.typed_context;
+                    if parameter_contracts
+                        .as_ref()
+                        .and_then(|contracts| contracts.get(index))
+                        .is_some_and(|contract| contract.is_some_and(|ty| ty != Type::Any))
+                    {
+                        self.typed_context = true;
+                    }
+                    let evaluated = self.eval(argument);
+                    self.typed_context = previous_typed_context;
+                    let value = evaluated?;
                     let (argument_line, argument_column) = argument.source_position();
                     vs.push((value, argument_line, argument_column));
                 }
