@@ -379,6 +379,9 @@ impl Engine {
     fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
     }
+    fn stdlib_error(&self, code: &'static str, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+        HkError::new(code, msg, &self.source, line, col, &self.source_text)
+    }
     fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
         match error {
             EnvError::Contract(message) => self.contract_error(message, line, column),
@@ -707,13 +710,19 @@ impl Engine {
                             _ => 1,
                         };
                         if vs.len() != expected_arity {
-                            return Err(self.error(format!("std:math function expects {expected_arity} argument(s), received {}.", vs.len()), *l, *c));
+                            return Err(self.stdlib_error(
+                                "E3011",
+                                format!("std:math function expects {expected_arity} argument(s), received {}.", vs.len()),
+                                *l,
+                                *c,
+                            ));
                         }
                         let mut numbers = Vec::with_capacity(vs.len());
                         for (value, line, column) in vs {
                             if let V::Num(number) = value {
                                 if !number.is_finite() {
-                                    return Err(self.error(
+                                    return Err(self.stdlib_error(
+                                        "E3012",
                                         "std:math arguments must be finite Numbers.",
                                         line,
                                         column,
@@ -721,7 +730,8 @@ impl Engine {
                                 }
                                 numbers.push(number);
                             } else {
-                                return Err(self.type_error(
+                                return Err(self.stdlib_error(
+                                    "E3012",
                                     "std:math arguments must be Numbers.",
                                     line,
                                     column,
@@ -734,7 +744,8 @@ impl Engine {
                             MathFn::Floor => numbers[0].floor(),
                             MathFn::Round => numbers[0].round(),
                             MathFn::Sqrt if numbers[0] < 0.0 => {
-                                return Err(self.error(
+                                return Err(self.stdlib_error(
+                                    "E3013",
                                     "std:math::sqrt requires a non-negative argument.",
                                     *l,
                                     *c,
@@ -744,7 +755,16 @@ impl Engine {
                             MathFn::Min => numbers[0].min(numbers[1]),
                             MathFn::Max => numbers[0].max(numbers[1]),
                         };
-                        self.finite(result, *l, *c)
+                        if result.is_finite() {
+                            Ok(V::Num(result))
+                        } else {
+                            Err(self.stdlib_error(
+                                "E3014",
+                                "std:math produced a non-finite result.",
+                                *l,
+                                *c,
+                            ))
+                        }
                     }
                     V::Fun(fun) => {
                         if vs.len() != fun.params.len() {
