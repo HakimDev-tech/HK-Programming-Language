@@ -629,3 +629,12 @@ mod tests {
         assert!(error.message.contains("Cannot call a value of type Number"));
     }
 }
+
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub mod fuzzing {
+    /// Runs the bytecode verifier on a bounded program decoded from arbitrary fuzz bytes.
+    pub fn verify_bytecode(input: &[u8]) {
+        crate::verifier::fuzz_verify(input);
+    }
+}
