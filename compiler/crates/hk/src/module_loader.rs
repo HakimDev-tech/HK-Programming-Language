@@ -1,11 +1,4 @@
-use crate::{
-    ast::S,
-    lexer::Lexer,
-    parser::Parser,
-    runtime,
-    type_checker::TypeChecker,
-    HkError, Result,
-};
+use crate::{ast::S, runtime, HkError, Result};
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -268,7 +261,7 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
     let mut order = Vec::<PathBuf>::new();
     let mut visiting = Vec::<PathBuf>::new();
     let mut total_source_bytes = 0usize;
-    let entry = load_module_graph(
+    let _entry = load_module_graph(
         entry,
         &mut modules,
         &mut order,
