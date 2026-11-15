@@ -422,15 +422,15 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
                 for name in names {
                     runtime::link_module_import(environment, &target, &name.local, &name.imported)
                         .map_err(|message| {
-                        module_error(
-                            "E4003",
-                            message,
-                            &module.path.display().to_string(),
-                            name.line,
-                            name.column,
-                            &module.source,
-                        )
-                    })?;
+                            module_error(
+                                "E4003",
+                                message,
+                                &module.path.display().to_string(),
+                                name.line,
+                                name.column,
+                                &module.source,
+                            )
+                        })?;
                 }
             }
         }
