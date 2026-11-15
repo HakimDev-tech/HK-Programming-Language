@@ -2,9 +2,9 @@
 
 HK is an experimental general-purpose programming language implemented in Rust. The 0.1.x line provides a small dynamically typed imperative language with a tree-walking interpreter. HK 0.2.0 extends that language with gradual typing.
 
-> **Status:** HK 0.2.0 is integrated into `main` and is the current stable language baseline. The implementation is a tree-walking interpreter, not an optimizing or native compiler.
+> **Status:** HK 0.2.0 is integrated into `main` and is the current implementation baseline. HK 0.3.0 is under design and implementation on a dedicated branch. The implementation remains a tree-walking interpreter, not an optimizing or native compiler.
 
-## Language capabilities
+## Language capabilities (0.2.0 baseline)
 
 - `let` and `const` bindings
 - Number, String, Boolean, Null, and Array values
@@ -29,14 +29,20 @@ fn double(value: number) -> number {
     return value * 2;
 }
 
-let input = 21;                 // dynamic binding
-let checked: number = input;    // runtime-checked boundary
+let input = 21;
+let checked: number = input;
 let result: number = double(checked);
-let operation = double;         // alias keeps the function's runtime contracts
-print(operation(result));       // 84
+let operation = double;
+print(operation(result)); // 84
 ~~~
 
 The source-level type vocabulary is deliberately small. Arrays remain heterogeneous, indexed reads are dynamic, and function aliases remain dynamically called unless a direct named-function signature is statically available.
+
+## HK 0.3.0 — planned module model
+
+The 0.3.0 design introduces explicit named imports and exports, isolated file-level module scopes, deterministic relative-path resolution, at-most-once initialization, cycle rejection, and a small `std:math` module. These are design targets, not shipped capabilities yet.
+
+See [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) for the normative design and [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) for release gates.
 
 ## Requirements
 
@@ -48,7 +54,7 @@ Rust stable toolchain with Cargo.
 cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-cargo doc --workspace --no-deps
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
 cargo run -p hk -- version
 ~~~
 
@@ -69,9 +75,11 @@ hk run examples/hello.hk
 ## Documentation
 
 - [HK-LANGUAGE-SPEC.md](HK-LANGUAGE-SPEC.md) — 0.1.x language behavior
-- [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) — normative gradual-typing specification
-- [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implemented architecture and invariants
-- [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md) — 0.2.0 finalization and release gates
+- [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) — normative 0.2.0 gradual-typing specification
+- [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) — normative 0.3.0 module and standard-library design
+- [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implemented architecture and target module architecture
+- [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md) — 0.2.0 finalization
+- [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) — 0.3.0 implementation and release gates
 - [ROADMAP.md](ROADMAP.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [examples/](examples/)
@@ -82,7 +90,7 @@ The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression 
 
 ## Scope
 
-Modules, package management, bytecode, native compilation, WebAssembly, concurrency, and native FFI remain outside the current 0.2.0 scope.
+The 0.2.0 implementation does not yet include modules, package management, bytecode, native compilation, WebAssembly, concurrency, or native FFI. The 0.3.0 module design does not imply these features are implemented.
 
 ## License
 
