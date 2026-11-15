@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-hk = { path = "../compiler/crates/hk" }
+hk = { path = "../compiler/crates/hk", features = ["fuzzing"] }
 
 [[bin]]
 name = "run"
@@ -21,6 +21,13 @@ bench = false
 [[bin]]
 name = "modules"
 path = "fuzz_targets/modules.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bytecode_verifier"
+path = "fuzz_targets/bytecode_verifier.rs"
 test = false
 doc = false
 bench = false
