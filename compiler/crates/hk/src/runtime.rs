@@ -509,7 +509,12 @@ impl Engine {
             }
             E::Unary(operator, operand, line, column) => {
                 let value = self.eval(operand)?;
-                self.unary(value, *operator, operand.source_position(), (*line, *column))
+                self.unary(
+                    value,
+                    *operator,
+                    operand.source_position(),
+                    (*line, *column),
+                )
             }
             E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
