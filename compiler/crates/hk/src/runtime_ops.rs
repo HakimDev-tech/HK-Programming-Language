@@ -14,10 +14,7 @@ pub(super) enum RuntimeOpError {
     },
 }
 
-pub(super) fn finite(
-    number: f64,
-    position: (usize, usize),
-) -> Result<V, RuntimeOpError> {
+pub(super) fn finite(number: f64, position: (usize, usize)) -> Result<V, RuntimeOpError> {
     if number.is_finite() {
         Ok(V::Num(number))
     } else {
