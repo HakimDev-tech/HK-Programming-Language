@@ -160,6 +160,7 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
 enum EnvError {
     Duplicate(String),
     Constant(String),
+    ImportedAlias(String),
     Undefined(String),
     Contract(String),
 }
@@ -306,7 +307,7 @@ impl Env {
                 )
             };
             if is_alias {
-                return Err(EnvError::Constant(format!(
+                return Err(EnvError::ImportedAlias(format!(
                     "Cannot reassign imported binding '{n}'."
                 )));
             }
@@ -393,6 +394,14 @@ impl Engine {
     fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
         match error {
             EnvError::Contract(message) => self.contract_error(message, line, column),
+            EnvError::ImportedAlias(message) => HkError::new(
+                "E4007",
+                message,
+                &self.source,
+                line,
+                column,
+                &self.source_text,
+            ),
             EnvError::Duplicate(message)
             | EnvError::Constant(message)
             | EnvError::Undefined(message) => self.error(message, line, column),
