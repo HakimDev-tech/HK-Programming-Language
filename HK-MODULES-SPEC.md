@@ -179,6 +179,25 @@ The implementation must define stable diagnostic codes for:
 
 Diagnostics must identify the source module and line/column of the relevant import/export or call site. Existing lexical, parser, static typing, and runtime diagnostic behavior must remain intact.
 
+## 8.1 Stable diagnostic code allocation
+
+The module loader and initial standard library use these dedicated codes:
+
+| Code | Meaning |
+|---|---|
+| `E4001` | Filesystem imports require `run_path`, or duplicate top-level module binding |
+| `E4002` | Invalid module specifier, missing module, invalid entry extension, or excessive graph depth |
+| `E4003` | Imported name is not exported or import linking fails |
+| `E4004` | Duplicate or unsupported export declaration |
+| `E4005` | Cyclic module dependency |
+| `E4006` | Module source cannot be read as UTF-8 |
+| `E3011` | Standard-library function arity violation |
+| `E3012` | Standard-library argument type violation |
+| `E3013` | Standard-library domain violation |
+| `E3014` | Standard-library non-finite result |
+
+Syntax and duplicate import-local diagnostics continue to use the parser's existing `E2000` and `E2001` codes. Existing dynamic runtime and gradual-typing contract diagnostics retain `E3000` and `E3008`.
+
 ## 9. Compatibility and non-goals
 
 A single-file HK program without import/export declarations must behave identically to 0.2.0. Existing syntax and type semantics are unchanged.
