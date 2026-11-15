@@ -434,7 +434,10 @@ fn verify_control_flow(
                 }
                 next.stack_height -= 1;
             }
-            Opcode::GetModule(_) | Opcode::GetImport(_) | Opcode::LoadPrint | Opcode::MakeFunction(_) => {
+            Opcode::GetModule(_)
+            | Opcode::GetImport(_)
+            | Opcode::LoadPrint
+            | Opcode::MakeFunction(_) => {
                 next.stack_height += 1;
             }
             Opcode::SetModule(_) => {
@@ -814,15 +817,12 @@ mod tests {
         assert!(error.message.contains("underflow"));
     }
 
-
     #[test]
     fn rejects_out_of_range_function_prototype_references() {
-        let error = verify(function(
-            vec![Opcode::MakeFunction(1), Opcode::Return],
-            1,
-        ))
-        .unwrap_err();
-        assert!(error.message.contains("function prototype index is out of range"));
+        let error = verify(function(vec![Opcode::MakeFunction(1), Opcode::Return], 1)).unwrap_err();
+        assert!(error
+            .message
+            .contains("function prototype index is out of range"));
     }
 
     #[test]
@@ -877,7 +877,6 @@ mod tests {
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("not definitely initialized"));
     }
-
 
     #[test]
     fn rejects_scope_depth_above_the_parser_limit() {
