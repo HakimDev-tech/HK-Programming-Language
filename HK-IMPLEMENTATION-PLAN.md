@@ -44,7 +44,7 @@ Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unan
 - [x] Add regression coverage for E3010 and preserve dynamic `any` call behavior.
 - [x] Run the complete workspace test suite on the exact final integration commit.
 - [x] Run parser/interpreter fuzzing on the exact final integration commit.
-- [ ] Review panic safety, depth limits, and malformed-source behavior.
+- [ ] Re-audit panic safety, depth limits, malformed-source behavior, and diagnostic provenance after the final runtime correction.
 - [x] Preserve dynamic checking for unrelated unannotated code in mixed typed/dynamic programs; enforce declared typed boundaries.
 
 ### 3. Documentation and release consistency
@@ -53,7 +53,7 @@ Deliver HK 0.2.0 gradual typing while preserving 0.1.x dynamic behavior for unan
 - [x] Align architecture documentation with implemented module boundaries.
 - [x] Align README and roadmap with the actual branch and release status.
 - [x] Consolidate scope and loop-analysis rules into the normative typing specification.
-- [ ] Verify all examples against the final interpreter.
+- [ ] Execute every documented example against the final interpreter.
 - [ ] Verify every public claim against implementation and tests.
 
 ### 4. Release gates
@@ -66,8 +66,8 @@ A 0.2.0 release candidate may be considered only after all of the following pass
 - [x] `cargo doc --workspace --no-deps`
 - [x] Linux, Windows, and macOS CI
 - [x] Dedicated fuzz workflow
-- [x] Final semantic and documentation review
-- [x] Explicit review of known limitations and compatibility guarantees
+- [ ] Final semantic and documentation review
+- [ ] Explicit review of known limitations and compatibility guarantees
 
 Passing these gates does not authorize publication or merging. HK 0.2.0 remains unreleased until the integration is reviewed and explicitly approved.
 
