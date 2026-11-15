@@ -201,3 +201,99 @@ fn import_declarations_must_be_in_the_module_header() {
 
     assert_eq!(error.code, "E2000");
 }
+
+#[test]
+fn imported_functions_keep_their_defining_module_environment_alive() {
+    let output = run_project(
+        &[
+            (
+                "values.hk",
+                "let private_value = 40; export fn reveal() { return private_value; }",
+            ),
+            (
+                "main.hk",
+                "import { reveal } from \"./values.hk\"; print(reveal());",
+            ),
+        ],
+        "main.hk",
+    )
+    .unwrap();
+
+    assert_eq!(output, vec!["40"]);
+}
+
+#[test]
+fn typed_export_contracts_are_enforced_across_module_boundaries() {
+    let error = run_project(
+        &[
+            (
+                "values.hk",
+                r#"
+                    export let amount: number = 1;
+                    export fn update(value: any) {
+                        amount = value;
+                    }
+                "#,
+            ),
+            (
+                "main.hk",
+                "import { update } from \"./values.hk\"; update(\"invalid\");",
+            ),
+        ],
+        "main.hk",
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "E3008");
+    assert!(error.message.contains("Runtime type contract violation"));
+}
+
+#[test]
+fn standard_math_uses_stable_arity_type_and_domain_diagnostics() {
+    let arity = run_project(
+        &[("main.hk", "import { abs } from \"std:math\"; abs();")],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(arity.code, "E3011");
+
+    let argument_type = run_project(
+        &[("main.hk", "import { sqrt } from \"std:math\"; sqrt(\"bad\");")],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(argument_type.code, "E3012");
+
+    let domain = run_project(
+        &[("main.hk", "import { sqrt } from \"std:math\"; sqrt(-1);")],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(domain.code, "E3013");
+}
+
+#[test]
+fn canonical_paths_deduplicate_the_same_dependency() {
+    let output = run_project(
+        &[
+            ("sub/placeholder.hk", ""),
+            ("base.hk", "print(\"base\"); export const value = 5;"),
+            (
+                "left.hk",
+                "import { value } from \"./base.hk\"; print(value); export const left = value;",
+            ),
+            (
+                "right.hk",
+                "import { value } from \"./sub/../base.hk\"; print(value); export const right = value;",
+            ),
+            (
+                "main.hk",
+                "import { left } from \"./left.hk\"; import { right } from \"./right.hk\"; print(left + right);",
+            ),
+        ],
+        "main.hk",
+    )
+    .unwrap();
+
+    assert_eq!(output, vec!["base", "5", "5", "10"]);
+}
