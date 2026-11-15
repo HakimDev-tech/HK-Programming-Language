@@ -178,10 +178,32 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                 "module {module_index} initializer belongs to a different module"
             )));
         }
+        if module.bindings.len() > u16::MAX as usize + 1 {
+            return Err(VerifyError::program(format!(
+                "module {module_index} binding table exceeds the slot limit"
+            )));
+        }
+        let mut internal_names = std::collections::HashSet::new();
+        for binding in &module.bindings {
+            if binding.internal_name.is_empty()
+                || binding.source_name.is_empty()
+                || !internal_names.insert(binding.internal_name.as_str())
+            {
+                return Err(VerifyError::program(format!(
+                    "module {module_index} has invalid binding metadata"
+                )));
+            }
+        }
+        let mut import_slots = std::collections::HashSet::new();
         for import in &module.imports {
-            if import.local_slot as usize >= module.bindings.len() {
+            let Some(local_binding) = module.bindings.get(import.local_slot as usize) else {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import local slot is out of range"
+                )));
+            };
+            if !import_slots.insert(import.local_slot) || local_binding.mutable {
+                return Err(VerifyError::program(format!(
+                    "module {module_index} import slot is duplicated or writable"
                 )));
             }
             let target = program
@@ -192,16 +214,30 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                         "module {module_index} import references an unknown module"
                     ))
                 })?;
-            if import.target_slot as usize >= target.bindings.len() {
+            if import.target_module as usize >= module_index {
+                return Err(VerifyError::program(format!(
+                    "module {module_index} dependencies must precede their importer"
+                )));
+            }
+            let Some(target_binding) = target.bindings.get(import.target_slot as usize) else {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import target slot is out of range"
                 )));
+            };
+            if local_binding.contract != target_binding.contract {
+                return Err(VerifyError::program(format!(
+                    "module {module_index} import contract metadata does not match its target"
+                )));
             }
         }
+        let mut export_names = std::collections::HashSet::new();
         for export in &module.exports {
-            if export.slot as usize >= module.bindings.len() {
+            if export.name.is_empty()
+                || !export_names.insert(export.name.as_str())
+                || export.slot as usize >= module.bindings.len()
+            {
                 return Err(VerifyError::program(format!(
-                    "module {module_index} export slot is out of range"
+                    "module {module_index} has invalid or duplicate exports"
                 )));
             }
         }
@@ -221,7 +257,7 @@ fn verify_function_tables(
             "function parameter count exceeds 255",
         ));
     }
-    if function.local_slots.len() > u16::MAX as usize
+    if function.local_slots.len() > u16::MAX as usize + 1
         || function.parameters.len() > function.local_slots.len()
     {
         return Err(VerifyError::at(
