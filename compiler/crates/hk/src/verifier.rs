@@ -578,6 +578,145 @@ fn merge_state(
     Ok(())
 }
 
+
+#[cfg(feature = "fuzzing")]
+pub(super) fn fuzz_verify(input: &[u8]) {
+    use super::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile};
+
+    fn take_byte(input: &[u8], cursor: &mut usize) -> u8 {
+        let value = input.get(*cursor).copied().unwrap_or(0);
+        *cursor = cursor.saturating_add(1);
+        value
+    }
+
+    fn take_u16(input: &[u8], cursor: &mut usize) -> u16 {
+        u16::from_le_bytes([
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+        ])
+    }
+
+    fn take_u32(input: &[u8], cursor: &mut usize) -> u32 {
+        u32::from_le_bytes([
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+        ])
+    }
+
+    fn take_u64(input: &[u8], cursor: &mut usize) -> u64 {
+        u64::from_le_bytes([
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+            take_byte(input, cursor),
+        ])
+    }
+
+    let mut cursor = 0usize;
+    let header = BytecodeHeader {
+        major: take_u16(input, &mut cursor),
+        minor: take_u16(input, &mut cursor),
+        required_features: take_u64(input, &mut cursor),
+    };
+
+    let constant_count = (take_byte(input, &mut cursor) % 16) as usize;
+    let mut constants = Vec::with_capacity(constant_count);
+    for _ in 0..constant_count {
+        if take_byte(input, &mut cursor) & 1 == 0 {
+            constants.push(Constant::Number(f64::from_bits(take_u64(
+                input,
+                &mut cursor,
+            ))));
+        } else {
+            let length = (take_byte(input, &mut cursor) % 16) as usize;
+            let mut value = String::with_capacity(length);
+            for _ in 0..length {
+                value.push(char::from(take_byte(input, &mut cursor)));
+            }
+            constants.push(Constant::String(value));
+        }
+    }
+
+    let parameter_count = (take_byte(input, &mut cursor) % 16) as u16;
+    let local_count = parameter_count + (take_byte(input, &mut cursor) % 16) as u16;
+    let instruction_count = 1 + (take_byte(input, &mut cursor) % 64) as usize;
+    let mut code = Vec::with_capacity(instruction_count);
+
+    for _ in 0..instruction_count {
+        let opcode = match take_byte(input, &mut cursor) % 36 {
+            0 => Opcode::Constant(take_u32(input, &mut cursor)),
+            1 => Opcode::Null,
+            2 => Opcode::True,
+            3 => Opcode::False,
+            4 => Opcode::Pop,
+            5 => Opcode::Dup,
+            6 => Opcode::DefineLocal(take_u16(input, &mut cursor)),
+            7 => Opcode::GetLocal(take_u16(input, &mut cursor)),
+            8 => Opcode::SetLocal(take_u16(input, &mut cursor)),
+            9 => Opcode::DefineModule(take_u16(input, &mut cursor)),
+            10 => Opcode::GetModule(take_u16(input, &mut cursor)),
+            11 => Opcode::SetModule(take_u16(input, &mut cursor)),
+            12 => Opcode::GetImport(take_u16(input, &mut cursor)),
+            13 => Opcode::EnterScope,
+            14 => Opcode::ExitScope,
+            15 => Opcode::Negate,
+            16 => Opcode::Not,
+            17 => Opcode::Add,
+            18 => Opcode::Subtract,
+            19 => Opcode::Multiply,
+            20 => Opcode::Divide,
+            21 => Opcode::Modulo,
+            22 => Opcode::Equal,
+            23 => Opcode::NotEqual,
+            24 => Opcode::Greater,
+            25 => Opcode::GreaterEqual,
+            26 => Opcode::Less,
+            27 => Opcode::LessEqual,
+            28 => Opcode::Jump(take_u32(input, &mut cursor)),
+            29 => Opcode::JumpIfFalse(take_u32(input, &mut cursor)),
+            30 => Opcode::Call(take_u16(input, &mut cursor)),
+            31 => Opcode::Return,
+            32 => Opcode::BuildArray(take_u16(input, &mut cursor)),
+            33 => Opcode::GetIndex,
+            34 => Opcode::SetIndex,
+            _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
+        };
+        code.push(Instruction {
+            opcode,
+            source: SourceLocation {
+                source_id: 0,
+                line: u32::from(take_byte(input, &mut cursor)) + 1,
+                column: u32::from(take_byte(input, &mut cursor)) + 1,
+            },
+        });
+    }
+
+    let program = BytecodeProgram {
+        header,
+        constants,
+        source_files: vec![SourceFile {
+            name: "<fuzz-bytecode>".to_owned(),
+        }],
+        functions: vec![FunctionProto {
+            name: "fuzz".to_owned(),
+            module_id: None,
+            parameter_count,
+            local_count,
+            max_stack: u32::from(take_byte(input, &mut cursor) % 64),
+            code,
+        }],
+        modules: Vec::new(),
+        entry_function: 0,
+    };
+    let _ = verify(program);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
