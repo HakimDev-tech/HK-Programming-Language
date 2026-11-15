@@ -1108,6 +1108,26 @@ fn load_module_graph(
     order: &mut Vec<PathBuf>,
     visiting: &mut Vec<PathBuf>,
 ) -> Result<PathBuf> {
+    if requested.extension().and_then(|extension| extension.to_str()) != Some("hk") {
+        return Err(module_error(
+            "E4002",
+            "The entry file must use the .hk extension.",
+            &requested.display().to_string(),
+            1,
+            1,
+            "",
+        ));
+    }
+    if visiting.len() >= 128 {
+        return Err(module_error(
+            "E4002",
+            "Maximum module dependency depth (128) exceeded.",
+            &requested.display().to_string(),
+            1,
+            1,
+            "",
+        ));
+    }
     let canonical = fs::canonicalize(requested).map_err(|error| {
         module_error(
             "E4002",
@@ -1221,6 +1241,31 @@ fn load_module_graph(
                 .parent()
                 .unwrap_or_else(|| Path::new("."))
                 .join(spec);
+            let target = fs::canonicalize(&target).map_err(|error| {
+                module_error(
+                    "E4002",
+                    format!("Cannot resolve module '{specifier}': {error}."),
+                    &source_name,
+                    *line,
+                    *column,
+                    &source,
+                )
+            })?;
+            if let Some(index) = visiting.iter().position(|path| path == &target) {
+                let mut chain = visiting[index..]
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>();
+                chain.push(target.display().to_string());
+                return Err(module_error(
+                    "E4005",
+                    format!("Cyclic module dependency: {}.", chain.join(" -> ")),
+                    &source_name,
+                    *line,
+                    *column,
+                    &source,
+                ));
+            }
             load_module_graph(&target, modules, order, visiting)?;
         }
     }
@@ -1236,8 +1281,55 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
     let mut visiting = Vec::<PathBuf>::new();
     let entry = load_module_graph(entry, &mut modules, &mut order, &mut visiting)?;
 
+    // Validate the complete top-level module namespace before execution.
+    for path in &order {
+        let module = modules.get(path).expect("loaded module must exist");
+        let mut local_names = HashSet::new();
+        for statement in &module.statements {
+            if let S::Import(_, names, _, _) = statement {
+                for name in names {
+                    if !local_names.insert(name.local.clone()) {
+                        return Err(module_error(
+                            "E4001",
+                            format!("Duplicate module binding '{}'.", name.local),
+                            &module.path.display().to_string(),
+                            name.line,
+                            name.column,
+                            &module.source,
+                        ));
+                    }
+                }
+            } else {
+                let declaration = match statement {
+                    S::Export(inner) => inner.as_ref(),
+                    other => other,
+                };
+                let declared = match declaration {
+                    S::Var(name, ..)
+                    | S::TypedVar(name, ..)
+                    | S::Fn(name, ..)
+                    | S::TypedFn(name, ..) => Some((name.as_str(), declaration.source_position())),
+                    _ => None,
+                };
+                if let Some((name, (line, column))) = declared {
+                    if !local_names.insert(name.to_owned()) {
+                        return Err(module_error(
+                            "E4001",
+                            format!("Duplicate module binding '{name}'."),
+                            &module.path.display().to_string(),
+                            line,
+                            column,
+                            &module.source,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     // Validate every import link before any module body executes.
-    for module in modules.values() {
+    for path in &order {
+        let module = modules.get(path).expect("loaded module must exist");
         let source_name = module.path.display().to_string();
         for statement in &module.statements {
             if let S::Import(specifier, names, line, column) = statement {
