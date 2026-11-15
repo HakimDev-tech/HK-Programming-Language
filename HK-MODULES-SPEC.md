@@ -87,7 +87,7 @@ Resolution rules:
 5. Reject directories, missing files, invalid UTF-8, and unsupported extensions with a source-located diagnostic.
 6. Canonical paths identify modules. Two paths resolving to the same canonical file refer to one module instance.
 
-The initial release does not search arbitrary global paths, environment variables, package registries, or implicit index files. There is no implicit extension insertion.
+The initial release does not search arbitrary global paths, environment variables, package registries, or implicit index files. There is no implicit extension insertion. The entry file and filesystem modules must use the `.hk` extension. A module source is limited to 1 MiB, the reachable graph to 16 MiB of aggregate source and 1,024 files, and dependency depth to 128.
 
 The standard-library namespace uses reserved specifiers beginning with `std:`. Filesystem paths cannot use that prefix. In 0.3.0, the supported standard module is `std:math`.
 
