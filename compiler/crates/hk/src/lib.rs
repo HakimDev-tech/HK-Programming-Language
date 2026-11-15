@@ -1,6 +1,7 @@
 //! HK 0.1.x reference interpreter.
 //! Dependency-free tree-walking implementation.
 mod ast;
+mod bytecode;
 use ast::S;
 pub mod diagnostics;
 mod lexer;
@@ -10,6 +11,7 @@ mod runtime;
 mod type_checker;
 mod types;
 mod value;
+mod verifier;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
 /// Tokenizes, parses, and executes a complete HK source file.
