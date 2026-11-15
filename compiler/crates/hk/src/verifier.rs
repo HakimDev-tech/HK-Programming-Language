@@ -10,7 +10,8 @@ const MAX_FUNCTIONS: usize = 65_535;
 const MAX_MODULES: usize = 1_024;
 const MAX_CODE_INSTRUCTIONS: usize = 1_000_000;
 const MAX_OPERAND_STACK: u32 = 65_536;
-const MAX_SCOPE_DEPTH: u32 = 1_024;
+// Aligns with the parser's existing maximum syntactic nesting depth.
+const MAX_SCOPE_DEPTH: u32 = 128;
 const MAX_CALL_ARGUMENTS: u16 = 255;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -853,6 +854,16 @@ mod tests {
         program.functions[0].local_count = 1;
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("not definitely initialized"));
+    }
+
+
+    #[test]
+    fn rejects_scope_depth_above_the_parser_limit() {
+        let mut code = vec![Opcode::EnterScope; 129];
+        code.extend(vec![Opcode::ExitScope; 129]);
+        code.extend([Opcode::Null, Opcode::Return]);
+        let error = verify(function(code, 1)).unwrap_err();
+        assert!(error.message.contains("lexical scope depth exceeds"));
     }
 
     #[test]
