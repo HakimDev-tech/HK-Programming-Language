@@ -9,6 +9,7 @@ mod lexer;
 mod module_loader;
 mod parser;
 mod runtime;
+mod runtime_ops;
 mod type_checker;
 mod types;
 mod value;
