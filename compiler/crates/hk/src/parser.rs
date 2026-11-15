@@ -32,7 +32,9 @@ impl Parser {
             }
             let is_import = self.check(K::Import);
             s.push(self.decl()?);
-            if !is_import { self.module_header_open = false; }
+            if !is_import {
+                self.module_header_open = false;
+            }
         }
         Ok(s)
     }
@@ -42,7 +44,9 @@ impl Parser {
     fn decl_inner(&mut self) -> Result<S> {
         if self.take(K::Import) {
             if self.block_depth != 0 || !self.module_header_open {
-                return Err(self.error("Import declarations are only allowed in the module header."));
+                return Err(
+                    self.error("Import declarations are only allowed in the module header.")
+                );
             }
             return self.import_decl();
         }
@@ -57,7 +61,9 @@ impl Parser {
             } else if self.take(K::Fn) {
                 self.function()?
             } else {
-                return Err(self.error("Export must precede a top-level variable or function declaration."));
+                return Err(
+                    self.error("Export must precede a top-level variable or function declaration.")
+                );
             };
             return Ok(S::Export(Box::new(declaration)));
         }
@@ -89,21 +95,51 @@ impl Parser {
                     imported.clone()
                 };
                 if !locals.insert(local.text.clone()) {
-                    return Err(HkError::new("E2001", format!("Duplicate imported local name '{}'.", local.text), &self.name, local.line, local.col, &self.source_text));
+                    return Err(HkError::new(
+                        "E2001",
+                        format!("Duplicate imported local name '{}'.", local.text),
+                        &self.name,
+                        local.line,
+                        local.col,
+                        &self.source_text,
+                    ));
                 }
-                names.push(ImportName { imported: imported.text, local: local.text, line: local.line, column: local.col });
-                if !self.take(K::Comma) { break; }
+                names.push(ImportName {
+                    imported: imported.text,
+                    local: local.text,
+                    line: local.line,
+                    column: local.col,
+                });
+                if !self.take(K::Comma) {
+                    break;
+                }
             }
         }
         self.expect(K::RBrace, "Expected '}' after imported names.")?;
         self.expect(K::From, "Expected 'from' after imported names.")?;
         let path_token = self.advance().clone();
         if path_token.kind != K::String {
-            return Err(HkError::new("E2000", "Expected a string module specifier.", &self.name, path_token.line, path_token.col, &self.source_text));
+            return Err(HkError::new(
+                "E2000",
+                "Expected a string module specifier.",
+                &self.name,
+                path_token.line,
+                path_token.col,
+                &self.source_text,
+            ));
         }
         let path = match path_token.literal {
             Some(Lit::String(value)) if !value.trim().is_empty() => value,
-            _ => return Err(HkError::new("E2000", "Expected a non-empty string module specifier.", &self.name, path.line, path.col, &self.source_text)),
+            _ => {
+                return Err(HkError::new(
+                    "E2000",
+                    "Expected a non-empty string module specifier.",
+                    &self.name,
+                    path.line,
+                    path.col,
+                    &self.source_text,
+                ))
+            }
         };
         self.expect(K::Semi, "Expected ';' after import declaration.")?;
         Ok(S::Import(path, names, start.line, start.col))
