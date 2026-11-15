@@ -18,7 +18,7 @@ HK is an experimental general-purpose programming language implemented in Rust. 
 - Static checking before execution and runtime contracts at typed boundaries
 - Source-aware diagnostics with excerpts and caret markers
 - Bounded parser/runtime nesting and function recursion
-- Explicit named imports and exports in the 0.3.0 development branch
+- Explicit named imports and exports in HK 0.3.0
 - Isolated file-level module scopes, canonical relative-path resolution, dependency-first initialization, and cycle rejection
 - Initial standard-library module `std:math` in the 0.3.0 development branch
 
@@ -40,7 +40,7 @@ print(operation(result)); // 84
 
 The source-level type vocabulary is deliberately small. Arrays remain heterogeneous, indexed reads are dynamic, and function aliases remain dynamically called unless a direct named-function signature is statically available.
 
-## Modules (0.3.0 development branch)
+## Modules (0.3.0)
 
 Imports are explicit, named, and declared at the beginning of a module:
 

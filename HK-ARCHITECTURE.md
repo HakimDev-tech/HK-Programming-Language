@@ -58,7 +58,7 @@ The checker distinguishes declared binding contracts, static expression facts, a
 
 Direct named-function calls can use signatures visible at the current source position. Function aliases and unresolved forward calls remain dynamic, while runtime parameter and return contracts stay attached to the actual function value.
 
-## Module architecture (0.3.0 implementation)
+## Module architecture (0.3.0)
 
 The normative contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md).
 
