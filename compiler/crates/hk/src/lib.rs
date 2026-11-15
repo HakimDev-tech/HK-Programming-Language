@@ -5,6 +5,7 @@ mod ast;
 mod bytecode;
 use ast::S;
 pub mod diagnostics;
+mod environment;
 mod lexer;
 mod module_loader;
 mod parser;
