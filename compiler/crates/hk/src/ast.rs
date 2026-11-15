@@ -59,6 +59,7 @@ pub(super) struct ImportName {
     pub(super) column: usize,
 }
 
+#[derive(Clone, Debug)]
 pub(super) enum S {
     Import(String, Vec<ImportName>, usize, usize),
     Export(Box<S>),
