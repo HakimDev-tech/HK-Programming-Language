@@ -419,3 +419,25 @@ fn each_run_path_call_starts_a_fresh_module_cache() {
     assert_eq!(first, vec!["initialized", "1"]);
     assert_eq!(second, vec!["initialized", "1"]);
 }
+
+#[test]
+fn cli_runs_filesystem_module_programs() {
+    let entry =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/modules/main.hk");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_hk"))
+        .arg("run")
+        .arg(entry)
+        .output()
+        .expect("the HK CLI should start");
+
+    assert!(
+        output.status.success(),
+        "CLI failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        vec!["counter initialized", "3", "3", "9", "18"]
+    );
+}
