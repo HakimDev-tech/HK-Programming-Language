@@ -1,7 +1,5 @@
 //! Mandatory verifier for compiler-produced in-memory HK bytecode.
-use super::bytecode::{
-    BytecodeProgram, Constant, FunctionProto, Opcode, SourceLocation,
-};
+use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode, SourceLocation};
 
 const SUPPORTED_MAJOR: u16 = 1;
 const SUPPORTED_MINOR: u16 = 0;
@@ -131,13 +129,17 @@ fn verify_header(program: &BytecodeProgram) -> Result<(), VerifyError> {
 
 fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
     if program.constants.len() > MAX_CONSTANTS {
-        return Err(VerifyError::program("constant pool exceeds the configured limit"));
+        return Err(VerifyError::program(
+            "constant pool exceeds the configured limit",
+        ));
     }
     if program.functions.is_empty() || program.functions.len() > MAX_FUNCTIONS {
         return Err(VerifyError::program("invalid function table size"));
     }
     if program.modules.len() > MAX_MODULES {
-        return Err(VerifyError::program("module table exceeds the configured limit"));
+        return Err(VerifyError::program(
+            "module table exceeds the configured limit",
+        ));
     }
     if program.entry_function as usize >= program.functions.len() {
         return Err(VerifyError::program("entry function index is out of range"));
@@ -150,7 +152,10 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
         }
     }
     for function in &program.functions {
-        if function.module_id.is_some_and(|id| id as usize >= program.modules.len()) {
+        if function
+            .module_id
+            .is_some_and(|id| id as usize >= program.modules.len())
+        {
             return Err(VerifyError::program(
                 "function references an unknown module",
             ));
@@ -174,11 +179,14 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                     "module {module_index} import local slot is out of range"
                 )));
             }
-            let target = program.modules.get(import.target_module as usize).ok_or_else(|| {
-                VerifyError::program(format!(
-                    "module {module_index} import references an unknown module"
-                ))
-            })?;
+            let target = program
+                .modules
+                .get(import.target_module as usize)
+                .ok_or_else(|| {
+                    VerifyError::program(format!(
+                        "module {module_index} import references an unknown module"
+                    ))
+                })?;
             if import.target_slot >= target.binding_count {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import target slot is out of range"
@@ -248,7 +256,10 @@ fn verify_function_tables(
                 }
             }
             Opcode::GetProperty(index) => {
-                if !matches!(program.constants.get(index as usize), Some(Constant::String(_))) {
+                if !matches!(
+                    program.constants.get(index as usize),
+                    Some(Constant::String(_))
+                ) {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
@@ -337,7 +348,9 @@ fn verify_control_flow(
     let mut saw_return = false;
 
     while let Some(index) = worklist.pop_front() {
-        let state = states[index].clone().expect("queued states are initialized");
+        let state = states[index]
+            .clone()
+            .expect("queued states are initialized");
         let instruction = &function.code[index];
         let mut next = state;
         let mut successors = Vec::with_capacity(2);
@@ -507,13 +520,7 @@ fn verify_control_flow(
         }
 
         for successor in successors {
-            merge_state(
-                function_index,
-                successor,
-                &next,
-                &mut states,
-                &mut worklist,
-            )?;
+            merge_state(function_index, successor, &next, &mut states, &mut worklist)?;
         }
     }
 
@@ -573,9 +580,7 @@ fn merge_state(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::{
-        BytecodeHeader, FunctionProto, Instruction, SourceFile,
-    };
+    use crate::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile};
 
     fn instruction(opcode: Opcode) -> Instruction {
         Instruction {
@@ -610,25 +615,25 @@ mod tests {
 
     #[test]
     fn accepts_a_well_formed_constant_return_function() {
-        let program = function(
-            vec![Opcode::Constant(0), Opcode::Return],
-            1,
-        );
+        let program = function(vec![Opcode::Constant(0), Opcode::Return], 1);
         let verified = verify(program).unwrap();
         assert_eq!(verified.max_stack(0), Some(1));
     }
 
     #[test]
     fn rejects_operand_stack_underflow() {
-        let error = verify(function(vec![Opcode::Pop, Opcode::Null, Opcode::Return], 1))
-            .unwrap_err();
+        let error =
+            verify(function(vec![Opcode::Pop, Opcode::Null, Opcode::Return], 1)).unwrap_err();
         assert!(error.message.contains("underflow"));
     }
 
     #[test]
     fn rejects_out_of_range_jump_targets() {
-        let error = verify(function(vec![Opcode::Jump(9), Opcode::Null, Opcode::Return], 1))
-            .unwrap_err();
+        let error = verify(function(
+            vec![Opcode::Jump(9), Opcode::Null, Opcode::Return],
+            1,
+        ))
+        .unwrap_err();
         assert!(error.message.contains("jump target"));
     }
 
