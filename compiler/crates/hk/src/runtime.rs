@@ -479,8 +479,7 @@ impl Engine {
                     || matches!(Env::get(&self.env, name), Some(V::Fun(function)) if function.typed)
             }
             E::Assign(name, value, _, _) => {
-                Env::has_contract(&self.env, name)
-                    || self.expression_has_typed_provenance(value)
+                Env::has_contract(&self.env, name) || self.expression_has_typed_provenance(value)
             }
             E::Unary(_, operand, _, _) | E::Group(operand) => {
                 self.expression_has_typed_provenance(operand)
@@ -489,10 +488,12 @@ impl Engine {
                 self.expression_has_typed_provenance(left)
                     || self.expression_has_typed_provenance(right)
             }
-            E::Call(_, arguments, _, _) => {
-                arguments.iter().any(|argument| self.expression_has_typed_provenance(argument))
-            }
-            E::Array(elements, _, _) => elements.iter().any(|element| self.expression_has_typed_provenance(element)),
+            E::Call(_, arguments, _, _) => arguments
+                .iter()
+                .any(|argument| self.expression_has_typed_provenance(argument)),
+            E::Array(elements, _, _) => elements
+                .iter()
+                .any(|element| self.expression_has_typed_provenance(element)),
             E::Index(receiver, index, _, _) => {
                 self.expression_has_typed_provenance(receiver)
                     || self.expression_has_typed_provenance(index)
