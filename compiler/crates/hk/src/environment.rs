@@ -34,6 +34,7 @@ impl Env {
             .or_insert(V::Print);
     }
 
+    #[allow(dead_code)] // Used by VM lexical-scope unwinding in the next milestone.
     pub(super) fn parent(e: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
         e.borrow().parent.clone()
     }
