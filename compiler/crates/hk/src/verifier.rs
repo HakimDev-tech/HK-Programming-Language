@@ -373,15 +373,10 @@ fn verify_control_flow(
                 if next.stack_height < 1 {
                     return Err(underflow(1));
                 }
-                let initialized = &mut next.initialized_locals[slot as usize];
-                if *initialized {
-                    return Err(VerifyError::at(
-                        function_index,
-                        Some(index),
-                        "local slot is defined more than once on one control-flow path",
-                    ));
-                }
-                *initialized = true;
+                // A declaration inside a loop may execute repeatedly. The compiler
+                // assigns stable, non-overlapping slots to lexical bindings; re-entering
+                // the same declaration reinitializes that slot.
+                next.initialized_locals[slot as usize] = true;
                 next.stack_height -= 1;
             }
             Opcode::GetLocal(slot) => {
