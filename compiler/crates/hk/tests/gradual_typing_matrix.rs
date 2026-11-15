@@ -620,3 +620,31 @@ fn mixed_program_top_level_unannotated_expression_preserves_runtime_diagnostic()
 
     assert_eq!(error_code(source), "E3000");
 }
+
+#[test]
+fn mixed_dynamic_condition_preserves_legacy_runtime_diagnostic() {
+    let source = "let marker: bool = true; if (1) {}";
+    let error = run("mixed-dynamic-condition.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3000");
+}
+
+#[test]
+fn mixed_unannotated_function_preserves_legacy_unary_diagnostic() {
+    let source = r#"
+        let marker: bool = true;
+        fn legacy() { print(-true); }
+        legacy();
+    "#;
+    let error = run("mixed-dynamic-unary.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3000");
+}
+
+#[test]
+fn typed_any_operand_uses_runtime_contract_diagnostic() {
+    let source = r#"
+        fn negate(value: any) -> number { return -value; }
+        negate("invalid");
+    "#;
+    let error = run("typed-any-operand.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+}
