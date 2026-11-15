@@ -1,23 +1,26 @@
 # HK 0.3.0 — Implementation and Release Plan
 
-**Status:** Design approved as the implementation baseline for the 0.3.0 branch. No implementation item is considered complete until code, regression tests, and exact-commit CI evidence exist.
+**Status:** Implementation underway on the dedicated 0.3.0 branch. The checklist is updated only after implementation evidence exists.
 **Target:** HK 0.3.0 — Modules and Standard Library
 **Base:** `main` at `9d09ea94836e1aa71987b7f45e9e718907a29e8f` (HK 0.2.0 source integration)
 
-The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). This plan does not create intermediate Alpha releases.
+The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No intermediate Alpha releases are planned.
 
-## 1. Architectural work
+## 1. Implementation status
 
-1. Extend AST and parser with top-level import and export declarations.
-2. Add a module graph loader that separates path resolution, source loading, parsing, export validation, dependency ordering, and execution.
-3. Canonicalize filesystem paths and cache modules by canonical identity.
-4. Introduce per-module runtime environments and explicit import bindings.
-5. Keep module environments alive for imported function closures and preserve export binding identity.
-6. Add a standard-library registry for the reserved `std:` namespace and implement `std:math`.
-7. Extend static checking with module-local declarations and imported-name bindings typed as `any` in 0.3.0.
-8. Preserve source identity through every loaded module so diagnostics point to the correct file.
-
-The loader must validate the complete dependency graph, duplicate declarations/exports/imports, and missing exports before executing any module body. Cycles are errors; partial initialization is not supported.
+- [x] AST and lexer support for import/export declarations.
+- [x] Parser support for named imports, aliases, and top-level exports.
+- [x] Filesystem module graph discovery and canonical path identity.
+- [x] Dependency-first execution and at-most-once module initialization.
+- [x] Import/export linking and pre-execution missing-export validation.
+- [x] Isolated module root environments and read-only live aliases.
+- [x] Preserve defining module environments for imported functions.
+- [x] Initial `std:math` implementation.
+- [x] Public `run_path` API and CLI integration.
+- [x] Initial module integration tests and runnable example.
+- [x] Dedicated module specifier/resolver fuzz target.
+- [ ] Full CI, fuzz, Clippy, rustdoc, and cross-platform validation on the final release candidate.
+- [ ] Complete acceptance matrix, robustness audit, documentation audit, version bump, merge, tag, and release.
 
 ## 2. Required test suites
 
@@ -27,18 +30,18 @@ The loader must validate the complete dependency graph, duplicate declarations/e
 - Source-position correctness for all new diagnostics.
 
 ### Resolver and graph
-- Nested relative imports, parent-directory imports, and resolution independent of current working directory.
+- Nested relative imports, parent-directory imports, and resolution independent of process working directory.
 - Canonical-path deduplication through `.` and `..`.
 - Missing file, directory target, unsupported extension, invalid UTF-8, and path read errors.
 - Diamond dependency initialized once.
 - Deterministic dependency order.
-- Direct and indirect cycles rejected before side effects.
+- Direct and indirect cycles rejected before side effects with import-edge diagnostics.
 - Repeated import uses the same module instance.
 
 ### Runtime and typing
 - Private top-level binding isolation.
 - Named imports and aliases.
-- Imported binding immutability.
+- Imported binding immutability and live exported mutable bindings.
 - Exported `let` and `const` behavior.
 - Exported function closure resolves private state in its defining module.
 - Typed parameter, return, and binding contracts survive import.
@@ -64,7 +67,7 @@ The loader must validate the complete dependency graph, duplicate declarations/e
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` passes.
 - [ ] `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` passes.
 - [ ] Linux, Windows, and macOS CI pass on the exact proposed merge commit.
-- [ ] Dedicated fuzz campaign passes on the exact release candidate code.
+- [ ] Dedicated parser and module-loader fuzz campaigns pass on the exact release candidate code.
 - [ ] Every documented example executes successfully.
 - [ ] Public API, diagnostics, compatibility, and known limitations are audited.
 - [ ] Crate version, README, changelog, architecture, language spec, and roadmap agree on 0.3.0.
