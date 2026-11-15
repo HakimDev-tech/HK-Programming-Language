@@ -31,6 +31,6 @@ Generics, unions, optional types, typed collection elements, flow-sensitive narr
 
 ## 0.4.0 design status
 
-The design proposal is recorded in [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md), with the staged delivery plan in [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md). It proposes an AST-to-bytecode compiler, mandatory bytecode verifier, versioned in-memory bytecode, and stack-based VM, while retaining the tree-walking interpreter as a differential reference. The proposal is tracked by [design PR](https://github.com/HakimDev-tech/HK-Programming-Language/pull/15) (pending PR creation).
+The design proposal is recorded in [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md), with the staged delivery plan in [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md). It proposes an AST-to-bytecode compiler, mandatory bytecode verifier, versioned in-memory bytecode, and stack-based VM, while retaining the tree-walking interpreter as a differential reference. The proposal is tracked by [design PR](https://github.com/HakimDev-tech/HK-Programming-Language/pull/15) (PR [#15](https://github.com/HakimDev-tech/HK-Programming-Language/pull/15)).
 
 **Status: design only.** No V0.4 compiler, bytecode format, verifier, or VM implementation has been merged. Implementation must not begin until the semantic contract and acceptance criteria are reviewed.
