@@ -2,6 +2,8 @@
 //! In-memory bytecode representation for HK 0.4.x.
 //!
 //! This is an internal format, not a serialized or stable public ABI.
+use super::ast::TypeName;
+use super::types::Type;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct BytecodeHeader {
     pub(super) major: u16,
@@ -86,11 +88,28 @@ pub(super) struct SourceFile {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LocalSlot {
+    pub(super) internal_name: String,
+    pub(super) source_name: String,
+    pub(super) mutable: bool,
+    pub(super) contract: Option<Type>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ParameterProto {
+    pub(super) name: String,
+    pub(super) slot: u16,
+    pub(super) annotation: Option<TypeName>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FunctionProto {
     pub(super) name: String,
     pub(super) module_id: Option<u32>,
-    pub(super) parameter_count: u16,
-    pub(super) local_count: u16,
+    pub(super) parameters: Vec<ParameterProto>,
+    pub(super) local_slots: Vec<LocalSlot>,
+    pub(super) return_contract: Option<Type>,
+    pub(super) typed: bool,
     /// Must equal the maximum reachable operand-stack height recomputed by the verifier.
     pub(super) max_stack: u32,
     pub(super) code: Vec<Instruction>,
@@ -113,7 +132,7 @@ pub(super) struct ExportBinding {
 pub(super) struct ModuleProto {
     pub(super) name: String,
     pub(super) initializer: u32,
-    pub(super) binding_count: u16,
+    pub(super) bindings: Vec<LocalSlot>,
     pub(super) imports: Vec<ImportBinding>,
     pub(super) exports: Vec<ExportBinding>,
 }
@@ -139,8 +158,10 @@ impl BytecodeProgram {
             functions: vec![FunctionProto {
                 name: name.into(),
                 module_id: None,
-                parameter_count: 0,
-                local_count: 0,
+                parameters: Vec::new(),
+                local_slots: Vec::new(),
+                return_contract: None,
+                typed: false,
                 max_stack: 0,
                 code,
             }],
