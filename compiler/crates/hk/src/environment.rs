@@ -26,6 +26,14 @@ pub(super) struct Env {
     parent: Option<Rc<RefCell<Env>>>,
 }
 impl Env {
+    pub(super) fn ensure_print(environment: &Rc<RefCell<Self>>) {
+        environment
+            .borrow_mut()
+            .values
+            .entry("print".to_owned())
+            .or_insert(V::Print);
+    }
+
     pub(super) fn parent(e: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
         e.borrow().parent.clone()
     }
