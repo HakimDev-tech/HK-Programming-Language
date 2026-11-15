@@ -10,6 +10,7 @@ const MAX_FUNCTIONS: usize = 65_535;
 const MAX_MODULES: usize = 1_024;
 const MAX_CODE_INSTRUCTIONS: usize = 1_000_000;
 const MAX_OPERAND_STACK: u32 = 65_536;
+const MAX_SCOPE_DEPTH: u32 = 1_024;
 const MAX_CALL_ARGUMENTS: u16 = 255;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,6 +77,7 @@ impl VerifiedProgram {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FlowState {
     stack_height: u32,
+    scope_depth: u32,
     initialized_locals: Vec<bool>,
 }
 
@@ -342,6 +344,7 @@ fn verify_control_flow(
     initial_locals[..function.parameter_count as usize].fill(true);
     states[0] = Some(FlowState {
         stack_height: 0,
+        scope_depth: 0,
         initialized_locals: initial_locals,
     });
     worklist.push_back(0usize);
@@ -429,7 +432,26 @@ fn verify_control_flow(
                     return Err(underflow(1));
                 }
             }
-            Opcode::EnterScope | Opcode::ExitScope => {}
+            Opcode::EnterScope => {
+                next.scope_depth += 1;
+                if next.scope_depth > MAX_SCOPE_DEPTH {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(index),
+                        "lexical scope depth exceeds the configured limit",
+                    ));
+                }
+            }
+            Opcode::ExitScope => {
+                if next.scope_depth == 0 {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(index),
+                        "lexical scope stack underflow",
+                    ));
+                }
+                next.scope_depth -= 1;
+            }
             Opcode::Negate | Opcode::Not | Opcode::GetProperty(_) => {
                 if next.stack_height < 1 {
                     return Err(underflow(1));
@@ -485,6 +507,13 @@ fn verify_control_flow(
                 }
             }
             Opcode::Return => {
+                if next.scope_depth != 0 {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(index),
+                        "return leaves a lexical scope open",
+                    ));
+                }
                 if next.stack_height != 1 {
                     return Err(VerifyError::at(
                         function_index,
@@ -548,6 +577,16 @@ fn merge_state(
             worklist.push_back(target);
         }
         Some(existing) => {
+            if existing.scope_depth != incoming.scope_depth {
+                return Err(VerifyError::at(
+                    function_index,
+                    Some(target),
+                    format!(
+                        "inconsistent lexical-scope depth at control-flow merge: {} versus {}",
+                        existing.scope_depth, incoming.scope_depth
+                    ),
+                ));
+            }
             if existing.stack_height != incoming.stack_height {
                 return Err(VerifyError::at(
                     function_index,
@@ -814,6 +853,46 @@ mod tests {
         program.functions[0].local_count = 1;
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("not definitely initialized"));
+    }
+
+
+    #[test]
+    fn rejects_scope_stack_underflow() {
+        let error = verify(function(vec![Opcode::ExitScope, Opcode::Null, Opcode::Return], 1))
+            .unwrap_err();
+        assert!(error.message.contains("lexical scope stack underflow"));
+    }
+
+    #[test]
+    fn rejects_return_with_an_open_lexical_scope() {
+        let error = verify(function(
+            vec![Opcode::EnterScope, Opcode::Null, Opcode::Return],
+            1,
+        ))
+        .unwrap_err();
+        assert!(error.message.contains("return leaves a lexical scope open"));
+    }
+
+    #[test]
+    fn rejects_inconsistent_scope_depth_at_control_flow_merges() {
+        let program = function(
+            vec![
+                Opcode::True,
+                Opcode::JumpIfFalse(5),
+                Opcode::EnterScope,
+                Opcode::Null,
+                Opcode::Jump(6),
+                Opcode::Null,
+                Opcode::Return,
+            ],
+            1,
+        );
+        let error = verify(program).unwrap_err();
+        assert!(
+            error.message.contains("inconsistent lexical-scope depth"),
+            "unexpected verifier error: {}",
+            error
+        );
     }
 
     #[test]
