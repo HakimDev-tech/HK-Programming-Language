@@ -168,8 +168,14 @@ fn missing_exports_are_link_errors() {
 fn private_module_bindings_do_not_leak() {
     let error = run_project(
         &[
-            ("values.hk", "let private_value = 42; export const public_value = 1;"),
-            ("main.hk", "import { public_value } from \"./values.hk\"; print(private_value);"),
+            (
+                "values.hk",
+                "let private_value = 42; export const public_value = 1;",
+            ),
+            (
+                "main.hk",
+                "import { public_value } from \"./values.hk\"; print(private_value);",
+            ),
         ],
         "main.hk",
     )
