@@ -17,3 +17,10 @@ path = "fuzz_targets/run.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "modules"
+path = "fuzz_targets/modules.rs"
+test = false
+doc = false
+bench = false
