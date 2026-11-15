@@ -21,12 +21,18 @@ pub(super) enum MathFn {
 }
 
 #[derive(Clone)]
+#[derive(Clone, Debug)]
+pub(super) enum FunctionBody {
+    Tree(Vec<S>),
+    Bytecode(u32),
+}
+
 pub(super) struct Fun {
     pub(super) name: String,
     pub(super) params: Vec<Param>,
     pub(super) return_type: Option<Type>,
     pub(super) typed: bool,
-    pub(super) body: Vec<S>,
+    pub(super) body: FunctionBody,
     pub(super) env: Weak<RefCell<Env>>,
     pub(super) source: Rc<String>,
     pub(super) source_text: Rc<String>,
