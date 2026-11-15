@@ -25,7 +25,7 @@ The 0.2.0 technical release gate is satisfied: all acceptance criteria in [HK-TY
 
 The normative 0.3.0 contract is recorded in [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md), with implementation and release gates in [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md). The implementation branch is `feat/hk-v0.3.0-modules-stdlib`, tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14).
 
-The implementation is complete on `feat/hk-v0.3.0-modules-stdlib` and tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14). The release candidate at `fe8dcc95a9a4894e9d3bb1bcde8bbb02fe6cb8c4` passed formatting, the full workspace test suite, Clippy with warnings denied, rustdoc, Linux/Windows/macOS CI, and both parser/interpreter and module-resolver fuzz jobs. The crate version is `0.3.0`; the PR remains unmerged and the Git tag/GitHub Release have not yet been published.
+HK 0.3.0 is integrated into `main` by squash merge commit `644cee85f839764b146c024ab04972861bd677fe` (PR [#14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14)). The release candidate at `38cd2a35cf4deebc17066d53e722cd3eb8df825b` passed formatting, the full workspace test suite, Clippy with warnings denied, rustdoc, Linux/Windows/macOS CI, and both parser/interpreter and module-resolver fuzz campaigns. The crate version is `0.3.0`. The Git tag and GitHub Release remain unpublished.
 
 ## Deferred
 

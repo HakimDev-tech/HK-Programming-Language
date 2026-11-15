@@ -1,6 +1,6 @@
 # HK 0.3.0 — Implementation and Release Plan
 
-**Status:** Implementation complete; release-candidate validation passed on the exact head recorded below. Merge and publication remain pending.
+**Status:** HK 0.3.0 is merged into `main`; all technical gates passed. Git tag and GitHub Release publication remain pending.
 **Target:** HK 0.3.0 — Modules and Standard Library
 **Base:** `main` at `9d09ea94836e1aa71987b7f45e9e718907a29e8f` (HK 0.2.0 source integration)
 
@@ -23,7 +23,8 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 - [x] Resource limits for module depth, count, per-file source size, and aggregate source size.
 - [x] Dedicated module specifier/resolver fuzz target.
 - [x] Full CI, fuzz, Clippy, rustdoc, and cross-platform validation on the final release candidate.
-- [ ] Complete acceptance matrix, robustness audit, documentation audit, version bump, merge, tag, and release.
+- [x] Complete acceptance matrix, robustness audit, documentation audit, version bump, and merge.
+- [ ] Publish the `v0.3.0` Git tag and GitHub Release.
 
 ## 2. Required test suites
 
@@ -75,7 +76,8 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 - [x] Public API, diagnostics, compatibility, and known limitations are audited.
 - [x] Crate version, README, changelog, architecture, language spec, and roadmap agree on 0.3.0.
 - [x] No unresolved PR review threads or blocking review comments exist.
-- [ ] Merge PR #14, then publish tag `v0.3.0` and the GitHub Release after the merge commit is verified.
+- [x] PR #14 merged into `main` by squash commit `644cee85f839764b146c024ab04972861bd677fe`.
+- [ ] Publish the `v0.3.0` Git tag and GitHub Release.
 
 ## 4. Release-candidate evidence\n\n- Release-candidate head: `fe8dcc95a9a4894e9d3bb1bcde8bbb02fe6cb8c4`.\n- Cross-platform CI run: `43760570742` (Linux, Windows, macOS all successful).\n- Fuzz run: `43760570755` (parser/interpreter and module-resolver jobs successful).\n- CI commands: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo doc --workspace --no-deps`.\n- PR: [#14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14).\n\n## 5. Deferred beyond 0.3.0
 

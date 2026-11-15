@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — HK 0.3.0 (implementation in progress)
+## HK 0.3.0 — 2026-11-15
 
 - Add top-level `import { name as alias } from "./module.hk";` and `export` declarations.
 - Add filesystem-backed `hk::run_path` and route the CLI file runner through the module loader.
@@ -12,7 +12,7 @@
 - Bound module loading to 128 dependency levels, 1,024 files, 1 MiB per file, and 16 MiB aggregate source.
 - Add `std:math` with `abs`, `ceil`, `floor`, `round`, `sqrt`, `min`, and `max`.
 - Add module integration tests, a runnable module example, and a dedicated module-specifier fuzz target.
-- Final release-candidate validation passed on Linux, Windows, and macOS: formatting, workspace tests, Clippy with warnings denied, rustdoc, parser/interpreter fuzzing, and module-resolver fuzzing. The PR merge, Git tag, and GitHub Release remain pending.
+- Final release-candidate validation passed on Linux, Windows, and macOS: formatting, workspace tests, Clippy with warnings denied, rustdoc, parser/interpreter fuzzing, and module-resolver fuzzing. The implementation is merged into `main`; Git tag and GitHub Release publication remain pending.
 
 ## HK 0.2.0 — 2026-11-15
 

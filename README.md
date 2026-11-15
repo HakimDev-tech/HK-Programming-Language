@@ -2,7 +2,7 @@
 
 HK is an experimental general-purpose programming language implemented in Rust. It provides a tree-walking interpreter with gradual typing and a file-based module system.
 
-> **Status:** HK 0.2.0 is integrated into `main`. The HK 0.3.0 release candidate is implemented and validated on `feat/hk-v0.3.0-modules-stdlib`; PR #14 is not yet merged and the release is not yet published. HK remains an interpreter, not an optimizing or native compiler.
+> **Status:** HK 0.2.0 and HK 0.3.0 are integrated into `main`. HK 0.3.0 is validated and merged by commit `644cee85f839764b146c024ab04972861bd677fe`; the Git tag and GitHub Release are the remaining publication steps. HK remains an interpreter, not an optimizing or native compiler.
 
 ## Language capabilities
 
