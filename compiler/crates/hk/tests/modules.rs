@@ -498,10 +498,7 @@ fn unreadable_and_non_utf8_module_sources_are_reported_without_panicking() {
     assert_eq!(invalid_utf8.code, "E4006");
 
     let (root, entry) = project(
-        &[(
-            "main.hk",
-            "import { value } from \"./directory.hk\";",
-        )],
+        &[("main.hk", "import { value } from \"./directory.hk\";")],
         "main.hk",
     );
     fs::create_dir(root.join("directory.hk")).unwrap();
