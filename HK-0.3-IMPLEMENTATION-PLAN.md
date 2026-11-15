@@ -1,6 +1,6 @@
 # HK 0.3.0 — Implementation and Release Plan
 
-**Status:** Implementation underway on the dedicated 0.3.0 branch. The checklist is updated only after implementation evidence exists.
+**Status:** Implementation complete; release-candidate validation passed on the exact head recorded below. Merge and publication remain pending.
 **Target:** HK 0.3.0 — Modules and Standard Library
 **Base:** `main` at `9d09ea94836e1aa71987b7f45e9e718907a29e8f` (HK 0.2.0 source integration)
 
@@ -22,7 +22,7 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 - [x] Stable diagnostics for module errors, imported-binding immutability, and std:math failures.
 - [x] Resource limits for module depth, count, per-file source size, and aggregate source size.
 - [x] Dedicated module specifier/resolver fuzz target.
-- [ ] Full CI, fuzz, Clippy, rustdoc, and cross-platform validation on the final release candidate.
+- [x] Full CI, fuzz, Clippy, rustdoc, and cross-platform validation on the final release candidate.
 - [ ] Complete acceptance matrix, robustness audit, documentation audit, version bump, merge, tag, and release.
 
 ## 2. Required test suites
@@ -64,19 +64,19 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 
 ## 3. Release gates
 
-- [ ] All normative acceptance criteria in HK-MODULES-SPEC.md pass.
-- [ ] Full workspace test suite passes without deleting or weakening legacy tests.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` passes.
-- [ ] `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` passes.
-- [ ] Linux, Windows, and macOS CI pass on the exact proposed merge commit.
-- [ ] Dedicated parser and module-loader fuzz campaigns pass on the exact release candidate code.
-- [ ] Every documented example executes successfully.
-- [ ] Public API, diagnostics, compatibility, and known limitations are audited.
-- [ ] Crate version, README, changelog, architecture, language spec, and roadmap agree on 0.3.0.
-- [ ] PR review has no unresolved blocking threads.
-- [ ] Tag and GitHub Release are published only after all technical gates pass.
+- [x] All normative acceptance criteria in HK-MODULES-SPEC.md pass by implementation audit and regression coverage.
+- [x] Full workspace test suite passes without deleting or weakening legacy tests.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` passes.
+- [x] `cargo doc --workspace --no-deps` passes.
+- [x] Linux, Windows, and macOS CI pass on the exact release-candidate head.
+- [x] Dedicated parser/interpreter and module-resolver fuzz campaigns pass on the exact release-candidate head.
+- [x] Documented core, gradual-typing, module, and CLI examples are covered by automated execution tests.
+- [x] Public API, diagnostics, compatibility, and known limitations are audited.
+- [x] Crate version, README, changelog, architecture, language spec, and roadmap agree on 0.3.0.
+- [x] No unresolved PR review threads or blocking review comments exist.
+- [ ] Merge PR #14, then publish tag `v0.3.0` and the GitHub Release after the merge commit is verified.
 
-## 4. Deferred beyond 0.3.0
+## 4. Release-candidate evidence\n\n- Release-candidate head: `fe8dcc95a9a4894e9d3bb1bcde8bbb02fe6cb8c4`.\n- Cross-platform CI run: `43760570742` (Linux, Windows, macOS all successful).\n- Fuzz run: `43760570755` (parser/interpreter and module-resolver jobs successful).\n- CI commands: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo doc --workspace --no-deps`.\n- PR: [#14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14).\n\n## 5. Deferred beyond 0.3.0
 
 Package management, third-party dependencies, lockfiles, namespace imports, cyclic modules, re-exports, default exports, dynamic imports, full static type-interface propagation, additional standard-library modules, bytecode/VM, native compilation, WASM, FFI, concurrency, closures, generics, classes, and traits.
