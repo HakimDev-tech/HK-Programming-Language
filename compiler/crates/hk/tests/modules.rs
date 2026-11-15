@@ -447,3 +447,36 @@ fn source_only_run_api_rejects_filesystem_imports_with_a_specific_diagnostic() {
     let error = hk::run("inline.hk", "import { abs } from \"std:math\";").unwrap_err();
     assert_eq!(error.code, "E4008");
 }
+
+#[test]
+fn malformed_module_declarations_are_rejected_by_the_parser() {
+    for source in [
+        "import {} from \"std:math\";",
+        "import { abs as value, sqrt as value } from \"std:math\";",
+        "fn nested() { import { abs } from \"std:math\"; }",
+        "{ export const hidden = 1; }",
+        "export print(1);",
+    ] {
+        let error = run_project(&[("main.hk", source)], "main.hk").unwrap_err();
+        assert!(
+            error.code == "E2000" || error.code == "E2001",
+            "unexpected diagnostic {} for source {source:?}: {}",
+            error.code,
+            error.message
+        );
+    }
+}
+
+#[test]
+fn duplicate_export_names_are_rejected_before_execution() {
+    let error = run_project(
+        &[(
+            "main.hk",
+            "export const value = 1; export let value = 2;",
+        )],
+        "main.hk",
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "E4004");
+}
