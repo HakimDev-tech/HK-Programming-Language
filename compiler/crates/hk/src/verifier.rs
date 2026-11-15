@@ -868,7 +868,10 @@ pub(super) fn fuzz_verify(input: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile, SourceLocation};
+    use crate::bytecode::{
+        BytecodeHeader, ExportBinding, FunctionProto, ImportBinding, Instruction, LocalSlot,
+        ModuleProto, SourceFile, SourceLocation,
+    };
 
     fn instruction(opcode: Opcode) -> Instruction {
         Instruction {
@@ -901,6 +904,70 @@ mod tests {
             modules: Vec::new(),
             entry_function: 0,
         }
+    }
+
+
+    fn local_slot(internal_name: &str, source_name: &str, mutable: bool) -> LocalSlot {
+        LocalSlot {
+            internal_name: internal_name.to_owned(),
+            source_name: source_name.to_owned(),
+            mutable,
+            contract: None,
+        }
+    }
+
+    fn module_function(name: &str, module_id: u32) -> FunctionProto {
+        FunctionProto {
+            name: name.to_owned(),
+            module_id: Some(module_id),
+            parameters: Vec::new(),
+            local_slots: Vec::new(),
+            return_contract: None,
+            typed: false,
+            max_stack: 1,
+            code: vec![instruction(Opcode::Null), instruction(Opcode::Return)],
+        }
+    }
+
+    fn module_program(reverse_dependency: bool) -> BytecodeProgram {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.functions.push(module_function("dependency", 0));
+        program.functions.push(module_function("root", 1));
+        let dependency = ModuleProto {
+            name: "dependency.hk".to_owned(),
+            initializer: 1,
+            bindings: vec![local_slot("\\0dependency:x", "x", true)],
+            imports: if reverse_dependency {
+                vec![ImportBinding {
+                    local_slot: 0,
+                    target_module: 1,
+                    target_slot: 0,
+                }]
+            } else {
+                Vec::new()
+            },
+            exports: vec![ExportBinding {
+                name: "x".to_owned(),
+                slot: 0,
+            }],
+        };
+        let root = ModuleProto {
+            name: "root.hk".to_owned(),
+            initializer: 2,
+            bindings: vec![local_slot("\\0root:x", "x", false)],
+            imports: if reverse_dependency {
+                Vec::new()
+            } else {
+                vec![ImportBinding {
+                    local_slot: 0,
+                    target_module: 0,
+                    target_slot: 0,
+                }]
+            },
+            exports: Vec::new(),
+        };
+        program.modules = vec![dependency, root];
+        program
     }
 
     #[test]
@@ -1034,6 +1101,18 @@ mod tests {
             "unexpected verifier error: {}",
             error
         );
+    }
+
+
+    #[test]
+    fn accepts_dependency_first_module_binding_and_import_metadata() {
+        verify(module_program(false)).unwrap();
+    }
+
+    #[test]
+    fn rejects_modules_that_are_not_ordered_dependency_first() {
+        let error = verify(module_program(true)).unwrap_err();
+        assert!(error.message.contains("dependencies must precede their importer"));
     }
 
     #[test]
