@@ -11,7 +11,8 @@ HK is a Rust modular monolith in one Cargo package. The interpreter and gradual-
 | `parser.rs` | Parsing declarations, control flow, expressions, imports, and exports |
 | `types.rs` | Source-level type representation and compatibility relation |
 | `type_checker.rs` | Lexical type scopes, static expression checks, function signatures, and return-path analysis |
-| `runtime.rs` | Tree-walking execution, lexical environments, contracts, module graph loading, import aliases, and native math functions |
+| `runtime.rs` | Tree-walking execution, lexical environments, contracts, import aliases, and native math functions |
+| `module_loader.rs` | Filesystem resolution, graph discovery, import/export linking, cycle validation, and dependency-first execution |
 | `diagnostics.rs` | Structured diagnostics with source excerpts and caret positions |
 | `lib.rs` | Public source and filesystem execution APIs |
 | `main.rs` | CLI entry point |
