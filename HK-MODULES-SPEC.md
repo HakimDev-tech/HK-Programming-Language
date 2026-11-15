@@ -98,7 +98,7 @@ The loader builds and validates the complete reachable dependency graph before e
 - Dependencies are initialized before their importer.
 - Imports are processed in source order.
 - A module is initialized at most once in one top-level program execution, even if multiple modules import it.
-- Repeated imports reuse the same module instance and exported binding identities.
+- Repeated imports reuse the same module instance and exported binding identities. Imported names are live read-only views of those bindings, not copied snapshots.
 - Cyclic dependencies are rejected before any module body executes.
 - The cycle diagnostic reports the import edge that closes the cycle and a readable module chain.
 - A failed module initialization aborts the program; partially initialized exports are never made observable.
@@ -114,7 +114,7 @@ Every filesystem module has an independent top-level lexical environment. A modu
 
 Exported variables preserve binding identity and mutability semantics:
 - exported `const` bindings cannot be reassigned by the exporting module or importers;
-- exported `let` bindings remain mutable through their exported binding;
+- exported `let` bindings remain mutable inside the exporting module; importers observe the current exported value but cannot assign through an imported name;
 - imported names are immutable aliases: an importer cannot rebind the imported name;
 - mutation of a referenced array remains governed by the existing 0.1.x/0.2.0 array semantics.
 
