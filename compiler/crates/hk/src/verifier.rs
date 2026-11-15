@@ -860,7 +860,7 @@ mod tests {
     #[test]
     fn rejects_scope_depth_above_the_parser_limit() {
         let mut code = vec![Opcode::EnterScope; 129];
-        code.extend(vec![Opcode::ExitScope; 129]);
+        code.extend(std::iter::repeat_n(Opcode::ExitScope, 129));
         code.extend([Opcode::Null, Opcode::Return]);
         let error = verify(function(code, 1)).unwrap_err();
         assert!(error.message.contains("lexical scope depth exceeds"));
