@@ -8,6 +8,7 @@ mod module_loader;
 mod parser;
 mod runtime;
 mod type_checker;
+mod value;
 mod types;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
