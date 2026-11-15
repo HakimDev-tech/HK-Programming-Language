@@ -351,3 +351,29 @@ fn cycle_diagnostic_points_to_the_import_edge_that_closes_the_cycle() {
     assert!(error.source.ends_with("b.hk"));
     assert_eq!(error.line, 1);
 }
+
+#[test]
+fn imported_function_diagnostics_retain_the_defining_module_source() {
+    let error = run_project(
+        &[
+            (
+                "values.hk",
+                r#"
+                    export fn fail(value: any) {
+                        let checked: number = value;
+                    }
+                "#,
+            ),
+            (
+                "main.hk",
+                "import { fail } from \"./values.hk\"; fail(\"invalid\");",
+            ),
+        ],
+        "main.hk",
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "E3008");
+    assert!(error.source.ends_with("values.hk"));
+    assert_eq!(error.line, 3);
+}
