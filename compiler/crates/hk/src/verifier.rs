@@ -11,7 +11,6 @@ const MAX_FUNCTIONS: usize = 65_535;
 const MAX_MODULES: usize = 1_024;
 const MAX_CODE_INSTRUCTIONS: usize = 1_000_000;
 const MAX_OPERAND_STACK: u32 = 65_536;
-const MAX_LOCAL_SLOTS: u16 = 65_535;
 const MAX_CALL_ARGUMENTS: u16 = 255;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -209,7 +208,7 @@ fn verify_function_tables(
             "function parameter count exceeds 255",
         ));
     }
-    if function.parameter_count > function.local_count || function.local_count > MAX_LOCAL_SLOTS {
+    if function.parameter_count > function.local_count {
         return Err(VerifyError::at(
             function_index,
             None,
