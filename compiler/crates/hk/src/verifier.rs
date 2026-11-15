@@ -936,7 +936,7 @@ mod tests {
         let dependency = ModuleProto {
             name: "dependency.hk".to_owned(),
             initializer: 1,
-            bindings: vec![local_slot("\\0dependency:x", "x", true)],
+            bindings: vec![local_slot("\\0dependency:x", "x", !reverse_dependency)],
             imports: if reverse_dependency {
                 vec![ImportBinding {
                     local_slot: 0,
@@ -946,15 +946,19 @@ mod tests {
             } else {
                 Vec::new()
             },
-            exports: vec![ExportBinding {
-                name: "x".to_owned(),
-                slot: 0,
-            }],
+            exports: if reverse_dependency {
+                Vec::new()
+            } else {
+                vec![ExportBinding {
+                    name: "x".to_owned(),
+                    slot: 0,
+                }]
+            },
         };
         let root = ModuleProto {
             name: "root.hk".to_owned(),
             initializer: 2,
-            bindings: vec![local_slot("\\0root:x", "x", false)],
+            bindings: vec![local_slot("\\0root:x", "x", reverse_dependency)],
             imports: if reverse_dependency {
                 Vec::new()
             } else {
