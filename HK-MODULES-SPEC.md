@@ -191,6 +191,7 @@ The module loader and initial standard library use these dedicated codes:
 | `E4004` | Duplicate or unsupported export declaration |
 | `E4005` | Cyclic module dependency |
 | `E4006` | Module source is unreadable, not a regular file, invalid UTF-8, or exceeds a source-size limit |
+| `E4007` | Attempt to reassign an imported binding |
 | `E3011` | Standard-library function arity violation |
 | `E3012` | Standard-library argument type violation |
 | `E3013` | Standard-library domain violation |
