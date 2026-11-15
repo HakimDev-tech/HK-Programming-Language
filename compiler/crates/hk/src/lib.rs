@@ -4,6 +4,7 @@ mod ast;
 use ast::S;
 pub mod diagnostics;
 mod lexer;
+mod module_loader;
 mod parser;
 mod runtime;
 mod type_checker;
@@ -36,7 +37,7 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
 
 /// Loads, links, type-checks, and executes a filesystem-backed HK program.
 pub fn run_path(path: impl AsRef<std::path::Path>) -> Result<Vec<String>> {
-    runtime::execute_file(path.as_ref())
+    module_loader::execute_file(path.as_ref())
 }
 
 fn has_type_annotations(statements: &[S]) -> bool {
