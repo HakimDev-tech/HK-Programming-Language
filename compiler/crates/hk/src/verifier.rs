@@ -906,7 +906,6 @@ mod tests {
         }
     }
 
-
     fn local_slot(internal_name: &str, source_name: &str, mutable: bool) -> LocalSlot {
         LocalSlot {
             internal_name: internal_name.to_owned(),
@@ -1107,7 +1106,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn accepts_dependency_first_module_binding_and_import_metadata() {
         verify(module_program(false)).unwrap();
@@ -1116,7 +1114,9 @@ mod tests {
     #[test]
     fn rejects_modules_that_are_not_ordered_dependency_first() {
         let error = verify(module_program(true)).unwrap_err();
-        assert!(error.message.contains("dependencies must precede their importer"));
+        assert!(error
+            .message
+            .contains("dependencies must precede their importer"));
     }
 
     #[test]
