@@ -1,0 +1,4 @@
+let marker: bool = true;
+let value = 1;
+print(false && value);
+print(true || value);

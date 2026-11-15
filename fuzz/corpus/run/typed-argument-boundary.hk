@@ -1,0 +1,3 @@
+fn take(value: number) -> number { return value; }
+let operation = take;
+operation("invalid");

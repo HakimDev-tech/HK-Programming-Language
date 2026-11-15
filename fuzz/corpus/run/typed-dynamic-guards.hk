@@ -1,0 +1,5 @@
+let marker: bool = true;
+let dynamic = "invalid";
+let number = 1;
+print(number - dynamic);
+print(false && dynamic);
