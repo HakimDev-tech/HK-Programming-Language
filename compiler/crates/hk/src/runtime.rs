@@ -379,7 +379,13 @@ impl Engine {
     fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
     }
-    fn stdlib_error(&self, code: &'static str, msg: impl Into<String>, line: usize, col: usize) -> HkError {
+    fn stdlib_error(
+        &self,
+        code: &'static str,
+        msg: impl Into<String>,
+        line: usize,
+        col: usize,
+    ) -> HkError {
         HkError::new(code, msg, &self.source, line, col, &self.source_text)
     }
     fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
