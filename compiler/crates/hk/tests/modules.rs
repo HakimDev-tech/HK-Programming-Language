@@ -477,3 +477,14 @@ fn duplicate_export_names_are_rejected_before_execution() {
 
     assert_eq!(error.code, "E4004");
 }
+
+#[test]
+fn cli_reports_the_0_3_0_package_version() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_hk"))
+        .arg("version")
+        .output()
+        .expect("the HK CLI should start");
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "HK 0.3.0");
+}
