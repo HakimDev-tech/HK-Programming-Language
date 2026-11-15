@@ -129,15 +129,15 @@ fn dynamic_boundary_matrix_checks_variables_assignments_parameters_and_returns()
 #[test]
 fn dynamic_boundary_matrix_guards_any_conditions_and_array_operations() {
     assert_eq!(
-        error_code("let marker: bool = true; let value = 1; if (value) {}"),
+        error_code("let marker: bool = true; let value: any = 1; if (value) {}"),
         "E3008"
     );
     assert_eq!(
-        error_code("let marker: bool = true; let value = 1; print(value[0]);"),
+        error_code("let marker: bool = true; let value: any = 1; print(value[0]);"),
         "E3008"
     );
     assert_eq!(
-        error_code("let marker: bool = true; let value = 1; print(value.length);"),
+        error_code("let marker: bool = true; let value: any = 1; print(value.length);"),
         "E3008"
     );
 }
@@ -215,7 +215,7 @@ fn indirect_function_return_contract_points_to_the_return_expression() {
 
 #[test]
 fn unary_dynamic_guard_points_to_the_operand() {
-    let source = "let marker: bool = true; let value = \"bad\"; print(-value);";
+    let source = "let marker: bool = true; let value: any = \"bad\"; print(-value);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("value").unwrap() + 1);
@@ -224,7 +224,7 @@ fn unary_dynamic_guard_points_to_the_operand() {
 #[test]
 fn binary_dynamic_guard_points_to_the_offending_operand() {
     let source =
-        "let marker: bool = true; let value = 1; let dynamic = \"bad\"; print(value - dynamic);";
+        "let marker: bool = true; let value: any = 1; let dynamic: any = \"bad\"; print(value - dynamic);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
@@ -233,7 +233,7 @@ fn binary_dynamic_guard_points_to_the_offending_operand() {
 #[test]
 fn dynamic_array_index_guard_points_to_the_index_expression() {
     let source =
-        "let marker: bool = true; let values = [1]; let dynamic = \"bad\"; print(values[dynamic]);";
+        "let marker: bool = true; let values = [1]; let dynamic: any = \"bad\"; print(values[dynamic]);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
@@ -241,7 +241,7 @@ fn dynamic_array_index_guard_points_to_the_index_expression() {
 
 #[test]
 fn dynamic_array_receiver_guard_points_to_the_receiver() {
-    let source = "let marker: bool = true; let value = 1; print(value.length);";
+    let source = "let marker: bool = true; let value: any = 1; print(value.length);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("value").unwrap() + 1);
@@ -250,7 +250,7 @@ fn dynamic_array_receiver_guard_points_to_the_receiver() {
 #[test]
 fn binary_dynamic_guard_reports_a_bad_left_operand() {
     let source =
-        "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(dynamic - value);";
+        "let marker: bool = true; let dynamic: any = \"bad\"; let value: any = 1; print(dynamic - value);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
@@ -258,12 +258,12 @@ fn binary_dynamic_guard_reports_a_bad_left_operand() {
 
 #[test]
 fn logical_dynamic_guards_report_the_offending_operand() {
-    let left_source = "let marker: bool = true; let dynamic = 1; print(dynamic && true);";
+    let left_source = "let marker: bool = true; let dynamic: any = 1; print(dynamic && true);";
     let left_error = run("gradual-typing-matrix.hk", left_source).unwrap_err();
     assert_eq!(left_error.code, "E3008");
     assert_eq!(left_error.column, left_source.rfind("dynamic").unwrap() + 1);
 
-    let right_source = "let marker: bool = true; let dynamic = 1; print(true && dynamic);";
+    let right_source = "let marker: bool = true; let dynamic: any = 1; print(true && dynamic);";
     let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
     assert_eq!(right_error.code, "E3008");
     assert_eq!(
@@ -274,7 +274,7 @@ fn logical_dynamic_guards_report_the_offending_operand() {
 
 #[test]
 fn dynamic_array_index_receiver_guard_reports_the_receiver() {
-    let source = "let marker: bool = true; let dynamic = 1; print(dynamic[0]);";
+    let source = "let marker: bool = true; let dynamic: any = 1; print(dynamic[0]);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
@@ -347,7 +347,7 @@ fn arithmetic_and_ordering_guards_report_bad_left_and_right_operands() {
     let operators = ["-", "*", "/", "%", "<", ">", "<=", ">="];
     for operator in operators {
         let left_source = format!(
-            "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(dynamic {operator} value);"
+            "let marker: bool = true; let dynamic: any = \"bad\"; let value: any = 1; print(dynamic {operator} value);"
         );
         let left_error = run("gradual-typing-matrix.hk", &left_source).unwrap_err();
         assert_eq!(left_error.code, "E3008", "operator: {operator}");
@@ -358,7 +358,7 @@ fn arithmetic_and_ordering_guards_report_bad_left_and_right_operands() {
         );
 
         let right_source = format!(
-            "let marker: bool = true; let dynamic = \"bad\"; let value = 1; print(value {operator} dynamic);"
+            "let marker: bool = true; let dynamic: any = \"bad\"; let value: any = 1; print(value {operator} dynamic);"
         );
         let right_error = run("gradual-typing-matrix.hk", &right_source).unwrap_err();
         assert_eq!(right_error.code, "E3008", "operator: {operator}");
@@ -372,7 +372,7 @@ fn arithmetic_and_ordering_guards_report_bad_left_and_right_operands() {
 
 #[test]
 fn unary_not_dynamic_guard_reports_the_operand() {
-    let source = "let marker: bool = true; let dynamic = 1; print(!dynamic);";
+    let source = "let marker: bool = true; let dynamic: any = 1; print(!dynamic);";
     let error = run("gradual-typing-matrix.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
     assert_eq!(error.column, source.rfind("dynamic").unwrap() + 1);
@@ -380,7 +380,7 @@ fn unary_not_dynamic_guard_reports_the_operand() {
 
 #[test]
 fn dynamic_while_and_for_conditions_report_the_condition() {
-    let while_source = "let marker: bool = true; let dynamic = 1; while (dynamic) {}";
+    let while_source = "let marker: bool = true; let dynamic: any = 1; while (dynamic) {}";
     let while_error = run("gradual-typing-matrix.hk", while_source).unwrap_err();
     assert_eq!(while_error.code, "E3008");
     assert_eq!(
@@ -388,7 +388,7 @@ fn dynamic_while_and_for_conditions_report_the_condition() {
         while_source.rfind("dynamic").unwrap() + 1
     );
 
-    let for_source = "let marker: bool = true; let dynamic = 1; for (; dynamic; ) {}";
+    let for_source = "let marker: bool = true; let dynamic: any = 1; for (; dynamic; ) {}";
     let for_error = run("gradual-typing-matrix.hk", for_source).unwrap_err();
     assert_eq!(for_error.code, "E3008");
     assert_eq!(for_error.column, for_source.rfind("dynamic").unwrap() + 1);
@@ -396,7 +396,7 @@ fn dynamic_while_and_for_conditions_report_the_condition() {
 
 #[test]
 fn dynamic_array_write_guards_report_receiver_and_index() {
-    let receiver_source = "let marker: bool = true; let dynamic = 1; dynamic[0] = 2;";
+    let receiver_source = "let marker: bool = true; let dynamic: any = 1; dynamic[0] = 2;";
     let receiver_error = run("gradual-typing-matrix.hk", receiver_source).unwrap_err();
     assert_eq!(receiver_error.code, "E3008");
     assert_eq!(
@@ -405,7 +405,7 @@ fn dynamic_array_write_guards_report_receiver_and_index() {
     );
 
     let index_source =
-        "let marker: bool = true; let values = [1]; let dynamic = \"bad\"; values[dynamic] = 2;";
+        "let marker: bool = true; let values = [1]; let dynamic: any = \"bad\"; values[dynamic] = 2;";
     let index_error = run("gradual-typing-matrix.hk", index_source).unwrap_err();
     assert_eq!(index_error.code, "E3008");
     assert_eq!(
@@ -430,12 +430,12 @@ fn direct_typed_function_parameter_contract_reports_dynamic_argument() {
 
 #[test]
 fn logical_or_dynamic_guards_report_evaluated_operands() {
-    let left_source = "let marker: bool = true; let dynamic = 1; print(dynamic || true);";
+    let left_source = "let marker: bool = true; let dynamic: any = 1; print(dynamic || true);";
     let left_error = run("gradual-typing-matrix.hk", left_source).unwrap_err();
     assert_eq!(left_error.code, "E3008");
     assert_eq!(left_error.column, left_source.rfind("dynamic").unwrap() + 1);
 
-    let right_source = "let marker: bool = true; let dynamic = 1; print(false || dynamic);";
+    let right_source = "let marker: bool = true; let dynamic: any = 1; print(false || dynamic);";
     let right_error = run("gradual-typing-matrix.hk", right_source).unwrap_err();
     assert_eq!(right_error.code, "E3008");
     assert_eq!(
@@ -446,7 +446,7 @@ fn logical_or_dynamic_guards_report_evaluated_operands() {
     assert_eq!(
         run(
             "gradual-typing-matrix.hk",
-            "let marker: bool = true; let dynamic = 1; print(true || dynamic);"
+            "let marker: bool = true; let dynamic: any = 1; print(true || dynamic);"
         )
         .unwrap(),
         vec!["true"]
