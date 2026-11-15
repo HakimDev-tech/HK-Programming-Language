@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Verifier entry points are integrated by the compiler/VM milestone.
 //! Mandatory verifier for compiler-produced in-memory HK bytecode.
-use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode, SourceLocation};
+use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode};
 
 const SUPPORTED_MAJOR: u16 = 1;
 const SUPPORTED_MINOR: u16 = 0;
@@ -581,7 +581,7 @@ fn merge_state(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile};
+    use crate::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile, SourceLocation};
 
     fn instruction(opcode: Opcode) -> Instruction {
         Instruction {
