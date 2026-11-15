@@ -52,7 +52,16 @@ pub(super) struct Param {
 }
 
 #[derive(Clone, Debug)]
+pub(super) struct ImportName {
+    pub(super) imported: String,
+    pub(super) local: String,
+    pub(super) line: usize,
+    pub(super) column: usize,
+}
+
 pub(super) enum S {
+    Import(String, Vec<ImportName>, usize, usize),
+    Export(Box<S>),
     Var(String, E, bool, usize, usize),
     TypedVar(String, TypeName, E, bool, usize, usize),
     Fn(String, Vec<String>, Vec<S>, usize, usize),
@@ -68,6 +77,8 @@ pub(super) enum S {
 impl S {
     pub(super) fn source_position(&self) -> (usize, usize) {
         match self {
+            S::Import(_, _, line, column) => (*line, *column),
+            S::Export(statement) => statement.source_position(),
             S::Var(_, _, _, line, column)
             | S::Fn(_, _, _, line, column)
             | S::TypedVar(_, _, _, _, line, column)
