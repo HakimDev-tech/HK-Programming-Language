@@ -400,7 +400,10 @@ fn imported_function_diagnostics_retain_the_defining_module_source() {
 fn each_run_path_call_starts_a_fresh_module_cache() {
     let (root, entry) = project(
         &[
-            ("dependency.hk", "print(\"initialized\"); export const value = 1;"),
+            (
+                "dependency.hk",
+                "print(\"initialized\"); export const value = 1;",
+            ),
             (
                 "main.hk",
                 "import { value } from \"./dependency.hk\"; print(value);",
