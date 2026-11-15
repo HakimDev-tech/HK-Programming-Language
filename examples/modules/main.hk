@@ -1,0 +1,7 @@
+import { add as increment, count } from "./counter.hk";
+import { sqrt, max } from "std:math";
+
+print(increment(2));
+print(count);
+print(sqrt(81));
+print(max(12, 18));

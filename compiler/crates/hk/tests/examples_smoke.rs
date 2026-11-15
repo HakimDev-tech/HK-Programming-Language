@@ -1,4 +1,4 @@
-use hk::run;
+use hk::{run, run_path};
 
 #[test]
 fn all_documented_examples_execute_with_expected_output() {
@@ -39,4 +39,12 @@ fn all_documented_examples_execute_with_expected_output() {
             .collect::<Vec<_>>();
         assert_eq!(actual, expected, "unexpected output from {name}");
     }
+}
+
+#[test]
+fn module_example_executes_through_filesystem_loader() {
+    let entry =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/modules/main.hk");
+    let actual = run_path(entry).expect("the module example should execute successfully");
+    assert_eq!(actual, vec!["counter initialized", "3", "3", "9", "18"]);
 }

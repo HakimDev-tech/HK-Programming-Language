@@ -4,7 +4,7 @@
 |---|---|---|
 | 0.1.x | Language Core | Dynamic imperative interpreter and Rust runtime hardening |
 | 0.2.0 | Gradual Typing | Optional annotations, static checking, runtime contracts, and conformance guarantees |
-| 0.3.x | Modules and Standard Library | Imports and a deliberately scoped standard library |
+| 0.3.0 | Modules and Standard Library | Isolated modules, named imports/exports, deterministic loading, and `std:math` |
 | 0.4.x | Bytecode and VM | Versioned bytecode and virtual machine |
 | 0.5.x | Advanced Language Features | Evaluate structs, enums, traits/interfaces, closures, and generics |
 | 0.6.x | Native Compilation | Evaluate a native backend only after technical assessment |
@@ -21,6 +21,12 @@ HK 0.2.0 is integrated into `main` by squash merge commit `0ab7d567c04beb30a603d
 
 The 0.2.0 technical release gate is satisfied: all acceptance criteria in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md), the finalization checklist in [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md), exact-commit CI on Linux/Windows/macOS, and dedicated fuzzing passed.
 
+## 0.3.0 status
+
+The normative 0.3.0 contract is recorded in [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md), with implementation and release gates in [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md). The implementation branch is `feat/hk-v0.3.0-modules-stdlib`, tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14).
+
+The implementation is complete on `feat/hk-v0.3.0-modules-stdlib` and tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14). The release candidate at `fe8dcc95a9a4894e9d3bb1bcde8bbb02fe6cb8c4` passed formatting, the full workspace test suite, Clippy with warnings denied, rustdoc, Linux/Windows/macOS CI, and both parser/interpreter and module-resolver fuzz jobs. The crate version is `0.3.0`; the PR remains unmerged and the Git tag/GitHub Release have not yet been published.
+
 ## Deferred
 
-Generics, unions, optional types, typed collection elements, flow-sensitive narrowing, modules, closures, bytecode, VM, native compilation, WASM, FFI, package management, LSP, formatter, and debugger are not part of 0.2.0.
+Generics, unions, optional types, typed collection elements, flow-sensitive narrowing, closures, bytecode, VM, native compilation, WASM, FFI, package management, LSP, formatter, and debugger are not part of 0.2.0. Cyclic imports, package resolution, and full static type-interface propagation across module boundaries are excluded from 0.3.0.

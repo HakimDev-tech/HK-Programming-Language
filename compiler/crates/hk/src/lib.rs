@@ -4,6 +4,7 @@ mod ast;
 use ast::S;
 pub mod diagnostics;
 mod lexer;
+mod module_loader;
 mod parser;
 mod runtime;
 mod type_checker;
@@ -14,11 +15,29 @@ pub(crate) type Result<T> = std::result::Result<T, HkError>;
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     let tokens = lexer::Lexer::new(source_name, source).scan()?;
     let statements = parser::Parser::new(tokens, source_name, source).parse()?;
+    if let Some(S::Import(_, _, line, column)) = statements
+        .iter()
+        .find(|statement| matches!(statement, S::Import(..)))
+    {
+        return Err(HkError::new(
+            "E4008",
+            "Filesystem imports require hk::run_path() with an entry file.",
+            source_name,
+            *line,
+            *column,
+            source,
+        ));
+    }
     let typed_mode = has_type_annotations(&statements);
     if typed_mode {
         type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     }
     runtime::execute(source_name, source, &statements)
+}
+
+/// Loads, links, type-checks, and executes a filesystem-backed HK program.
+pub fn run_path(path: impl AsRef<std::path::Path>) -> Result<Vec<String>> {
+    module_loader::execute_file(path.as_ref())
 }
 
 fn has_type_annotations(statements: &[S]) -> bool {
@@ -37,7 +56,8 @@ fn has_type_annotations(statements: &[S]) -> bool {
                 has_type_annotations(std::slice::from_ref(statement.as_ref()))
             }) || has_type_annotations(std::slice::from_ref(body.as_ref()))
         }
-        S::Var(..) | S::Expr(..) | S::Return(..) => false,
+        S::Export(statement) => has_type_annotations(std::slice::from_ref(statement.as_ref())),
+        S::Import(..) | S::Var(..) | S::Expr(..) | S::Return(..) => false,
     })
 }
 

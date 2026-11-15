@@ -8,6 +8,17 @@ use std::{
     rc::{Rc, Weak},
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MathFn {
+    Abs,
+    Ceil,
+    Floor,
+    Round,
+    Sqrt,
+    Min,
+    Max,
+}
+
 #[derive(Clone)]
 struct Fun {
     name: String,
@@ -16,6 +27,10 @@ struct Fun {
     typed: bool,
     body: Vec<S>,
     env: Weak<RefCell<Env>>,
+    source: Rc<String>,
+    source_text: Rc<String>,
+    line: usize,
+    column: usize,
 }
 #[derive(Clone)]
 enum V {
@@ -26,6 +41,7 @@ enum V {
     Arr(Rc<RefCell<Vec<V>>>),
     Fun(Rc<Fun>),
     Print,
+    Math(MathFn),
 }
 impl V {
     fn ty(&self) -> &'static str {
@@ -35,7 +51,7 @@ impl V {
             V::Bool(_) => "Boolean",
             V::Null => "Null",
             V::Arr(_) => "Array",
-            V::Fun(_) | V::Print => "Function",
+            V::Fun(_) | V::Print | V::Math(_) => "Function",
         }
     }
     fn show(&self) -> String {
@@ -67,6 +83,18 @@ impl V {
             }
             V::Fun(f) => format!("<fn {}>", f.name),
             V::Print => "<native fn print>".into(),
+            V::Math(function) => format!(
+                "<native fn std:math::{}>",
+                match function {
+                    MathFn::Abs => "abs",
+                    MathFn::Ceil => "ceil",
+                    MathFn::Floor => "floor",
+                    MathFn::Round => "round",
+                    MathFn::Sqrt => "sqrt",
+                    MathFn::Min => "min",
+                    MathFn::Max => "max",
+                }
+            ),
         }
     }
     fn eq(&self, b: &V) -> bool {
@@ -78,6 +106,7 @@ impl V {
             (V::Arr(a), V::Arr(b)) => Rc::ptr_eq(a, b),
             (V::Fun(a), V::Fun(b)) => Rc::ptr_eq(a, b),
             (V::Print, V::Print) => true,
+            (V::Math(a), V::Math(b)) => a == b,
             _ => false,
         }
     }
@@ -105,7 +134,7 @@ fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Re
                 V::Bool(_) => "bool",
                 V::Null => "null",
                 V::Arr(_) => "array",
-                V::Fun(_) | V::Print => "function",
+                V::Fun(_) | V::Print | V::Math(_) => "function",
             }
         ))
     }
@@ -131,16 +160,18 @@ fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usiz
 enum EnvError {
     Duplicate(String),
     Constant(String),
+    ImportedAlias(String),
     Undefined(String),
     Contract(String),
 }
 
 #[derive(Default)]
-struct Env {
+pub(super) struct Env {
     values: HashMap<String, V>,
     constants: HashSet<String>,
     contracts: HashMap<String, Type>,
     function_names: HashSet<String>,
+    aliases: HashMap<String, (Weak<RefCell<Env>>, String)>,
     parent: Option<Rc<RefCell<Env>>>,
 }
 impl Env {
@@ -158,7 +189,7 @@ impl Env {
         contract: Option<Type>,
         boundary: &str,
     ) -> std::result::Result<(), EnvError> {
-        if self.values.contains_key(&n) {
+        if self.values.contains_key(&n) || self.aliases.contains_key(&n) {
             return Err(EnvError::Duplicate(format!(
                 "'{n}' is already declared in this scope."
             )));
@@ -173,6 +204,20 @@ impl Env {
         self.values.insert(n, v);
         Ok(())
     }
+    fn define_alias(
+        &mut self,
+        name: String,
+        target: &Rc<RefCell<Env>>,
+        exported: String,
+    ) -> std::result::Result<(), EnvError> {
+        if self.values.contains_key(&name) || self.aliases.contains_key(&name) {
+            return Err(EnvError::Duplicate(format!(
+                "'{name}' is already declared in this scope."
+            )));
+        }
+        self.aliases.insert(name, (Rc::downgrade(target), exported));
+        Ok(())
+    }
     fn define_function(&mut self, name: String, value: V) -> std::result::Result<(), EnvError> {
         self.define(name.clone(), value, false, None, "function declaration")?;
         self.function_names.insert(name);
@@ -181,16 +226,22 @@ impl Env {
     fn is_function_binding(e: &Rc<RefCell<Self>>, n: &str) -> bool {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (exists, is_function, parent) = {
+            let (exists, is_function, alias, parent) = {
                 let env = scope.borrow();
                 (
                     env.values.contains_key(n),
                     env.function_names.contains(n),
+                    env.aliases.get(n).cloned(),
                     env.parent.clone(),
                 )
             };
             if exists {
                 return is_function;
+            }
+            if let Some((target, exported)) = alias {
+                return target
+                    .upgrade()
+                    .is_some_and(|target| Self::is_function_binding(&target, &exported));
             }
             current = parent;
         }
@@ -199,12 +250,21 @@ impl Env {
     fn has_contract(e: &Rc<RefCell<Self>>, n: &str) -> bool {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (contains, parent) = {
+            let (contains, alias, parent) = {
                 let env = scope.borrow();
-                (env.contracts.contains_key(n), env.parent.clone())
+                (
+                    env.contracts.contains_key(n),
+                    env.aliases.get(n).cloned(),
+                    env.parent.clone(),
+                )
             };
             if contains {
                 return true;
+            }
+            if let Some((target, exported)) = alias {
+                return target
+                    .upgrade()
+                    .is_some_and(|target| Self::has_contract(&target, &exported));
             }
             current = parent;
         }
@@ -213,12 +273,21 @@ impl Env {
     fn get(e: &Rc<RefCell<Self>>, n: &str) -> Option<V> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (value, parent) = {
+            let (value, alias, parent) = {
                 let env = scope.borrow();
-                (env.values.get(n).cloned(), env.parent.clone())
+                (
+                    env.values.get(n).cloned(),
+                    env.aliases.get(n).cloned(),
+                    env.parent.clone(),
+                )
             };
             if value.is_some() {
                 return value;
+            }
+            if let Some((target, exported)) = alias {
+                return target
+                    .upgrade()
+                    .and_then(|target| Self::get(&target, &exported));
             }
             current = parent;
         }
@@ -227,15 +296,21 @@ impl Env {
     fn set(e: &Rc<RefCell<Self>>, n: &str, v: V) -> std::result::Result<(), EnvError> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
-            let (exists, is_const, contract, parent) = {
+            let (exists, is_const, contract, is_alias, parent) = {
                 let env = scope.borrow();
                 (
                     env.values.contains_key(n),
                     env.constants.contains(n),
                     env.contracts.get(n).copied(),
+                    env.aliases.contains_key(n),
                     env.parent.clone(),
                 )
             };
+            if is_alias {
+                return Err(EnvError::ImportedAlias(format!(
+                    "Cannot reassign imported binding '{n}'."
+                )));
+            }
             if exists {
                 if is_const {
                     return Err(EnvError::Constant(format!(
@@ -275,8 +350,8 @@ enum Flow {
 struct Engine {
     env: Rc<RefCell<Env>>,
     output: Vec<String>,
-    source: String,
-    source_text: String,
+    source: Rc<String>,
+    source_text: Rc<String>,
     typed_context: bool,
     call_depth: usize,
     eval_depth: usize,
@@ -284,13 +359,17 @@ struct Engine {
 }
 impl Engine {
     fn new(source: &str, source_text: &str) -> Self {
-        let e = Rc::new(RefCell::new(Env::default()));
-        e.borrow_mut().values.insert("print".into(), V::Print);
+        Self::new_with_env(source, source_text, Rc::new(RefCell::new(Env::default())))
+    }
+    fn new_with_env(source: &str, source_text: &str, e: Rc<RefCell<Env>>) -> Self {
+        if !e.borrow().values.contains_key("print") {
+            e.borrow_mut().values.insert("print".into(), V::Print);
+        }
         Self {
             env: e,
             output: vec![],
-            source: source.into(),
-            source_text: source_text.into(),
+            source: Rc::new(source.to_owned()),
+            source_text: Rc::new(source_text.to_owned()),
             typed_context: false,
             call_depth: 0,
             eval_depth: 0,
@@ -303,9 +382,26 @@ impl Engine {
     fn contract_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
         HkError::new("E3008", msg, &self.source, line, col, &self.source_text)
     }
+    fn stdlib_error(
+        &self,
+        code: &'static str,
+        msg: impl Into<String>,
+        line: usize,
+        col: usize,
+    ) -> HkError {
+        HkError::new(code, msg, &self.source, line, col, &self.source_text)
+    }
     fn env_error(&self, error: EnvError, line: usize, column: usize) -> HkError {
         match error {
             EnvError::Contract(message) => self.contract_error(message, line, column),
+            EnvError::ImportedAlias(message) => HkError::new(
+                "E4007",
+                message,
+                &self.source,
+                line,
+                column,
+                &self.source_text,
+            ),
             EnvError::Duplicate(message)
             | EnvError::Constant(message)
             | EnvError::Undefined(message) => self.error(message, line, column),
@@ -348,6 +444,8 @@ impl Engine {
     }
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
+            S::Import(..) => {}
+            S::Export(statement) => return self.exec(statement),
             S::TypedVar(name, annotation, initializer, mutable, line, column) => {
                 let previous_typed_context = self.typed_context;
                 self.typed_context = true;
@@ -373,6 +471,10 @@ impl Engine {
                     typed: true,
                     body: body.clone(),
                     env: Rc::downgrade(&self.env),
+                    source: self.source.clone(),
+                    source_text: self.source_text.clone(),
+                    line: *line,
+                    column: *column,
                 }));
                 self.env
                     .borrow_mut()
@@ -400,6 +502,10 @@ impl Engine {
                     typed: false,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
+                    source: self.source.clone(),
+                    source_text: self.source_text.clone(),
+                    line: *l,
+                    column: *c,
                 }));
                 self.env
                     .borrow_mut()
@@ -623,6 +729,68 @@ impl Engine {
                         self.output.push(vs[0].0.show());
                         Ok(V::Null)
                     }
+                    V::Math(function) => {
+                        let expected_arity = match function {
+                            MathFn::Min | MathFn::Max => 2,
+                            _ => 1,
+                        };
+                        if vs.len() != expected_arity {
+                            return Err(self.stdlib_error(
+                                "E3011",
+                                format!("std:math function expects {expected_arity} argument(s), received {}.", vs.len()),
+                                *l,
+                                *c,
+                            ));
+                        }
+                        let mut numbers = Vec::with_capacity(vs.len());
+                        for (value, line, column) in vs {
+                            if let V::Num(number) = value {
+                                if !number.is_finite() {
+                                    return Err(self.stdlib_error(
+                                        "E3012",
+                                        "std:math arguments must be finite Numbers.",
+                                        line,
+                                        column,
+                                    ));
+                                }
+                                numbers.push(number);
+                            } else {
+                                return Err(self.stdlib_error(
+                                    "E3012",
+                                    "std:math arguments must be Numbers.",
+                                    line,
+                                    column,
+                                ));
+                            }
+                        }
+                        let result = match function {
+                            MathFn::Abs => numbers[0].abs(),
+                            MathFn::Ceil => numbers[0].ceil(),
+                            MathFn::Floor => numbers[0].floor(),
+                            MathFn::Round => numbers[0].round(),
+                            MathFn::Sqrt if numbers[0] < 0.0 => {
+                                return Err(self.stdlib_error(
+                                    "E3013",
+                                    "std:math::sqrt requires a non-negative argument.",
+                                    *l,
+                                    *c,
+                                ))
+                            }
+                            MathFn::Sqrt => numbers[0].sqrt(),
+                            MathFn::Min => numbers[0].min(numbers[1]),
+                            MathFn::Max => numbers[0].max(numbers[1]),
+                        };
+                        if result.is_finite() {
+                            Ok(V::Num(result))
+                        } else {
+                            Err(self.stdlib_error(
+                                "E3014",
+                                "std:math produced a non-finite result.",
+                                *l,
+                                *c,
+                            ))
+                        }
+                    }
                     V::Fun(fun) => {
                         if vs.len() != fun.params.len() {
                             return Err(self.error(
@@ -666,19 +834,38 @@ impl Engine {
                         self.env = call;
                         self.call_depth += 1;
                         let previous_typed_context = self.typed_context;
+                        let previous_source = self.source.clone();
+                        let previous_source_text = self.source_text.clone();
                         self.typed_context = fun.typed;
-                        let r = self.exec_all(&fun.body);
+                        self.source = fun.source.clone();
+                        self.source_text = fun.source_text.clone();
+                        let result = self.exec_all(&fun.body);
                         self.typed_context = previous_typed_context;
                         self.call_depth -= 1;
                         self.env = old;
-                        let (value, return_line, return_column) = match r? {
-                            Flow::Next => (V::Null, *l, *c),
+                        let flow = match result {
+                            Ok(flow) => flow,
+                            Err(error) => {
+                                self.source = previous_source;
+                                self.source_text = previous_source_text;
+                                return Err(error);
+                            }
+                        };
+                        let (value, return_line, return_column) = match flow {
+                            Flow::Next => (V::Null, fun.line, fun.column),
                             Flow::Return(value, line, column) => (value, line, column),
                         };
-                        if let Some(expected) = fun.return_type {
-                            ensure_contract(expected, &value, "function return").map_err(
-                                |message| self.contract_error(message, return_line, return_column),
-                            )?;
+                        let return_error = fun.return_type.and_then(|expected| {
+                            ensure_contract(expected, &value, "function return")
+                                .err()
+                                .map(|message| {
+                                    self.contract_error(message, return_line, return_column)
+                                })
+                        });
+                        self.source = previous_source;
+                        self.source_text = previous_source_text;
+                        if let Some(error) = return_error {
+                            return Err(error);
                         }
                         Ok(value)
                     }
@@ -947,6 +1134,54 @@ impl Engine {
             Err(self.type_error("Array index must be Number.", l, c))
         }
     }
+}
+
+pub(super) type ModuleEnv = Rc<RefCell<Env>>;
+
+pub(super) fn new_module_env() -> ModuleEnv {
+    Rc::new(RefCell::new(Env::default()))
+}
+
+pub(super) fn new_std_math_env() -> ModuleEnv {
+    let environment = new_module_env();
+    for (name, function) in [
+        ("abs", MathFn::Abs),
+        ("ceil", MathFn::Ceil),
+        ("floor", MathFn::Floor),
+        ("round", MathFn::Round),
+        ("sqrt", MathFn::Sqrt),
+        ("min", MathFn::Min),
+        ("max", MathFn::Max),
+    ] {
+        environment
+            .borrow_mut()
+            .define_function(name.to_owned(), V::Math(function))
+            .expect("fresh std:math environment cannot contain duplicate functions");
+    }
+    environment
+}
+
+pub(super) fn link_module_import(
+    environment: &ModuleEnv,
+    target: &ModuleEnv,
+    local: &str,
+    imported: &str,
+) -> std::result::Result<(), String> {
+    environment
+        .borrow_mut()
+        .define_alias(local.to_owned(), target, imported.to_owned())
+        .map_err(|error| format!("{error:?}"))
+}
+
+pub(super) fn execute_module(
+    source_name: &str,
+    source: &str,
+    statements: &[S],
+    environment: ModuleEnv,
+) -> Result<Vec<String>> {
+    let mut engine = Engine::new_with_env(source_name, source, environment);
+    engine.run(statements)?;
+    Ok(engine.output)
 }
 
 pub(super) fn execute(

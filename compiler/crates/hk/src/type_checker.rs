@@ -11,6 +11,7 @@ struct Binding {
     ty: Type,
     contract: Option<Type>,
     mutable: bool,
+    imported: bool,
 }
 #[derive(Clone)]
 struct FunctionSignature {
@@ -96,6 +97,20 @@ impl<'a> TypeChecker<'a> {
 
     fn check_statement(&mut self, statement: &S) -> Result<()> {
         match statement {
+            S::Import(_, names, _, _) => {
+                for name in names {
+                    self.define_binding(
+                        &name.local,
+                        Binding {
+                            ty: Type::Any,
+                            contract: None,
+                            mutable: false,
+                            imported: true,
+                        },
+                    );
+                }
+            }
+            S::Export(declaration) => self.check_statement(declaration)?,
             S::Var(name, initializer, mutable, _, _) => {
                 self.check_expression(initializer)?;
                 self.define_binding(
@@ -104,6 +119,7 @@ impl<'a> TypeChecker<'a> {
                         ty: Type::Any,
                         contract: None,
                         mutable: *mutable,
+                        imported: false,
                     },
                 );
             }
@@ -124,6 +140,7 @@ impl<'a> TypeChecker<'a> {
                         ty: expected,
                         contract: Some(expected),
                         mutable: *mutable,
+                        imported: false,
                     },
                 );
             }
@@ -140,6 +157,7 @@ impl<'a> TypeChecker<'a> {
                         ty: Type::Any,
                         contract: None,
                         mutable: false,
+                        imported: false,
                     },
                 );
                 self.check_function_body(
@@ -169,6 +187,7 @@ impl<'a> TypeChecker<'a> {
                         ty: Type::Any,
                         contract: None,
                         mutable: false,
+                        imported: false,
                     },
                 );
                 let parameter_bindings = parameters
@@ -314,6 +333,7 @@ impl<'a> TypeChecker<'a> {
                     ty,
                     contract,
                     mutable: true,
+                    imported: false,
                 },
             );
         }
@@ -424,6 +444,14 @@ impl<'a> TypeChecker<'a> {
                 let actual =
                     self.check_expression_with_strict(value, contract.is_some() || self.strict)?;
                 if let Some(binding) = self.binding(name) {
+                    if binding.imported {
+                        return Err(self.error(
+                            "E4007",
+                            format!("Cannot reassign imported binding '{name}'."),
+                            *line,
+                            *column,
+                        ));
+                    }
                     if !binding.mutable {
                         return Err(self.error(
                             "E3002",
