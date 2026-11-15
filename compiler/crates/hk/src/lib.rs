@@ -18,7 +18,7 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
     if typed_mode {
         type_checker::TypeChecker::new(source_name, source).check(&statements)?;
     }
-    runtime::execute(source_name, source, &statements, typed_mode)
+    runtime::execute(source_name, source, &statements)
 }
 
 fn has_type_annotations(statements: &[S]) -> bool {
