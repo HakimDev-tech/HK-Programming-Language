@@ -174,7 +174,7 @@ It must validate:
 11. Maximum stack and code-size limits are respected.
 12. No control-flow edge can jump between function bodies or module units.
 
-Verification uses a worklist over the control-flow graph and propagates abstract operand-stack heights. If future opcodes require richer abstract state, the verifier must extend the abstract domain explicitly.
+Verification uses a worklist over the control-flow graph and propagates abstract operand-stack heights plus definite-initialization state for local slots. Jump targets are instruction indexes in the in-memory instruction stream, never arbitrary byte offsets. If future opcodes require richer abstract state, the verifier must extend the abstract domain explicitly.
 
 The verifier must not trust compiler-supplied `max_stack`; it recomputes the maximum and rejects mismatches.
 
@@ -249,7 +249,7 @@ Benchmarks are required for representative workloads: arithmetic loops, recursiv
 - [ ] Function calls preserve left-to-right evaluation and contracts.
 
 ### Verifier
-- [ ] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid local slot, invalid function reference, and invalid module link are rejected.
+- [ ] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid/uninitialized local access where statically provable, invalid function reference, and invalid module link are rejected.
 - [ ] Malformed bytecode fuzzing cannot panic, hang, or access invalid memory.
 - [ ] Verification runs before any user instruction or module initializer.
 
