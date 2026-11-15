@@ -104,7 +104,7 @@ The loader builds and validates the complete reachable dependency graph before e
 - A failed module initialization aborts the program; partially initialized exports are never made observable.
 - A new call to the public run API starts a fresh module graph and module cache.
 
-This release deliberately rejects cycles instead of exposing partially initialized bindings. There is no temporal-dead-zone or live-binding behavior to reason about.
+This release deliberately rejects cycles instead of exposing partially initialized bindings. Importers only observe dependencies after successful initialization; read-only aliases remain live for subsequent mutations performed by the exporting module.
 
 Top-level statements execute once, in dependency-first order. Their output is appended to the same output stream as the entry module. Import declarations themselves produce no output.
 
@@ -186,11 +186,11 @@ The module loader and initial standard library use these dedicated codes:
 | Code | Meaning |
 |---|---|
 | `E4001` | Filesystem imports require `run_path`, or duplicate top-level module binding |
-| `E4002` | Invalid module specifier, missing module, invalid entry extension, or excessive graph depth |
+| `E4002` | Invalid module specifier, missing module, invalid entry extension, or excessive graph depth/file count |
 | `E4003` | Imported name is not exported or import linking fails |
 | `E4004` | Duplicate or unsupported export declaration |
 | `E4005` | Cyclic module dependency |
-| `E4006` | Module source cannot be read as UTF-8 |
+| `E4006` | Module source is unreadable, not a regular file, invalid UTF-8, or exceeds a source-size limit |
 | `E3011` | Standard-library function arity violation |
 | `E3012` | Standard-library argument type violation |
 | `E3013` | Standard-library domain violation |
@@ -200,7 +200,7 @@ Syntax and duplicate import-local diagnostics continue to use the parser's exist
 
 ## 9. Compatibility and non-goals
 
-A single-file HK program without import/export declarations must behave identically to 0.2.0. Existing syntax and type semantics are unchanged.
+A single-file HK program without import/export declarations must retain its 0.2.0 runtime and type semantics. The words `import`, `export`, `as`, and `from` become reserved keywords in 0.3.0, and filesystem entry files must use the `.hk` extension.
 
 Explicit non-goals for 0.3.0:
 - package manager, dependency manifests, registries, lockfiles, version constraints;
