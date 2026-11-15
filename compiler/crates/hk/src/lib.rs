@@ -20,7 +20,7 @@ pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
         .find(|statement| matches!(statement, S::Import(..)))
     {
         return Err(HkError::new(
-            "E4001",
+            "E4008",
             "Filesystem imports require hk::run_path() with an entry file.",
             source_name,
             *line,
