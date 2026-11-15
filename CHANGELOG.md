@@ -12,7 +12,7 @@
 - Bound module loading to 128 dependency levels, 1,024 files, 1 MiB per file, and 16 MiB aggregate source.
 - Add `std:math` with `abs`, `ceil`, `floor`, `round`, `sqrt`, `min`, and `max`.
 - Add module integration tests, a runnable module example, and a dedicated module-specifier fuzz target.
-- Cross-platform CI, full regression validation, and the final release audit remain pending.
+- Final release-candidate validation passed on Linux, Windows, and macOS: formatting, workspace tests, Clippy with warnings denied, rustdoc, parser/interpreter fuzzing, and module-resolver fuzzing. The PR merge, Git tag, and GitHub Release remain pending.
 
 ## HK 0.2.0 — 2026-11-15
 
