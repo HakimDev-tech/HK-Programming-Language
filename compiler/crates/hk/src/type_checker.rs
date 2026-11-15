@@ -96,6 +96,12 @@ impl<'a> TypeChecker<'a> {
 
     fn check_statement(&mut self, statement: &S) -> Result<()> {
         match statement {
+            S::Import(_, names, _, _) => {
+                for name in names {
+                    self.define_binding(&name.local, Binding { ty: Type::Any, contract: None, mutable: false });
+                }
+            }
+            S::Export(declaration) => self.check_statement(declaration)?,
             S::Var(name, initializer, mutable, _, _) => {
                 self.check_expression(initializer)?;
                 self.define_binding(
