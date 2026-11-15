@@ -29,6 +29,10 @@ struct Fun {
     typed: bool,
     body: Vec<S>,
     env: Weak<RefCell<Env>>,
+    source: Rc<String>,
+    source_text: Rc<String>,
+    line: usize,
+    column: usize,
 }
 #[derive(Clone)]
 enum V {
@@ -347,8 +351,8 @@ enum Flow {
 struct Engine {
     env: Rc<RefCell<Env>>,
     output: Vec<String>,
-    source: String,
-    source_text: String,
+    source: Rc<String>,
+    source_text: Rc<String>,
     typed_context: bool,
     call_depth: usize,
     eval_depth: usize,
@@ -365,8 +369,8 @@ impl Engine {
         Self {
             env: e,
             output: vec![],
-            source: source.into(),
-            source_text: source_text.into(),
+            source: Rc::new(source.to_owned()),
+            source_text: Rc::new(source_text.to_owned()),
             typed_context: false,
             call_depth: 0,
             eval_depth: 0,
@@ -460,6 +464,10 @@ impl Engine {
                     typed: true,
                     body: body.clone(),
                     env: Rc::downgrade(&self.env),
+                    source: self.source.clone(),
+                    source_text: self.source_text.clone(),
+                    line: *line,
+                    column: *column,
                 }));
                 self.env
                     .borrow_mut()
@@ -487,6 +495,10 @@ impl Engine {
                     typed: false,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
+                    source: self.source.clone(),
+                    source_text: self.source_text.clone(),
+                    line: *l,
+                    column: *c,
                 }));
                 self.env
                     .borrow_mut()
@@ -815,19 +827,38 @@ impl Engine {
                         self.env = call;
                         self.call_depth += 1;
                         let previous_typed_context = self.typed_context;
+                        let previous_source = self.source.clone();
+                        let previous_source_text = self.source_text.clone();
                         self.typed_context = fun.typed;
-                        let r = self.exec_all(&fun.body);
+                        self.source = fun.source.clone();
+                        self.source_text = fun.source_text.clone();
+                        let result = self.exec_all(&fun.body);
                         self.typed_context = previous_typed_context;
                         self.call_depth -= 1;
                         self.env = old;
-                        let (value, return_line, return_column) = match r? {
-                            Flow::Next => (V::Null, *l, *c),
+                        let flow = match result {
+                            Ok(flow) => flow,
+                            Err(error) => {
+                                self.source = previous_source;
+                                self.source_text = previous_source_text;
+                                return Err(error);
+                            }
+                        };
+                        let (value, return_line, return_column) = match flow {
+                            Flow::Next => (V::Null, fun.line, fun.column),
                             Flow::Return(value, line, column) => (value, line, column),
                         };
-                        if let Some(expected) = fun.return_type {
-                            ensure_contract(expected, &value, "function return").map_err(
-                                |message| self.contract_error(message, return_line, return_column),
-                            )?;
+                        let return_error = fun.return_type.and_then(|expected| {
+                            ensure_contract(expected, &value, "function return")
+                                .err()
+                                .map(|message| {
+                                    self.contract_error(message, return_line, return_column)
+                                })
+                        });
+                        self.source = previous_source;
+                        self.source_text = previous_source_text;
+                        if let Some(error) = return_error {
+                            return Err(error);
                         }
                         Ok(value)
                     }
