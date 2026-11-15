@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased — HK 0.2.0
+- Classify runtime type diagnostics by typed-expression provenance rather than a file-wide annotation flag, preserving legacy `E3000` errors in unrelated dynamic regions while retaining `E3008` for typed guards.
 - Preserve 0.1.x dynamic behavior in unannotated regions of mixed typed/dynamic programs while retaining static checks at declared boundaries.
 
 - Add optional annotations for variables and named-function parameters and return values using `number`, `string`, `bool`, `null`, `array`, and `any`.
