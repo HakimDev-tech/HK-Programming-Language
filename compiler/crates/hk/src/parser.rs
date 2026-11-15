@@ -77,6 +77,9 @@ impl Parser {
         self.expect(K::LBrace, "Expected '{' after import.")?;
         let mut names = Vec::new();
         let mut locals = HashSet::new();
+        if self.check(K::RBrace) {
+            return Err(self.error("An import declaration must import at least one name."));
+        }
         if !self.check(K::RBrace) {
             loop {
                 let imported = self.id("Expected imported name.")?;
@@ -94,8 +97,11 @@ impl Parser {
         }
         self.expect(K::RBrace, "Expected '}' after imported names.")?;
         self.expect(K::From, "Expected 'from' after imported names.")?;
-        let path = self.advance().clone();
-        let path = match path.literal {
+        let path_token = self.advance().clone();
+        if path_token.kind != K::String {
+            return Err(HkError::new("E2000", "Expected a string module specifier.", &self.name, path_token.line, path_token.col, &self.source_text));
+        }
+        let path = match path_token.literal {
             Some(Lit::String(value)) if !value.trim().is_empty() => value,
             _ => return Err(HkError::new("E2000", "Expected a non-empty string module specifier.", &self.name, path.line, path.col, &self.source_text)),
         };
