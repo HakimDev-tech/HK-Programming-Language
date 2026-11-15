@@ -185,7 +185,8 @@ The module loader and initial standard library use these dedicated codes:
 
 | Code | Meaning |
 |---|---|
-| `E4001` | Filesystem imports require `run_path`, or duplicate top-level module binding |
+| `E4001` | Duplicate top-level module binding |
+| `E4008` | Filesystem imports attempted through the source-only `run` API; use `run_path` |
 | `E4002` | Invalid module specifier, missing module, invalid entry extension, or excessive graph depth/file count |
 | `E4003` | Imported name is not exported or import linking fails |
 | `E4004` | Duplicate or unsupported export declaration |
