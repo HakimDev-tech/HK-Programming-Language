@@ -642,13 +642,14 @@ mod tests {
         let program = function(
             vec![
                 Opcode::True,
-                Opcode::JumpIfFalse(4),
+                Opcode::JumpIfFalse(5),
                 Opcode::Null,
-                Opcode::Jump(5),
-                Opcode::Jump(5),
+                Opcode::Null,
+                Opcode::Jump(6),
+                Opcode::Null,
                 Opcode::Return,
             ],
-            1,
+            2,
         );
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("inconsistent operand-stack height"));
