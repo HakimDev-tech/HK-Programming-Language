@@ -1,18 +1,22 @@
 # Changelog
 
-## Unreleased — HK 0.3.0 (design baseline)
+## Unreleased — HK 0.3.0 (implementation in progress)
 
-- Define a normative module model with explicit named imports/exports, isolated module scopes, canonical relative-path resolution, dependency-first initialization, at-most-once execution, and cycle rejection.
-- Specify the initial `std:math` standard-library module and its finite-number, arity, type, and domain contracts.
-- Define gradual-typing behavior across module boundaries: imported values are statically dynamic while exported runtime contracts remain authoritative.
-- Record implementation architecture, regression matrix, and exact-commit release gates before implementation.
+- Add top-level `import { name as alias } from "./module.hk";` and `export` declarations.
+- Add filesystem-backed `hk::run_path` and route the CLI file runner through the module loader.
+- Resolve imports relative to the importer, canonicalize module identities, deduplicate dependencies, and initialize dependencies before importers.
+- Validate the reachable graph and export links before execution; reject cycles and duplicate module bindings.
+- Isolate module root environments and preserve live, read-only imported aliases and defining environments for exported functions.
+- Add `std:math` with `abs`, `ceil`, `floor`, `round`, `sqrt`, `min`, and `max`.
+- Add module integration tests, a runnable module example, and a dedicated module-specifier fuzz target.
+- Cross-platform CI, full regression validation, and the final release audit remain pending.
 
 ## HK 0.2.0 — 2026-11-15
+
 - Classify runtime type diagnostics by typed-expression provenance rather than a file-wide annotation flag, preserving legacy `E3000` errors in unrelated dynamic regions while retaining `E3008` for typed guards.
 - Set the distributable `hk` crate version to `0.2.0` and add automated execution tests for all five documented examples.
 - Merge the validated HK 0.2.0 gradual-typing integration into `main`.
 - Preserve 0.1.x dynamic behavior in unannotated regions of mixed typed/dynamic programs while retaining static checks at declared boundaries.
-
 - Add optional annotations for variables and named-function parameters and return values using `number`, `string`, `bool`, `null`, `array`, and `any`.
 - Add static type checking before runtime execution, including variable initialization/assignment, known function arguments/returns, operator operands, conditions, and conservative return-path checks.
 - Enforce runtime contracts on typed bindings, function parameters, and function returns; guard dynamic values at concrete typed boundaries.
