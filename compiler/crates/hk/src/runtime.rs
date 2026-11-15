@@ -13,6 +13,7 @@ struct Fun {
     name: String,
     params: Vec<Param>,
     return_type: Option<Type>,
+    typed: bool,
     body: Vec<S>,
     env: Weak<RefCell<Env>>,
 }
@@ -171,6 +172,20 @@ impl Env {
         self.values.insert(n, v);
         Ok(())
     }
+    fn has_contract(e: &Rc<RefCell<Self>>, n: &str) -> bool {
+        let mut current = Some(e.clone());
+        while let Some(scope) = current {
+            let (contains, parent) = {
+                let env = scope.borrow();
+                (env.contracts.contains_key(n), env.parent.clone())
+            };
+            if contains {
+                return true;
+            }
+            current = parent;
+        }
+        false
+    }
     fn get(e: &Rc<RefCell<Self>>, n: &str) -> Option<V> {
         let mut current = Some(e.clone());
         while let Some(scope) = current {
@@ -238,13 +253,13 @@ struct Engine {
     output: Vec<String>,
     source: String,
     source_text: String,
-    typed_mode: bool,
+    typed_context: bool,
     call_depth: usize,
     eval_depth: usize,
     exec_depth: usize,
 }
 impl Engine {
-    fn new(source: &str, source_text: &str, typed_mode: bool) -> Self {
+    fn new(source: &str, source_text: &str) -> Self {
         let e = Rc::new(RefCell::new(Env::default()));
         e.borrow_mut().values.insert("print".into(), V::Print);
         Self {
@@ -252,7 +267,7 @@ impl Engine {
             output: vec![],
             source: source.into(),
             source_text: source_text.into(),
-            typed_mode,
+            typed_context: false,
             call_depth: 0,
             eval_depth: 0,
             exec_depth: 0,
@@ -273,7 +288,7 @@ impl Engine {
         }
     }
     fn type_error(&self, msg: impl Into<String>, line: usize, col: usize) -> HkError {
-        let code = if self.typed_mode { "E3008" } else { "E3000" };
+        let code = if self.typed_context { "E3008" } else { "E3000" };
         HkError::new(code, msg, &self.source, line, col, &self.source_text)
     }
     fn run(&mut self, ss: &[S]) -> Result<()> {
@@ -310,7 +325,11 @@ impl Engine {
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
             S::TypedVar(name, annotation, initializer, mutable, line, column) => {
-                let value = self.eval(initializer)?;
+                let previous_typed_context = self.typed_context;
+                self.typed_context = true;
+                let evaluated = self.eval(initializer);
+                self.typed_context = previous_typed_context;
+                let value = evaluated?;
                 self.env
                     .borrow_mut()
                     .define(
@@ -327,6 +346,7 @@ impl Engine {
                     name: name.clone(),
                     params: parameters.clone(),
                     return_type: return_type.map(Type::from),
+                    typed: true,
                     body: body.clone(),
                     env: Rc::downgrade(&self.env),
                 }));
@@ -353,6 +373,7 @@ impl Engine {
                         })
                         .collect(),
                     return_type: None,
+                    typed: false,
                     body: b.clone(),
                     env: Rc::downgrade(&self.env),
                 }));
@@ -444,9 +465,47 @@ impl Engine {
             ));
         }
         self.eval_depth += 1;
+        let previous_typed_context = self.typed_context;
+        self.typed_context |= self.expression_has_typed_provenance(e);
         let result = self.eval_inner(e);
+        self.typed_context = previous_typed_context;
         self.eval_depth -= 1;
         result
+    }
+    fn expression_has_typed_provenance(&self, expression: &E) -> bool {
+        match expression {
+            E::Var(name, _, _) => {
+                Env::has_contract(&self.env, name)
+                    || matches!(Env::get(&self.env, name), Some(V::Fun(function)) if function.typed)
+            }
+            E::Assign(name, value, _, _) => {
+                Env::has_contract(&self.env, name)
+                    || self.expression_has_typed_provenance(value)
+            }
+            E::Unary(_, operand, _, _) | E::Group(operand) => {
+                self.expression_has_typed_provenance(operand)
+            }
+            E::Binary(left, _, right, _, _) => {
+                self.expression_has_typed_provenance(left)
+                    || self.expression_has_typed_provenance(right)
+            }
+            E::Call(callee, arguments, _, _) => {
+                self.expression_has_typed_provenance(callee)
+                    || arguments.iter().any(|argument| self.expression_has_typed_provenance(argument))
+            }
+            E::Array(elements, _, _) => elements.iter().any(|element| self.expression_has_typed_provenance(element)),
+            E::Index(receiver, index, _, _) => {
+                self.expression_has_typed_provenance(receiver)
+                    || self.expression_has_typed_provenance(index)
+            }
+            E::SetIndex(receiver, index, value, _, _) => {
+                self.expression_has_typed_provenance(receiver)
+                    || self.expression_has_typed_provenance(index)
+                    || self.expression_has_typed_provenance(value)
+            }
+            E::Property(receiver, _, _, _) => self.expression_has_typed_provenance(receiver),
+            E::Lit(_, _, _) | E::Bool(_, _, _) | E::Null(_, _) => false,
+        }
     }
     fn eval_inner(&mut self, e: &E) -> Result<V> {
         let _source_position = e.source_position();
@@ -563,7 +622,10 @@ impl Engine {
                         let old = self.env.clone();
                         self.env = call;
                         self.call_depth += 1;
+                        let previous_typed_context = self.typed_context;
+                        self.typed_context = fun.typed;
                         let r = self.exec_all(&fun.body);
+                        self.typed_context = previous_typed_context;
                         self.call_depth -= 1;
                         self.env = old;
                         let (value, return_line, return_column) = match r? {
@@ -837,9 +899,8 @@ pub(super) fn execute(
     source_name: &str,
     source_text: &str,
     statements: &[S],
-    typed_mode: bool,
 ) -> Result<Vec<String>> {
-    let mut engine = Engine::new(source_name, source_text, typed_mode);
+    let mut engine = Engine::new(source_name, source_text);
     engine.run(statements)?;
     Ok(engine.output)
 }
@@ -889,7 +950,7 @@ mod contract_tests {
             .check(&statements)
             .unwrap();
 
-        let mut engine = Engine::new("contract-test.hk", source, true);
+        let mut engine = Engine::new("contract-test.hk", source);
         let error = engine.run(&statements).unwrap_err();
 
         assert_eq!(error.code, "E3008");
