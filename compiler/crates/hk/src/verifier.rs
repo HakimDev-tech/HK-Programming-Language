@@ -259,6 +259,15 @@ fn verify_function_tables(
                     ));
                 }
             }
+            Opcode::MakeFunction(index) => {
+                if index as usize >= program.functions.len() {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "function prototype index is out of range",
+                    ));
+                }
+            }
             Opcode::GetProperty(index) => {
                 if !matches!(
                     program.constants.get(index as usize),
@@ -425,7 +434,7 @@ fn verify_control_flow(
                 }
                 next.stack_height -= 1;
             }
-            Opcode::GetModule(_) | Opcode::GetImport(_) => {
+            Opcode::GetModule(_) | Opcode::GetImport(_) | Opcode::LoadPrint | Opcode::MakeFunction(_) => {
                 next.stack_height += 1;
             }
             Opcode::SetModule(_) => {
@@ -685,7 +694,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
     let mut code = Vec::with_capacity(instruction_count);
 
     for _ in 0..instruction_count {
-        let opcode = match take_byte(input, &mut cursor) % 36 {
+        let opcode = match take_byte(input, &mut cursor) % 38 {
             0 => Opcode::Constant(take_u32(input, &mut cursor)),
             1 => Opcode::Null,
             2 => Opcode::True,
@@ -721,6 +730,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             32 => Opcode::BuildArray(take_u16(input, &mut cursor)),
             33 => Opcode::GetIndex,
             34 => Opcode::SetIndex,
+            36 => Opcode::MakeFunction(take_u32(input, &mut cursor)),
+            37 => Opcode::LoadPrint,
             _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
         };
         code.push(Instruction {
@@ -801,6 +812,17 @@ mod tests {
         let error =
             verify(function(vec![Opcode::Pop, Opcode::Null, Opcode::Return], 1)).unwrap_err();
         assert!(error.message.contains("underflow"));
+    }
+
+
+    #[test]
+    fn rejects_out_of_range_function_prototype_references() {
+        let error = verify(function(
+            vec![Opcode::MakeFunction(1), Opcode::Return],
+            1,
+        ))
+        .unwrap_err();
+        assert!(error.message.contains("function prototype index is out of range"));
     }
 
     #[test]
