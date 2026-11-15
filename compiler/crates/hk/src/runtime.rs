@@ -489,9 +489,8 @@ impl Engine {
                 self.expression_has_typed_provenance(left)
                     || self.expression_has_typed_provenance(right)
             }
-            E::Call(callee, arguments, _, _) => {
-                self.expression_has_typed_provenance(callee)
-                    || arguments.iter().any(|argument| self.expression_has_typed_provenance(argument))
+            E::Call(_, arguments, _, _) => {
+                arguments.iter().any(|argument| self.expression_has_typed_provenance(argument))
             }
             E::Array(elements, _, _) => elements.iter().any(|element| self.expression_has_typed_provenance(element)),
             E::Index(receiver, index, _, _) => {
