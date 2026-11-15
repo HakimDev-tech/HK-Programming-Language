@@ -237,7 +237,7 @@ fn typed_export_contracts_are_enforced_across_module_boundaries() {
             ),
             (
                 "main.hk",
-                "import { update } from \"./values.hk\"; update(\"invalid\");",
+                "import { update } from \"./values.hk\"; let input: string = \"invalid\"; update(input);",
             ),
         ],
         "main.hk",
@@ -376,4 +376,25 @@ fn imported_function_diagnostics_retain_the_defining_module_source() {
     assert_eq!(error.code, "E3008");
     assert!(error.source.ends_with("values.hk"));
     assert_eq!(error.line, 3);
+}
+
+#[test]
+fn each_run_path_call_starts_a_fresh_module_cache() {
+    let (root, entry) = project(
+        &[
+            ("dependency.hk", "print(\"initialized\"); export const value = 1;"),
+            (
+                "main.hk",
+                "import { value } from \"./dependency.hk\"; print(value);",
+            ),
+        ],
+        "main.hk",
+    );
+
+    let first = run_path(&entry).unwrap();
+    let second = run_path(&entry).unwrap();
+    fs::remove_dir_all(root).unwrap();
+
+    assert_eq!(first, vec!["initialized", "1"]);
+    assert_eq!(second, vec!["initialized", "1"]);
 }
