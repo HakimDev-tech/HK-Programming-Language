@@ -8,7 +8,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use super::value::{contains_array_reference, ensure_contract, Fun, MathFn, V};
+use super::value::{contains_array_reference, ensure_contract, Fun, FunctionBody, MathFn, V};
 
 #[derive(Debug)]
 enum EnvError {
@@ -323,7 +323,7 @@ impl Engine {
                     params: parameters.clone(),
                     return_type: return_type.map(Type::from),
                     typed: true,
-                    body: body.clone(),
+                    body: FunctionBody::Tree(body.clone()),
                     env: Rc::downgrade(&self.env),
                     source: self.source.clone(),
                     source_text: self.source_text.clone(),
@@ -354,7 +354,7 @@ impl Engine {
                         .collect(),
                     return_type: None,
                     typed: false,
-                    body: b.clone(),
+                    body: FunctionBody::Tree(b.clone()),
                     env: Rc::downgrade(&self.env),
                     source: self.source.clone(),
                     source_text: self.source_text.clone(),
@@ -672,7 +672,14 @@ impl Engine {
                         self.typed_context = fun.typed;
                         self.source = fun.source.clone();
                         self.source_text = fun.source_text.clone();
-                        let result = self.exec_all(&fun.body);
+                        let result = match &fun.body {
+                            FunctionBody::Tree(body) => self.exec_all(body),
+                            FunctionBody::Bytecode(_) => Err(self.error(
+                                "Bytecode functions cannot be executed by the reference engine.",
+                                fun.line,
+                                fun.column,
+                            )),
+                        };
                         self.typed_context = previous_typed_context;
                         self.call_depth -= 1;
                         self.env = old;
