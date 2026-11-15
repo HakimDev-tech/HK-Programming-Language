@@ -300,3 +300,67 @@ fn canonical_paths_deduplicate_the_same_dependency() {
 
     assert_eq!(output, vec!["base", "5", "5", "10"]);
 }
+
+#[test]
+fn module_preflight_rejects_builtin_shadowing_and_duplicate_top_level_names() {
+    let builtin = run_project(
+        &[("main.hk", "export const print = 1;")],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(builtin.code, "E4001");
+
+    let duplicate = run_project(
+        &[("main.hk", "let value = 1; const value = 2;")],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(duplicate.code, "E4001");
+}
+
+#[test]
+fn unsupported_and_missing_filesystem_specifiers_are_rejected() {
+    let unsupported = run_project(
+        &[(
+            "main.hk",
+            "import { value } from \"./values.txt\";",
+        )],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(unsupported.code, "E4002");
+
+    let missing = run_project(
+        &[(
+            "main.hk",
+            "import { value } from \"./missing.hk\";",
+        )],
+        "main.hk",
+    )
+    .unwrap_err();
+    assert_eq!(missing.code, "E4002");
+}
+
+#[test]
+fn module_source_size_is_bounded() {
+    let oversized = format!("//{}", "x".repeat(1_048_576));
+    let error = run_project(&[("main.hk", &oversized)], "main.hk").unwrap_err();
+    assert_eq!(error.code, "E4006");
+}
+
+#[test]
+fn cycle_diagnostic_points_to_the_import_edge_that_closes_the_cycle() {
+    let error = run_project(
+        &[
+            ("a.hk", "import { b } from \"./b.hk\"; export const a = 1;"),
+            ("b.hk", "import { a } from \"./a.hk\"; export const b = 2;"),
+            ("main.hk", "import { a } from \"./a.hk\";"),
+        ],
+        "main.hk",
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "E4005");
+    assert!(error.source.ends_with("b.hk"));
+    assert_eq!(error.line, 1);
+}
