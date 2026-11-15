@@ -20,13 +20,13 @@ pub(super) enum MathFn {
     Max,
 }
 
-#[derive(Clone)]
 #[derive(Clone, Debug)]
 pub(super) enum FunctionBody {
     Tree(Vec<S>),
     Bytecode(u32),
 }
 
+#[derive(Clone)]
 pub(super) struct Fun {
     pub(super) name: String,
     pub(super) params: Vec<Param>,
