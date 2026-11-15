@@ -441,3 +441,9 @@ fn cli_runs_filesystem_module_programs() {
         vec!["counter initialized", "3", "3", "9", "18"]
     );
 }
+
+#[test]
+fn source_only_run_api_rejects_filesystem_imports_with_a_specific_diagnostic() {
+    let error = hk::run("inline.hk", "import { abs } from \"std:math\";").unwrap_err();
+    assert_eq!(error.code, "E4008");
+}
