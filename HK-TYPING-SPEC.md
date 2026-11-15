@@ -1,6 +1,6 @@
 # HK 0.2.0 — Gradual Typing Specification
 
-**Status:** Normative specification for the validated HK 0.2.0 release candidate. The gradual-typing pipeline, runtime contracts, boundary diagnostics, and checker/runtime scope conformance passed the final regression suite, cross-platform CI, and dedicated fuzz run on commit `ff8be051dd46c8a6a7c9aca89e7b30592cc944c5`. The candidate remains unreleased until integration and tagging.  
+**Status:** Normative specification for HK 0.2.0, integrated into `main` by merge commit `0ab7d567c04beb30a603d94fab34b908aa71391a`. The gradual-typing pipeline, runtime contracts, boundary diagnostics, and checker/runtime scope conformance passed the final regression suite and Linux/Windows/macOS CI on PR head `38fca78f3ebc05f016a828522de080569f4ef74e`, plus dedicated fuzzing with 1,190,041 executions. The source integration is complete; Git tag/release publication remains separate.  
 **Target release:** 0.2.0  
 **Typing model:** Gradual typing with explicit annotations and dynamic `any`  
 **Implementation baseline:** Rust tree-walking interpreter from 0.1.x

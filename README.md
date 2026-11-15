@@ -2,7 +2,7 @@
 
 HK is an experimental general-purpose programming language implemented in Rust. The 0.1.x line provides a small dynamically typed imperative language with a tree-walking interpreter. HK 0.2.0 extends that language with gradual typing.
 
-> **Status:** HK 0.2.0 implementation candidate. It is under final integration review and is not yet a stable release or production-ready compiler. The default `main` branch remains the 0.1.x baseline until the 0.2.0 integration is explicitly merged.
+> **Status:** HK 0.2.0 is integrated into `main` and is the current stable language baseline. The implementation is a tree-walking interpreter, not an optimizing or native compiler.
 
 ## Language capabilities
 

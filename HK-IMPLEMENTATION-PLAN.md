@@ -1,6 +1,6 @@
 # HK 0.2.0 — Finalization Plan
 
-**Status:** The release candidate `ff8be051dd46c8a6a7c9aca89e7b30592cc944c5` passed the full Linux/Windows/macOS CI matrix and the dedicated parser/interpreter fuzz run. Semantic review, regression coverage, and documentation/example verification are complete. PR #13 is ready for integration; the version remains unreleased until merge and release tagging.
+**Status:** Completed and integrated into `main` by squash merge commit `0ab7d567c04beb30a603d94fab34b908aa71391a`. The validated PR head `38fca78f3ebc05f016a828522de080569f4ef74e` passed the full Linux/Windows/macOS CI matrix and dedicated parser/interpreter fuzzing (1,190,041 runs). All semantic, regression, documentation, and example gates are complete. The Git tag/release publication remains a separate final repository operation.
 
 The normative language contract is [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md). Internal engineering steps do not create separate Alpha versions.
 
@@ -69,7 +69,7 @@ A 0.2.0 release candidate may be considered only after all of the following pass
 - [x] Final semantic and documentation review
 - [x] Explicit review of known limitations and compatibility guarantees
 
-All technical gates are satisfied on the same exact candidate commit. HK 0.2.0 remains unreleased until PR #13 is merged and the `v0.2.0` release tag is created.
+All technical gates are satisfied. PR #13 is merged into `main`, and the distributable crate version is `0.2.0`. The `v0.2.0` Git tag and GitHub Release have not been created.
 
 ## Deferred beyond 0.2.0
 

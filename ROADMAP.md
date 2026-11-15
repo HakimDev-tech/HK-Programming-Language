@@ -17,9 +17,9 @@ Each release requires acceptance criteria, regression tests, documentation, and 
 
 ## 0.2.0 status
 
-The gradual-typing candidate includes annotation syntax, static checking, runtime contracts, dynamic-boundary diagnostics, lexical-scope conformance, and a dedicated regression/fuzzing setup. Candidate commit `ff8be051dd46c8a6a7c9aca89e7b30592cc944c5` passed formatting, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and 1,106,989 fuzz executions. It is ready to merge; it remains unreleased until merge and `v0.2.0` tagging.
+HK 0.2.0 is integrated into `main` by squash merge commit `0ab7d567c04beb30a603d94fab34b908aa71391a`. The validated PR head `38fca78f3ebc05f016a828522de080569f4ef74e` passed formatting, workspace tests, Clippy, rustdoc, Linux/Windows/macOS CI, and 1,190,041 fuzz executions. The implementation and crate version are complete; Git tag and GitHub Release publication remain outstanding.
 
-The 0.2.0 release gate requires all acceptance criteria in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md), the finalization checklist in [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md), exact-commit CI on Linux/Windows/macOS, and a successful dedicated fuzz run.
+The 0.2.0 technical release gate is satisfied: all acceptance criteria in [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md), the finalization checklist in [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md), exact-commit CI on Linux/Windows/macOS, and dedicated fuzzing passed.
 
 ## Deferred
 
