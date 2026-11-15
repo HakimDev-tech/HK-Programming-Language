@@ -81,7 +81,11 @@ impl Env {
         self.aliases.insert(name, (Rc::downgrade(target), exported));
         Ok(())
     }
-    pub(super) fn define_function(&mut self, name: String, value: V) -> std::result::Result<(), EnvError> {
+    pub(super) fn define_function(
+        &mut self,
+        name: String,
+        value: V,
+    ) -> std::result::Result<(), EnvError> {
         self.define(name.clone(), value, false, None, "function declaration")?;
         self.function_names.insert(name);
         Ok(())
