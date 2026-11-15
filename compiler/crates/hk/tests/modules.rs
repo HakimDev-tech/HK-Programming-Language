@@ -488,3 +488,24 @@ fn cli_reports_the_0_3_0_package_version() {
     assert!(output.status.success());
     assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "HK 0.3.0");
 }
+
+#[test]
+fn unreadable_and_non_utf8_module_sources_are_reported_without_panicking() {
+    let (root, entry) = project(&[("main.hk", "")], "main.hk");
+    fs::write(root.join("main.hk"), [0xff, 0xfe]).unwrap();
+    let invalid_utf8 = run_path(&entry).unwrap_err();
+    fs::remove_dir_all(&root).unwrap();
+    assert_eq!(invalid_utf8.code, "E4006");
+
+    let (root, entry) = project(
+        &[(
+            "main.hk",
+            "import { value } from \"./directory.hk\";",
+        )],
+        "main.hk",
+    );
+    fs::create_dir(root.join("directory.hk")).unwrap();
+    let directory = run_path(&entry).unwrap_err();
+    fs::remove_dir_all(root).unwrap();
+    assert_eq!(directory.code, "E4006");
+}
