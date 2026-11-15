@@ -322,7 +322,7 @@ For an `E3008` contract or guard failure, the location must identify the most sp
 - unary/binary/logical guard: the offending operand;
 - array operation: the invalid receiver or index expression.
 
-Call expressions use the callee expression's source position when an enclosing contract reports the call as a returned or passed expression. Operator failures that are ordinary dynamic runtime errors retain their legacy `E3000` classification and operator position. In particular, unsupported dynamic `+` overload combinations and non-callable values are not reclassified as contract violations.
+Call expressions use the callee expression's source position when an enclosing contract reports the call as a returned or passed expression. Operator failures that are ordinary dynamic runtime errors retain their legacy `E3000` classification and operator position. Runtime diagnostic classification follows the provenance of the failing expression, not the presence of annotations elsewhere in the file: unrelated unannotated regions retain `E3000`; failures from typed checking regions or explicit runtime contract/guard boundaries use `E3008` where specified. A file-wide typing flag must not reclassify dynamic runtime failures. In particular, unsupported dynamic `+` overload combinations and non-callable values are not reclassified as contract violations.
 
 A skipped right operand of `&&` or `||` must not be evaluated and must not produce a runtime diagnostic. Diagnostic provenance changes must not cause expression re-evaluation or alter evaluation order.
 
