@@ -702,7 +702,10 @@ impl Engine {
                         Ok(V::Null)
                     }
                     V::Math(function) => {
-                        let expected_arity = match function { MathFn::Min | MathFn::Max => 2, _ => 1 };
+                        let expected_arity = match function {
+                            MathFn::Min | MathFn::Max => 2,
+                            _ => 1,
+                        };
                         if vs.len() != expected_arity {
                             return Err(self.error(format!("std:math function expects {expected_arity} argument(s), received {}.", vs.len()), *l, *c));
                         }
@@ -710,11 +713,19 @@ impl Engine {
                         for (value, line, column) in vs {
                             if let V::Num(number) = value {
                                 if !number.is_finite() {
-                                    return Err(self.error("std:math arguments must be finite Numbers.", line, column));
+                                    return Err(self.error(
+                                        "std:math arguments must be finite Numbers.",
+                                        line,
+                                        column,
+                                    ));
                                 }
                                 numbers.push(number);
                             } else {
-                                return Err(self.type_error("std:math arguments must be Numbers.", line, column));
+                                return Err(self.type_error(
+                                    "std:math arguments must be Numbers.",
+                                    line,
+                                    column,
+                                ));
                             }
                         }
                         let result = match function {
@@ -722,7 +733,13 @@ impl Engine {
                             MathFn::Ceil => numbers[0].ceil(),
                             MathFn::Floor => numbers[0].floor(),
                             MathFn::Round => numbers[0].round(),
-                            MathFn::Sqrt if numbers[0] < 0.0 => return Err(self.error("std:math::sqrt requires a non-negative argument.", *l, *c)),
+                            MathFn::Sqrt if numbers[0] < 0.0 => {
+                                return Err(self.error(
+                                    "std:math::sqrt requires a non-negative argument.",
+                                    *l,
+                                    *c,
+                                ))
+                            }
                             MathFn::Sqrt => numbers[0].sqrt(),
                             MathFn::Min => numbers[0].min(numbers[1]),
                             MathFn::Max => numbers[0].max(numbers[1]),
@@ -1055,7 +1072,6 @@ impl Engine {
     }
 }
 
-
 struct LoadedModule {
     path: PathBuf,
     source: String,
@@ -1077,10 +1093,9 @@ fn module_error(
 fn exported_name(statement: &S) -> Option<&str> {
     match statement {
         S::Export(inner) => match inner.as_ref() {
-            S::Var(name, ..)
-            | S::TypedVar(name, ..)
-            | S::Fn(name, ..)
-            | S::TypedFn(name, ..) => Some(name),
+            S::Var(name, ..) | S::TypedVar(name, ..) | S::Fn(name, ..) | S::TypedFn(name, ..) => {
+                Some(name)
+            }
             _ => None,
         },
         _ => None,
