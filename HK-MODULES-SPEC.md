@@ -102,7 +102,7 @@ The loader builds and validates the complete reachable dependency graph before e
 - Cyclic dependencies are rejected before any module body executes.
 - The cycle diagnostic reports the import edge that closes the cycle and a readable module chain.
 - A failed module initialization aborts the program; partially initialized exports are never made observable.
-- A new call to the public run API starts a fresh module graph and module cache.
+- A new call to `run_path` starts a fresh module graph and module cache.
 
 This release deliberately rejects cycles instead of exposing partially initialized bindings. Importers only observe dependencies after successful initialization; read-only aliases remain live for subsequent mutations performed by the exporting module.
 
