@@ -1,10 +1,10 @@
 # HK Programming Language
 
-HK is an experimental general-purpose programming language implemented in Rust. The 0.1.x line provides a small dynamically typed imperative language with a tree-walking interpreter. HK 0.2.0 extends that language with gradual typing.
+HK is an experimental general-purpose programming language implemented in Rust. It provides a tree-walking interpreter with gradual typing and a file-based module system.
 
-> **Status:** HK 0.2.0 is integrated into `main` and is the current implementation baseline. HK 0.3.0 is under design and implementation on a dedicated branch. The implementation remains a tree-walking interpreter, not an optimizing or native compiler.
+> **Status:** HK 0.2.0 is integrated into `main`. HK 0.3.0 implementation is being developed and validated on `feat/hk-v0.3.0-modules-stdlib`; it is not yet merged or published. HK remains an interpreter, not an optimizing or native compiler.
 
-## Language capabilities (0.2.0 baseline)
+## Language capabilities
 
 - `let` and `const` bindings
 - Number, String, Boolean, Null, and Array values
@@ -18,7 +18,9 @@ HK is an experimental general-purpose programming language implemented in Rust. 
 - Static checking before execution and runtime contracts at typed boundaries
 - Source-aware diagnostics with excerpts and caret markers
 - Bounded parser/runtime nesting and function recursion
-- Duplicate parameter validation and cyclic-array rejection
+- Explicit named imports and exports in the 0.3.0 development branch
+- Isolated file-level module scopes, canonical relative-path resolution, dependency-first initialization, and cycle rejection
+- Initial standard-library module `std:math` in the 0.3.0 development branch
 
 ## Gradual typing
 
@@ -38,11 +40,31 @@ print(operation(result)); // 84
 
 The source-level type vocabulary is deliberately small. Arrays remain heterogeneous, indexed reads are dynamic, and function aliases remain dynamically called unless a direct named-function signature is statically available.
 
-## HK 0.3.0 — planned module model
+## Modules (0.3.0 development branch)
 
-The 0.3.0 design introduces explicit named imports and exports, isolated file-level module scopes, deterministic relative-path resolution, at-most-once initialization, cycle rejection, and a small `std:math` module. These are design targets, not shipped capabilities yet.
+Imports are explicit, named, and declared at the beginning of a module:
 
-See [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) for the normative design and [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) for release gates.
+~~~hk
+import { add as increment, count } from "./counter.hk";
+import { sqrt, max } from "std:math";
+
+print(increment(2));
+print(count);
+print(sqrt(81));
+print(max(12, 18));
+~~~
+
+A module exports only declarations marked with `export`. Imported names are immutable aliases; exported mutable bindings remain live, and exported functions retain their defining module environment. Modules initialize once per `run_path` execution, dependencies initialize first, and cycles are rejected before module bodies execute.
+
+Run a filesystem-backed program with the CLI:
+
+~~~bash
+cargo run -p hk -- run examples/modules/main.hk
+~~~
+
+The Rust library exposes `hk::run_path(path)` for filesystem-backed programs. The existing `hk::run(source_name, source)` API remains suitable for single-file source strings; it reports an error if the source contains filesystem imports.
+
+See [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) for normative semantics.
 
 ## Requirements
 
@@ -63,6 +85,7 @@ cargo run -p hk -- version
 ~~~bash
 cargo run -p hk -- run examples/hello.hk
 cargo run -p hk -- run examples/gradual_typing.hk
+cargo run -p hk -- run examples/modules/main.hk
 ~~~
 
 Install locally:
@@ -70,14 +93,15 @@ Install locally:
 ~~~bash
 cargo install --path compiler/crates/hk
 hk run examples/hello.hk
+hk run examples/modules/main.hk
 ~~~
 
 ## Documentation
 
-- [HK-LANGUAGE-SPEC.md](HK-LANGUAGE-SPEC.md) — 0.1.x language behavior
+- [HK-LANGUAGE-SPEC.md](HK-LANGUAGE-SPEC.md) — original 0.1.x language behavior
 - [HK-TYPING-SPEC.md](HK-TYPING-SPEC.md) — normative 0.2.0 gradual-typing specification
-- [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) — normative 0.3.0 module and standard-library design
-- [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implemented architecture and target module architecture
+- [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md) — normative 0.3.0 module and standard-library specification
+- [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implementation architecture
 - [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md) — 0.2.0 finalization
 - [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) — 0.3.0 implementation and release gates
 - [ROADMAP.md](ROADMAP.md)
@@ -86,11 +110,11 @@ hk run examples/hello.hk
 
 ## Runtime limits
 
-The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. Cyclic array references are rejected before mutation. Environment lookup and array graph checks are iterative. These are interpreter constraints, not guarantees of an optimizing/native compiler.
+The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. The module loader caps dependency depth at 128 and reachable filesystem modules at 1,024 per run. Cyclic array references and cyclic module dependencies are rejected. These are interpreter constraints, not guarantees of an optimizing/native compiler.
 
 ## Scope
 
-The 0.2.0 implementation does not yet include modules, package management, bytecode, native compilation, WebAssembly, concurrency, or native FFI. The 0.3.0 module design does not imply these features are implemented.
+HK 0.3.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, bytecode, native compilation, WebAssembly, concurrency, or native FFI. Imported names are statically treated as `any` in this release; runtime contracts on exported values and functions remain authoritative.
 
 ## License
 
