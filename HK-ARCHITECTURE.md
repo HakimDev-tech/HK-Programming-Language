@@ -1,6 +1,6 @@
 # HK Architecture
 
-## Current implementation
+## Current implementation (0.2.0)
 
 HK is a Rust modular monolith in one Cargo package. The interpreter and gradual-typing implementation are separated into focused modules:
 
@@ -18,7 +18,7 @@ HK is a Rust modular monolith in one Cargo package. The interpreter and gradual-
 
 The crate remains intentionally unified. Splitting it into multiple crates is deferred until a real dependency or compilation boundary justifies that cost.
 
-## Execution pipeline
+## 0.2.0 execution pipeline
 
 For every source file:
 
@@ -58,14 +58,41 @@ Values use a tagged Rust enum. Arrays use shared reference-counted interior muta
 
 The interpreter propagates return control flow explicitly. Invalid HK programs must return diagnostics rather than trigger Rust panics. Parser/runtime depth limits, bounded function recursion, iterative environment traversal, and iterative array-cycle checks remain part of the robustness baseline.
 
+## 0.3.0 target module architecture (design, not yet implemented)
+
+The normative contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md).
+
+The intended pipeline is:
+
+```text
+Entry source path
+  -> Canonical path resolver / std: registry
+  -> Module graph discovery
+  -> UTF-8 source loading
+  -> Lexer / Parser per module
+  -> Export and import linking
+  -> Cycle and graph validation
+  -> Module-local static checking
+  -> Dependency-first module initialization
+  -> Shared output collection
+```
+
+The implementation must separate these responsibilities rather than embed filesystem access in the parser or evaluator. A module instance owns its canonical identity, source text, AST, export table, and runtime environment. The module graph owns instances for the duration of one `run` invocation. Exported functions must keep their defining module environment alive; imported names must not be implemented by flattening module ASTs into one global scope.
+
+The loader validates the full reachable graph and all import/export links before executing user statements. Cycles are rejected rather than exposing partially initialized values. Filesystem resolution is relative to the importing module, then canonicalized for identity and deduplication. The reserved `std:` namespace is resolved through an explicit standard-library registry, not filesystem fallback.
+
+Imported names are dynamic (`any`) to the 0.3.0 static checker, while runtime binding and function contracts remain attached to the exported values. This is an explicit gradual-typing boundary, not an inference of external signatures.
+
 ## Architectural constraints
 
 - Keep the type checker independent of runtime side effects.
-- Preserve source locations through AST and diagnostics.
+- Preserve source locations and source identity through every module.
 - Do not add unsafe Rust without a measured requirement and safety review.
 - Preserve dynamic behavior for unannotated code.
+- Do not flatten modules into a shared global environment.
+- Do not execute module bodies during graph discovery or link validation.
 - Do not claim bytecode, optimization, native compilation, or performance characteristics that are not implemented and benchmarked.
 
 ## Deferred architecture
 
-HIR/MIR, bytecode, optimizer, VM, LLVM/native backend, WASM, package manager, LSP, formatter, debugger, concurrency primitives, and C/C++ FFI are future work. They are not prerequisites for HK 0.2.0.
+HIR/MIR, bytecode, optimizer, VM, LLVM/native backend, WASM, package manager, LSP, formatter, debugger, concurrency primitives, and C/C++ FFI are future work. They are not prerequisites for 0.2.0 or 0.3.0.
