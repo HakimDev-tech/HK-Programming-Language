@@ -855,11 +855,13 @@ mod tests {
         assert!(error.message.contains("not definitely initialized"));
     }
 
-
     #[test]
     fn rejects_scope_stack_underflow() {
-        let error = verify(function(vec![Opcode::ExitScope, Opcode::Null, Opcode::Return], 1))
-            .unwrap_err();
+        let error = verify(function(
+            vec![Opcode::ExitScope, Opcode::Null, Opcode::Return],
+            1,
+        ))
+        .unwrap_err();
         assert!(error.message.contains("lexical scope stack underflow"));
     }
 
