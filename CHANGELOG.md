@@ -7,6 +7,9 @@
 - Resolve imports relative to the importer, canonicalize module identities, deduplicate dependencies, and initialize dependencies before importers.
 - Validate the reachable graph and export links before execution; reject cycles and duplicate module bindings.
 - Isolate module root environments and preserve live, read-only imported aliases and defining environments for exported functions.
+- Preserve defining-module source context for runtime errors raised inside imported functions.
+- Add stable diagnostics for module resolution, export linking, cycles, imported-binding reassignment, and standard-library contract failures.
+- Bound module loading to 128 dependency levels, 1,024 files, 1 MiB per file, and 16 MiB aggregate source.
 - Add `std:math` with `abs`, `ceil`, `floor`, `round`, `sqrt`, `min`, and `max`.
 - Add module integration tests, a runnable module example, and a dedicated module-specifier fuzz target.
 - Cross-platform CI, full regression validation, and the final release audit remain pending.
