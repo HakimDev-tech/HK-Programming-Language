@@ -33,7 +33,10 @@ fn all_documented_examples_execute_with_expected_output() {
     for (name, source, expected) in examples {
         let actual = run(name, source)
             .unwrap_or_else(|error| panic!("{name} should execute successfully: {error}"));
-        let expected = expected.iter().map(|line| (*line).to_owned()).collect::<Vec<_>>();
+        let expected = expected
+            .iter()
+            .map(|line| (*line).to_owned())
+            .collect::<Vec<_>>();
         assert_eq!(actual, expected, "unexpected output from {name}");
     }
 }
