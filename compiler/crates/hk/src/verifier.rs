@@ -578,10 +578,9 @@ fn merge_state(
     Ok(())
 }
 
-
 #[cfg(feature = "fuzzing")]
 pub(super) fn fuzz_verify(input: &[u8]) {
-    use super::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile};
+    use super::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile, SourceLocation};
 
     fn take_byte(input: &[u8], cursor: &mut usize) -> u8 {
         let value = input.get(*cursor).copied().unwrap_or(0);
@@ -590,10 +589,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
     }
 
     fn take_u16(input: &[u8], cursor: &mut usize) -> u16 {
-        u16::from_le_bytes([
-            take_byte(input, cursor),
-            take_byte(input, cursor),
-        ])
+        u16::from_le_bytes([take_byte(input, cursor), take_byte(input, cursor)])
     }
 
     fn take_u32(input: &[u8], cursor: &mut usize) -> u32 {
