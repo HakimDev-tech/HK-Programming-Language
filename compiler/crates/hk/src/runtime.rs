@@ -1229,6 +1229,16 @@ fn load_module_graph(
             "",
         )
     })?;
+    if source.len() as u64 > MAX_MODULE_SOURCE_BYTES {
+        return Err(module_error(
+            "E4006",
+            "Module source exceeds the 1 MiB per-file limit.",
+            &canonical.display().to_string(),
+            1,
+            1,
+            &source,
+        ));
+    }
     if total_source_bytes.saturating_add(source.len()) > MAX_MODULE_GRAPH_SOURCE_BYTES {
         return Err(module_error(
             "E4006",
