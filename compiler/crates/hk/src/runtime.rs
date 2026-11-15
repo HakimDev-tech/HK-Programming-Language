@@ -1133,6 +1133,7 @@ fn load_module_graph(
     modules: &mut HashMap<PathBuf, LoadedModule>,
     order: &mut Vec<PathBuf>,
     visiting: &mut Vec<PathBuf>,
+    total_source_bytes: &mut usize,
 ) -> Result<PathBuf> {
     if requested
         .extension()
@@ -1196,6 +1197,28 @@ fn load_module_graph(
             "",
         ));
     }
+    const MAX_MODULE_SOURCE_BYTES: u64 = 1_048_576;
+    const MAX_MODULE_GRAPH_SOURCE_BYTES: usize = 16 * 1_048_576;
+    let metadata = fs::metadata(&canonical).map_err(|error| {
+        module_error(
+            "E4006",
+            format!("Cannot inspect module '{}': {error}.", canonical.display()),
+            &canonical.display().to_string(),
+            1,
+            1,
+            "",
+        )
+    })?;
+    if !metadata.is_file() || metadata.len() > MAX_MODULE_SOURCE_BYTES {
+        return Err(module_error(
+            "E4006",
+            "Module source must be a regular file no larger than 1 MiB.",
+            &canonical.display().to_string(),
+            1,
+            1,
+            "",
+        ));
+    }
     let source = fs::read_to_string(&canonical).map_err(|error| {
         module_error(
             "E4006",
@@ -1206,6 +1229,17 @@ fn load_module_graph(
             "",
         )
     })?;
+    if total_source_bytes.saturating_add(source.len()) > MAX_MODULE_GRAPH_SOURCE_BYTES {
+        return Err(module_error(
+            "E4006",
+            "Module graph source exceeds the 16 MiB aggregate limit.",
+            &canonical.display().to_string(),
+            1,
+            1,
+            &source,
+        ));
+    }
+    *total_source_bytes += source.len();
     let source_name = canonical.display().to_string();
     let tokens = super::lexer::Lexer::new(&source_name, &source).scan()?;
     let statements = super::parser::Parser::new(tokens, &source_name, &source).parse()?;
@@ -1296,7 +1330,7 @@ fn load_module_graph(
                     &source,
                 ));
             }
-            load_module_graph(&target, modules, order, visiting)?;
+            load_module_graph(&target, modules, order, visiting, total_source_bytes)?;
         }
     }
 
@@ -1309,12 +1343,20 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
     let mut modules = HashMap::<PathBuf, LoadedModule>::new();
     let mut order = Vec::<PathBuf>::new();
     let mut visiting = Vec::<PathBuf>::new();
-    let entry = load_module_graph(entry, &mut modules, &mut order, &mut visiting)?;
+    let mut total_source_bytes = 0usize;
+    let entry = load_module_graph(
+        entry,
+        &mut modules,
+        &mut order,
+        &mut visiting,
+        &mut total_source_bytes,
+    )?;
 
     // Validate the complete top-level module namespace before execution.
     for path in &order {
         let module = modules.get(path).expect("loaded module must exist");
         let mut local_names = HashSet::new();
+        local_names.insert("print".to_owned());
         for statement in &module.statements {
             if let S::Import(_, names, _, _) = statement {
                 for name in names {
