@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — HK 0.3.0 (design baseline)
+
+- Define a normative module model with explicit named imports/exports, isolated module scopes, canonical relative-path resolution, dependency-first initialization, at-most-once execution, and cycle rejection.
+- Specify the initial `std:math` standard-library module and its finite-number, arity, type, and domain contracts.
+- Define gradual-typing behavior across module boundaries: imported values are statically dynamic while exported runtime contracts remain authoritative.
+- Record implementation architecture, regression matrix, and exact-commit release gates before implementation.
+
 ## HK 0.2.0 — 2026-11-15
 - Classify runtime type diagnostics by typed-expression provenance rather than a file-wide annotation flag, preserving legacy `E3000` errors in unrelated dynamic regions while retaining `E3008` for typed guards.
 - Set the distributable `hk` crate version to `0.2.0` and add automated execution tests for all five documented examples.
