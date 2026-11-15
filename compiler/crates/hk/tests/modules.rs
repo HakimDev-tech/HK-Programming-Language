@@ -506,3 +506,79 @@ fn unreadable_and_non_utf8_module_sources_are_reported_without_panicking() {
     fs::remove_dir_all(root).unwrap();
     assert_eq!(directory.code, "E4006");
 }
+
+#[test]
+fn module_dependency_depth_limit_is_enforced() {
+    let id = NEXT_PROJECT.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!("hk-modules-depth-{}-{id}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+
+    for index in 0..129 {
+        let source = if index < 128 {
+            format!(
+                "import {{ value }} from \"./module{}.hk\"; export const current = value;",
+                index + 1
+            )
+        } else {
+            "export const value = 1;".to_owned()
+        };
+        fs::write(root.join(format!("module{index}.hk")), source).unwrap();
+    }
+
+    let error = run_path(root.join("module0.hk")).unwrap_err();
+    fs::remove_dir_all(root).unwrap();
+    assert_eq!(error.code, "E4002");
+    assert!(error.message.contains("dependency depth"));
+}
+
+#[test]
+fn module_count_limit_is_enforced() {
+    let id = NEXT_PROJECT.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!("hk-modules-count-{}-{id}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+
+    let mut entry = String::new();
+    for index in 0..1024 {
+        entry.push_str(&format!(
+            "import {{ value as value{index} }} from \"./module{index}.hk\";\n"
+        ));
+        fs::write(
+            root.join(format!("module{index}.hk")),
+            "export const value = 1;",
+        )
+        .unwrap();
+    }
+    fs::write(root.join("main.hk"), entry).unwrap();
+
+    let error = run_path(root.join("main.hk")).unwrap_err();
+    fs::remove_dir_all(root).unwrap();
+    assert_eq!(error.code, "E4002");
+    assert!(error.message.contains("1024 files"));
+}
+
+#[test]
+fn aggregate_module_source_limit_is_enforced() {
+    let id = NEXT_PROJECT.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!("hk-modules-size-{}-{id}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+
+    for index in 0..17 {
+        let prefix = if index < 16 {
+            format!(
+                "import {{ value }} from \"./module{}.hk\"; export const value = 1;\n",
+                index + 1
+            )
+        } else {
+            "export const value = 1;\n".to_owned()
+        };
+        let filler_length = 1_000_000 - prefix.len() - 3;
+        let source = format!("{prefix}//{}\n", "x".repeat(filler_length));
+        assert_eq!(source.len(), 1_000_000);
+        fs::write(root.join(format!("module{index}.hk")), source).unwrap();
+    }
+
+    let error = run_path(root.join("module0.hk")).unwrap_err();
+    fs::remove_dir_all(root).unwrap();
+    assert_eq!(error.code, "E4006");
+    assert!(error.message.contains("aggregate limit"));
+}
