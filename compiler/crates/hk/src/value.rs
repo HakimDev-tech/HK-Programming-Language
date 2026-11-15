@@ -23,6 +23,7 @@ pub(super) enum MathFn {
 #[derive(Clone, Debug)]
 pub(super) enum FunctionBody {
     Tree(Vec<S>),
+    #[allow(dead_code)] // Constructed by the bytecode compiler when VM integration lands.
     Bytecode(u32),
 }
 
