@@ -37,7 +37,8 @@ fn has_type_annotations(statements: &[S]) -> bool {
                 has_type_annotations(std::slice::from_ref(statement.as_ref()))
             }) || has_type_annotations(std::slice::from_ref(body.as_ref()))
         }
-        S::Var(..) | S::Expr(..) | S::Return(..) => false,
+        S::Export(statement) => has_type_annotations(std::slice::from_ref(statement.as_ref())),
+        S::Import(..) | S::Var(..) | S::Expr(..) | S::Return(..) => false,
     })
 }
 
