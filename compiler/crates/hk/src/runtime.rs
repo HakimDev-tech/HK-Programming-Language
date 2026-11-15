@@ -1108,7 +1108,11 @@ fn load_module_graph(
     order: &mut Vec<PathBuf>,
     visiting: &mut Vec<PathBuf>,
 ) -> Result<PathBuf> {
-    if requested.extension().and_then(|extension| extension.to_str()) != Some("hk") {
+    if requested
+        .extension()
+        .and_then(|extension| extension.to_str())
+        != Some("hk")
+    {
         return Err(module_error(
             "E4002",
             "The entry file must use the .hk extension.",
