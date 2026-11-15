@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 description = "Gradually typed modular interpreter and CLI for the HK programming language."
 
+[features]
+fuzzing = []
+
 [lib]
 path = "src/lib.rs"
 
