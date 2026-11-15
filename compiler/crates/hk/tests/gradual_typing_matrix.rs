@@ -648,3 +648,27 @@ fn typed_any_operand_uses_runtime_contract_diagnostic() {
     let error = run("typed-any-operand.hk", source).unwrap_err();
     assert_eq!(error.code, "E3008");
 }
+
+
+#[test]
+fn direct_typed_call_checks_dynamic_argument_expression_at_boundary() {
+    let source = r#"
+        fn take(value: number) -> number { return value; }
+        let dynamic = "invalid";
+        take(-dynamic);
+    "#;
+    let error = run("typed-call-argument.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3008");
+}
+
+#[test]
+fn aliased_typed_call_keeps_argument_expression_dynamic() {
+    let source = r#"
+        fn take(value: number) -> number { return value; }
+        let operation = take;
+        let dynamic = "invalid";
+        operation(-dynamic);
+    "#;
+    let error = run("typed-call-alias-argument.hk", source).unwrap_err();
+    assert_eq!(error.code, "E3000");
+}
