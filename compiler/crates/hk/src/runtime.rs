@@ -348,6 +348,8 @@ impl Engine {
     }
     fn exec_inner(&mut self, s: &S) -> Result<Flow> {
         match s {
+            S::Import(..) => {}
+            S::Export(statement) => return self.exec(statement),
             S::TypedVar(name, annotation, initializer, mutable, line, column) => {
                 let previous_typed_context = self.typed_context;
                 self.typed_context = true;
