@@ -649,7 +649,6 @@ fn typed_any_operand_uses_runtime_contract_diagnostic() {
     assert_eq!(error.code, "E3008");
 }
 
-
 #[test]
 fn direct_typed_call_checks_dynamic_argument_expression_at_boundary() {
     let source = r#"
