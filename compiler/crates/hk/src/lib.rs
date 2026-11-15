@@ -510,7 +510,7 @@ mod tests {
     fn runtime_guards_any_values_in_boolean_conditions() {
         let error = run(
             "typed.hk",
-            "let marker: bool = true; let condition = 1; if (condition) { print(1); }",
+            "let marker: bool = true; let condition: any = 1; if (condition) { print(1); }",
         )
         .unwrap_err();
         assert_eq!(error.code, "E3008");
@@ -521,7 +521,7 @@ mod tests {
     fn runtime_guards_any_values_in_arithmetic_operands() {
         let error = run(
             "typed.hk",
-            "let marker: bool = true; let value = \"bad\"; print(value - 1);",
+            "let marker: bool = true; let value: any = \"bad\"; print(value - 1);",
         )
         .unwrap_err();
         assert_eq!(error.code, "E3008");
@@ -534,13 +534,13 @@ mod tests {
     fn runtime_guards_any_array_receivers_and_property_access() {
         let error = run(
             "typed.hk",
-            "let marker: bool = true; let value = 1; print(value[0]);",
+            "let marker: bool = true; let value: any = 1; print(value[0]);",
         )
         .unwrap_err();
         assert_eq!(error.code, "E3008");
         let error = run(
             "typed.hk",
-            "let marker: bool = true; let value = 1; print(value.length);",
+            "let marker: bool = true; let value: any = 1; print(value.length);",
         )
         .unwrap_err();
         assert_eq!(error.code, "E3008");
