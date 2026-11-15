@@ -31,7 +31,7 @@ pub(super) struct SourceLocation {
     pub(super) column: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Opcode {
     Constant(u32),
     Null,
