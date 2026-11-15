@@ -47,6 +47,8 @@ pub(super) enum Opcode {
     GetModule(u16),
     SetModule(u16),
     GetImport(u16),
+    LoadPrint,
+    MakeFunction(u32),
     EnterScope,
     ExitScope,
     Negate,
