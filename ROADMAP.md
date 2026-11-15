@@ -25,7 +25,7 @@ The 0.2.0 technical release gate is satisfied: all acceptance criteria in [HK-TY
 
 The normative 0.3.0 contract is recorded in [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md), with implementation and release gates in [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md). The implementation branch is `feat/hk-v0.3.0-modules-stdlib`, tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14).
 
-The branch now contains the parser/AST additions, filesystem module graph, isolated environments, live read-only imports, runtime contract preservation, `std:math`, CLI/API integration, integration tests, example programs, and module-loader fuzz target. Linux and macOS checks have passed on an implementation commit; Windows and fuzz validation are being completed. V0.3.0 is not yet merged or published. The release gate remains blocked until every acceptance criterion passes on the final exact commit, the version is bumped, and the release is published.
+The implementation is complete on `feat/hk-v0.3.0-modules-stdlib` and tracked by [PR #14](https://github.com/HakimDev-tech/HK-Programming-Language/pull/14). The release candidate at `fe8dcc95a9a4894e9d3bb1bcde8bbb02fe6cb8c4` passed formatting, the full workspace test suite, Clippy with warnings denied, rustdoc, Linux/Windows/macOS CI, and both parser/interpreter and module-resolver fuzz jobs. The crate version is `0.3.0`; the PR remains unmerged and the Git tag/GitHub Release have not yet been published.
 
 ## Deferred
 
