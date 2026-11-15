@@ -166,3 +166,53 @@ M0 is complete only when:
 - [ ] The exact baseline commit and CI status are recorded with reproducible links.
 
 **Current conclusion:** the language surface is now enumerated. M0 remains open; no claim of implementation readiness or V0.4 completion is made until the remaining checkboxes are satisfied.
+
+
+## 9. Named existing regression tests mapped to semantics
+
+The following names were verified in the V0.3.0 source tree. They form the initial reference corpus; their presence does not imply that a VM differential harness already exists.
+
+### Interpreter unit tests — `compiler/crates/hk/src/lib.rs`
+
+| Semantic area | Existing tests |
+|---|---|
+| Arithmetic and precedence | `arithmetic_precedence`, `division_by_zero_fails` |
+| Functions and loops | `functions_recursion_and_arrays`, `recursive_calls_stop_at_a_controlled_limit` |
+| Binding/scope | `constant_reassignment_fails`, `lexical_scopes_allow_shadowing`, `for_loop_scope_does_not_leak`, `duplicate_declarations_in_one_scope_are_rejected` |
+| Arrays | `cyclic_array_references_are_rejected_without_leaking`, `indirect_cyclic_array_references_are_rejected`, `array_bounds_are_checked_for_reads_and_writes`, `arrays_compare_by_identity`, `deeply_nested_array_display_is_bounded` |
+| Conditions/control flow | `conditions_require_booleans`, `short_circuit_operators_do_not_evaluate_right_operand` |
+| Parser/lexer safety | `duplicate_function_parameters_are_rejected_at_declaration`, `eof_diagnostics_point_to_end_of_input`, `invalid_assignment_reports_operator_position`, `unknown_single_logical_operator_is_lexical_error`, `unterminated_string_is_lexical_error`, `deeply_nested_unary_input_returns_a_diagnostic`, `deeply_nested_blocks_return_a_diagnostic`, `deeply_nested_array_expression_returns_a_diagnostic`, `deep_left_associative_expression_evaluates_without_stack_growth`, `malformed_source_corpus_never_panics`, `generated_source_inputs_never_panic`, `strings_support_only_documented_escapes` |
+| Diagnostics | `diagnostics_include_source_excerpt_and_caret` |
+| Static gradual typing | `executes_annotated_variable_declarations`, `executes_typed_function_parameters_and_return_annotations`, `rejects_unknown_type_names_during_parsing`, `executes_all_supported_type_names`, `executes_nested_typed_syntax`, `rejects_incompatible_typed_variable_initializers`, `rejects_incompatible_direct_function_arguments`, `rejects_incompatible_typed_function_returns`, `rejects_non_boolean_typed_conditions`, `rejects_typed_functions_that_may_fall_through`, `rejects_incompatible_typed_variable_assignments`, `rejects_known_incompatible_arithmetic_operands`, `typed_const_still_rejects_reassignment` |
+| Runtime contracts/provenance | `runtime_guards_dynamic_typed_variable_initializers`, `runtime_guards_assignments_to_typed_bindings`, `runtime_guards_typed_parameters_through_dynamic_function_aliases`, `runtime_guards_typed_function_returns_from_dynamic_expressions`, `runtime_contracts_survive_function_aliasing`, `failed_typed_assignment_does_not_replace_the_previous_value`, `runtime_contracts_check_null_exactly`, `runtime_guards_any_values_in_boolean_conditions`, `runtime_guards_any_values_in_arithmetic_operands`, `runtime_guards_any_array_receivers_and_property_access`, `runtime_guards_dynamic_null_function_returns`, `unannotated_runtime_type_errors_keep_legacy_diagnostic_codes`, `dynamic_plus_overload_failure_keeps_legacy_runtime_diagnostic`, `non_callable_dynamic_value_keeps_legacy_runtime_diagnostic` |
+| Dynamic compatibility | `preserves_dynamic_behavior_for_unannotated_programs`, `short_circuit_skips_dynamic_runtime_type_guards`, `accepts_null_and_any_return_fallthrough_contracts`, `typed_array_bindings_do_not_constrain_array_elements_or_aliases`, `documented_gradual_typing_example_executes` |
+
+### Module integration tests — `compiler/crates/hk/tests/modules.rs`
+
+| Semantic area | Existing tests |
+|---|---|
+| Imports/exports and live aliases | `imports_exports_aliases_and_live_bindings_work_with_gradual_contracts`, `import_aliases_are_read_only`, `missing_exports_are_link_errors`, `typed_modules_use_the_same_imported_binding_diagnostic`, `private_module_bindings_do_not_leak`, `duplicate_export_names_are_rejected_before_execution` |
+| Initialization and identity | `shared_dependencies_initialize_once_in_dependency_first_order`, `canonical_paths_deduplicate_the_same_dependency`, `each_run_path_call_starts_a_fresh_module_cache` |
+| Module safety/preflight | `cycles_are_rejected_before_any_module_body_executes`, `cycle_diagnostic_points_to_the_import_edge_that_closes_the_cycle`, `module_preflight_rejects_builtin_shadowing_and_duplicate_top_level_names`, `unsupported_and_missing_filesystem_specifiers_are_rejected`, `malformed_module_declarations_are_rejected_by_the_parser`, `unreadable_and_non_utf8_module_sources_are_reported_without_panicking` |
+| Module limits/diagnostics | `module_source_size_is_bounded`, `module_dependency_depth_limit_is_enforced`, `module_count_limit_is_enforced`, `aggregate_module_source_limit_is_enforced`, `imported_function_diagnostics_retain_the_defining_module_source` |
+| Functions and native modules | `imported_functions_keep_their_defining_module_environment_alive`, `typed_export_contracts_are_enforced_across_module_boundaries`, `standard_math_functions_enforce_results_and_contracts`, `standard_math_uses_stable_arity_type_and_domain_diagnostics` |
+| API/CLI | `cli_runs_filesystem_module_programs`, `source_only_run_api_rejects_filesystem_imports_with_a_specific_diagnostic`, `cli_reports_the_0_3_0_package_version` |
+
+### Examples and type-checker matrix
+
+- `compiler/crates/hk/tests/examples_smoke.rs`: `all_documented_examples_execute_with_expected_output`, `module_example_executes_through_filesystem_loader`.
+- `compiler/crates/hk/tests/gradual_typing_matrix.rs`: includes positive/negative matrices, dynamic-boundary diagnostic provenance, array contract non-propagation, return-path analysis, operand-position checks, nested shadowing, mutually recursive typed functions, loop/block scope behavior, and typed-vs-dynamic call boundaries. The full file remains the source of truth; individual cases must be ported to the differential harness rather than replaced with a smaller hand-picked subset.
+
+## 10. Explicit M0 gaps after test mapping
+
+The existing corpus is strong for V0.3 semantics but does not yet establish VM correctness. The following are still implementation work:
+- A test-only reference entry point that can run the exact parsed/checked input through the tree-walking engine without changing public APIs.
+- A differential test harness that compares success output or structured error fields between reference and VM.
+- Per-AST-variant compiler coverage tests, including malformed/internal AST states where reachable from internal tests.
+- Side-effect ordering tests for callee/argument evaluation and array receiver/index/value evaluation.
+- Verifier unit/property tests for invalid opcodes, indexes, jumps, stack underflow, merge-height mismatch, uninitialized locals, function boundaries, and module links.
+- Verifier fuzz target and VM/compiler fuzz targets.
+- Empirically selected bytecode instruction-count, operand-stack, frame, and code-size ceilings. Existing parser/module limits must remain independently enforced.
+- CI status must be checked on the exact head commit after the relevant GitHub Actions run completes; empty status arrays are not evidence of success.
+
+**M0 status remains open.** The named regression mapping is now recorded, but missing differential tests and measured VM limits have not been implemented.
