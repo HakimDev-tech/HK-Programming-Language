@@ -871,10 +871,6 @@ impl Engine {
         )
         .map_err(|error| self.operation_error(error))
     }
-    fn finite(&self, number: f64, line: usize, column: usize) -> Result<V> {
-        super::runtime_ops::finite(number, (line, column))
-            .map_err(|error| self.operation_error(error))
-    }
     fn eval_condition(&mut self, expression: &E) -> Result<bool> {
         let previous_typed_context = self.typed_context;
         self.typed_context |= self.expression_has_typed_provenance(expression);
