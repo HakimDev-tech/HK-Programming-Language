@@ -1,8 +1,7 @@
 //! HK 0.1.x reference interpreter.
 //! Dependency-free tree-walking implementation.
 mod ast;
-// Temporary until the AST compiler and VM consume the internal bytecode model.
-#[allow(dead_code)]
+// Temporary scaffolding; dead-code allowances live inside the unfinished modules.
 mod bytecode;
 use ast::S;
 pub mod diagnostics;
@@ -13,8 +12,6 @@ mod runtime;
 mod type_checker;
 mod types;
 mod value;
-// The verifier is exercised directly by its unit tests before VM integration.
-#[allow(dead_code)]
 mod verifier;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
