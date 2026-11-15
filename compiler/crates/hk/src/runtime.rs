@@ -41,9 +41,7 @@ impl Engine {
         Self::new_with_env(source, source_text, Rc::new(RefCell::new(Env::default())))
     }
     fn new_with_env(source: &str, source_text: &str, e: Rc<RefCell<Env>>) -> Self {
-        if !e.borrow().values.contains_key("print") {
-            e.borrow_mut().values.insert("print".into(), V::Print);
-        }
+        Env::ensure_print(&e);
         Self {
             env: e,
             output: vec![],
