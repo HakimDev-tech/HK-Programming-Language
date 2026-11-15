@@ -417,9 +417,7 @@ impl Engine {
                 return r;
             }
             S::If(c, a, b) => {
-                let v = self.eval(c)?;
-                let (line, col) = c.source_position();
-                if self.boolean(v, line, col)? {
+                if self.eval_condition(c)? {
                     return self.exec(a);
                 }
                 if let Some(b) = b {
@@ -427,9 +425,7 @@ impl Engine {
                 }
             }
             S::While(c, b) => loop {
-                let v = self.eval(c)?;
-                let (line, col) = c.source_position();
-                if !self.boolean(v, line, col)? {
+                if !self.eval_condition(c)? {
                     break;
                 }
                 if let Flow::Return(v, line, col) = self.exec(b)? {
@@ -445,9 +441,7 @@ impl Engine {
                     }
                     loop {
                         if let Some(c) = cond {
-                            let v = self.eval(c)?;
-                            let (line, col) = c.source_position();
-                            if !self.boolean(v, line, col)? {
+                            if !self.eval_condition(c)? {
                                 break;
                             }
                         }
@@ -919,6 +913,17 @@ impl Engine {
         } else {
             Err(self.error("Numeric operation produced a non-finite result.", l, c))
         }
+    }
+    fn eval_condition(&mut self, expression: &E) -> Result<bool> {
+        let previous_typed_context = self.typed_context;
+        self.typed_context |= self.expression_has_typed_provenance(expression);
+        let result = (|| {
+            let value = self.eval(expression)?;
+            let (line, column) = expression.source_position();
+            self.boolean(value, line, column)
+        })();
+        self.typed_context = previous_typed_context;
+        result
     }
     fn boolean(&self, v: V, l: usize, c: usize) -> Result<bool> {
         if let V::Bool(b) = v {
