@@ -258,7 +258,10 @@ fn standard_math_uses_stable_arity_type_and_domain_diagnostics() {
     assert_eq!(arity.code, "E3011");
 
     let argument_type = run_project(
-        &[("main.hk", "import { sqrt } from \"std:math\"; sqrt(\"bad\");")],
+        &[(
+            "main.hk",
+            "import { sqrt } from \"std:math\"; sqrt(\"bad\");",
+        )],
         "main.hk",
     )
     .unwrap_err();
