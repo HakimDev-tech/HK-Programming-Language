@@ -49,6 +49,7 @@ Direct named-function calls can use signatures visible at the current source pos
 - Static `for` analysis follows runtime order: initializer, condition, body, increment.
 - Short-circuit operators preserve lazy runtime evaluation.
 - Dynamic guards do not evaluate expressions more than once.
+- Runtime diagnostic classification follows typed-expression provenance; unrelated dynamic regions preserve legacy `E3000` diagnostics.
 - Binding writes and function entry/return boundaries enforce contracts before invalid values become observable.
 
 ## Runtime safety
