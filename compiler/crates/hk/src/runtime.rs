@@ -507,35 +507,9 @@ impl Engine {
                 }
                 Ok(V::Arr(Rc::new(RefCell::new(a))))
             }
-            E::Unary(op, e, l, c) => {
-                let v = self.eval(e)?;
-                match op {
-                    K::Minus => {
-                        if let V::Num(n) = v {
-                            self.finite(-n, *l, *c)
-                        } else {
-                            let (operand_line, operand_column) = e.source_position();
-                            Err(self.type_error(
-                                "Unary '-' expects Number.",
-                                operand_line,
-                                operand_column,
-                            ))
-                        }
-                    }
-                    K::Bang => {
-                        if let V::Bool(b) = v {
-                            Ok(V::Bool(!b))
-                        } else {
-                            let (operand_line, operand_column) = e.source_position();
-                            Err(self.type_error(
-                                "'!' expects Boolean.",
-                                operand_line,
-                                operand_column,
-                            ))
-                        }
-                    }
-                    _ => unreachable!(),
-                }
+            E::Unary(operator, operand, line, column) => {
+                let value = self.eval(operand)?;
+                self.unary(value, *operator, operand.source_position(), (*line, *column))
             }
             E::Binary(_, _, _, _, _) => self.eval_binary_chain(e),
             E::Call(callee, args, l, c) => {
@@ -863,97 +837,38 @@ impl Engine {
         Ok(value)
     }
 
-    fn binary(&self, a: V, op: K, b: V, positions: BinaryPositions) -> Result<V> {
-        match op {
-            K::Plus => match (a, b) {
-                (V::Num(x), V::Num(y)) => {
-                    self.finite(x + y, positions.operator.0, positions.operator.1)
-                }
-                (V::Str(x), V::Str(y)) => Ok(V::Str(x + &y)),
-                (x, y) => Err(self.error(
-                    format!(
-                        "'+' expects two Numbers or two Strings, got {} and {}.",
-                        x.ty(),
-                        y.ty()
-                    ),
-                    positions.operator.0,
-                    positions.operator.1,
-                )),
-            },
-            K::Minus | K::Star | K::Slash | K::Percent => {
-                let (x, y) = match (a, b) {
-                    (V::Num(x), V::Num(y)) => (x, y),
-                    (left, _) if !matches!(&left, V::Num(_)) => {
-                        return Err(self.type_error(
-                            "Arithmetic operators require Number operands.",
-                            positions.left.0,
-                            positions.left.1,
-                        ));
-                    }
-                    (_, _) => {
-                        return Err(self.type_error(
-                            "Arithmetic operators require Number operands.",
-                            positions.right.0,
-                            positions.right.1,
-                        ));
-                    }
-                };
-                if (op == K::Slash || op == K::Percent) && y == 0.0 {
-                    return Err(self.error(
-                        "Division or modulo by zero.",
-                        positions.operator.0,
-                        positions.operator.1,
-                    ));
-                }
-                self.finite(
-                    match op {
-                        K::Minus => x - y,
-                        K::Star => x * y,
-                        K::Slash => x / y,
-                        K::Percent => x % y,
-                        _ => unreachable!(),
-                    },
-                    positions.operator.0,
-                    positions.operator.1,
-                )
+    fn operation_error(&self, error: super::runtime_ops::RuntimeOpError) -> HkError {
+        match error {
+            super::runtime_ops::RuntimeOpError::Type { message, position } => {
+                self.type_error(message, position.0, position.1)
             }
-            K::Gt | K::GtEq | K::Lt | K::LtEq => {
-                let (x, y) = match (a, b) {
-                    (V::Num(x), V::Num(y)) => (x, y),
-                    (left, _) if !matches!(&left, V::Num(_)) => {
-                        return Err(self.type_error(
-                            "Ordering comparisons require Number operands.",
-                            positions.left.0,
-                            positions.left.1,
-                        ));
-                    }
-                    (_, _) => {
-                        return Err(self.type_error(
-                            "Ordering comparisons require Number operands.",
-                            positions.right.0,
-                            positions.right.1,
-                        ));
-                    }
-                };
-                Ok(V::Bool(match op {
-                    K::Gt => x > y,
-                    K::GtEq => x >= y,
-                    K::Lt => x < y,
-                    K::LtEq => x <= y,
-                    _ => unreachable!(),
-                }))
+            super::runtime_ops::RuntimeOpError::Runtime { message, position } => {
+                self.error(message, position.0, position.1)
             }
-            K::EqEq => Ok(V::Bool(a.eq(&b))),
-            K::BangEq => Ok(V::Bool(!a.eq(&b))),
-            _ => unreachable!(),
         }
     }
-    fn finite(&self, n: f64, l: usize, c: usize) -> Result<V> {
-        if n.is_finite() {
-            Ok(V::Num(n))
-        } else {
-            Err(self.error("Numeric operation produced a non-finite result.", l, c))
-        }
+    fn unary(
+        &self,
+        value: V,
+        operator: K,
+        operand_position: SourcePosition,
+        operator_position: SourcePosition,
+    ) -> Result<V> {
+        super::runtime_ops::unary(value, operator, operand_position, operator_position)
+            .map_err(|error| self.operation_error(error))
+    }
+    fn binary(&self, a: V, op: K, b: V, positions: BinaryPositions) -> Result<V> {
+        super::runtime_ops::binary(
+            a,
+            op,
+            b,
+            (positions.operator, positions.left, positions.right),
+        )
+        .map_err(|error| self.operation_error(error))
+    }
+    fn finite(&self, number: f64, line: usize, column: usize) -> Result<V> {
+        super::runtime_ops::finite(number, (line, column))
+            .map_err(|error| self.operation_error(error))
     }
     fn eval_condition(&mut self, expression: &E) -> Result<bool> {
         let previous_typed_context = self.typed_context;
