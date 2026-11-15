@@ -14,10 +14,13 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 - [x] Dependency-first execution and at-most-once module initialization.
 - [x] Import/export linking and pre-execution missing-export validation.
 - [x] Isolated module root environments and read-only live aliases.
-- [x] Preserve defining module environments for imported functions.
+- [x] Preserve defining module environments and source diagnostics for imported functions.
 - [x] Initial `std:math` implementation.
 - [x] Public `run_path` API and CLI integration.
 - [x] Initial module integration tests and runnable example.
+- [x] CLI integration test for filesystem-backed module execution.
+- [x] Stable diagnostics for module errors, imported-binding immutability, and std:math failures.
+- [x] Resource limits for module depth, count, per-file source size, and aggregate source size.
 - [x] Dedicated module specifier/resolver fuzz target.
 - [ ] Full CI, fuzz, Clippy, rustdoc, and cross-platform validation on the final release candidate.
 - [ ] Complete acceptance matrix, robustness audit, documentation audit, version bump, merge, tag, and release.
@@ -55,7 +58,7 @@ The normative language contract is [HK-MODULES-SPEC.md](HK-MODULES-SPEC.md). No 
 
 ### Regression and robustness
 - Full 0.1.x/V0.2 suite unchanged and passing.
-- Parser and module-loader fuzzing.
+- Parser and module-loader fuzzing, including malformed import specifiers and filesystem resolution.
 - Path normalization and symlink/canonicalization cases where supported by the platform.
 - No uncontrolled panic on malformed source or dependency graphs.
 
