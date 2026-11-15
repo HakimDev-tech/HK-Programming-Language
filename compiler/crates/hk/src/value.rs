@@ -1,6 +1,6 @@
 //! Shared runtime value representation and value-level semantics.
 //! Both the tree-walking reference engine and the bytecode VM use this module.
-use super::ast::{Param, E, S};
+use super::ast::{Param, S};
 use super::runtime::Env;
 use super::types::Type;
 use std::{
