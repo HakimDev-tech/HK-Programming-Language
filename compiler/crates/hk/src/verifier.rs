@@ -852,8 +852,10 @@ mod tests {
             functions: vec![FunctionProto {
                 name: "main".to_owned(),
                 module_id: None,
-                parameter_count: 0,
-                local_count: 0,
+                parameters: Vec::new(),
+                local_slots: Vec::new(),
+                return_contract: None,
+                typed: false,
                 max_stack,
                 code: code.into_iter().map(instruction).collect(),
             }],
@@ -932,7 +934,12 @@ mod tests {
             1,
         );
         let mut program = program;
-        program.functions[0].local_count = 1;
+        program.functions[0].local_slots.push(super::super::bytecode::LocalSlot {
+            internal_name: "\0slot0".to_owned(),
+            source_name: "x".to_owned(),
+            mutable: true,
+            contract: None,
+        });
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("not definitely initialized"));
     }
