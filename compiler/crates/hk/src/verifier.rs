@@ -1,6 +1,7 @@
 #![allow(dead_code)] // Verifier entry points are integrated by the compiler/VM milestone.
 //! Mandatory verifier for compiler-produced in-memory HK bytecode.
 use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode};
+use super::types::Type;
 
 const SUPPORTED_MAJOR: u16 = 1;
 const SUPPORTED_MINOR: u16 = 0;
@@ -178,7 +179,7 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             )));
         }
         for import in &module.imports {
-            if import.local_slot >= module.binding_count {
+            if import.local_slot as usize >= module.bindings.len() {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import local slot is out of range"
                 )));
@@ -191,14 +192,14 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                         "module {module_index} import references an unknown module"
                     ))
                 })?;
-            if import.target_slot >= target.binding_count {
+            if import.target_slot as usize >= target.bindings.len() {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import target slot is out of range"
                 )));
             }
         }
         for export in &module.exports {
-            if export.slot >= module.binding_count {
+            if export.slot as usize >= module.bindings.len() {
                 return Err(VerifyError::program(format!(
                     "module {module_index} export slot is out of range"
                 )));
@@ -213,19 +214,54 @@ fn verify_function_tables(
     function_index: usize,
     function: &FunctionProto,
 ) -> Result<(), VerifyError> {
-    if function.parameter_count > MAX_CALL_ARGUMENTS {
+    if function.parameters.len() > MAX_CALL_ARGUMENTS as usize {
         return Err(VerifyError::at(
             function_index,
             None,
             "function parameter count exceeds 255",
         ));
     }
-    if function.parameter_count > function.local_count {
+    if function.local_slots.len() > u16::MAX as usize
+        || function.parameters.len() > function.local_slots.len()
+    {
         return Err(VerifyError::at(
             function_index,
             None,
             "invalid local-slot layout",
         ));
+    }
+    let mut internal_names = std::collections::HashSet::new();
+    for slot in &function.local_slots {
+        if slot.internal_name.is_empty()
+            || slot.source_name.is_empty()
+            || !internal_names.insert(slot.internal_name.as_str())
+        {
+            return Err(VerifyError::at(
+                function_index,
+                None,
+                "local slots require unique internal names and non-empty source names",
+            ));
+        }
+    }
+    let mut parameter_slots = std::collections::HashSet::new();
+    for parameter in &function.parameters {
+        let Some(slot) = function.local_slots.get(parameter.slot as usize) else {
+            return Err(VerifyError::at(
+                function_index,
+                None,
+                "parameter local slot is out of range",
+            ));
+        };
+        if !parameter_slots.insert(parameter.slot)
+            || slot.source_name != parameter.name
+            || slot.contract != parameter.annotation.map(Type::from)
+        {
+            return Err(VerifyError::at(
+                function_index,
+                None,
+                "parameter metadata does not match its local slot",
+            ));
+        }
     }
     if function.code.is_empty() || function.code.len() > MAX_CODE_INSTRUCTIONS {
         return Err(VerifyError::at(
@@ -281,7 +317,7 @@ fn verify_function_tables(
                 }
             }
             Opcode::DefineLocal(slot) | Opcode::GetLocal(slot) | Opcode::SetLocal(slot) => {
-                if slot >= function.local_count {
+                if slot as usize >= function.local_slots.len() {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
@@ -297,7 +333,7 @@ fn verify_function_tables(
                         "module binding opcode used by a source-only function",
                     ));
                 };
-                if slot >= program.modules[module_id as usize].binding_count {
+                if slot as usize >= program.modules[module_id as usize].bindings.len() {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
@@ -350,8 +386,10 @@ fn verify_control_flow(
 ) -> Result<u32, VerifyError> {
     let mut states = vec![None::<FlowState>; function.code.len()];
     let mut worklist = std::collections::VecDeque::new();
-    let mut initial_locals = vec![false; function.local_count as usize];
-    initial_locals[..function.parameter_count as usize].fill(true);
+    let mut initial_locals = vec![false; function.local_slots.len()];
+    for parameter in &function.parameters {
+        initial_locals[parameter.slot as usize] = true;
+    }
     states[0] = Some(FlowState {
         stack_height: 0,
         scope_depth: 0,
@@ -693,6 +731,25 @@ pub(super) fn fuzz_verify(input: &[u8]) {
 
     let parameter_count = (take_byte(input, &mut cursor) % 16) as u16;
     let local_count = parameter_count + (take_byte(input, &mut cursor) % 16) as u16;
+    let parameters = (0..parameter_count)
+        .map(|slot| super::bytecode::ParameterProto {
+            name: format!("param{slot}"),
+            slot,
+            annotation: None,
+        })
+        .collect();
+    let local_slots = (0..local_count)
+        .map(|slot| super::bytecode::LocalSlot {
+            internal_name: format!("\\0fuzz:{slot}"),
+            source_name: if slot < parameter_count {
+                format!("param{slot}")
+            } else {
+                format!("local{slot}")
+            },
+            mutable: true,
+            contract: None,
+        })
+        .collect();
     let instruction_count = 1 + (take_byte(input, &mut cursor) % 64) as usize;
     let mut code = Vec::with_capacity(instruction_count);
 
@@ -756,8 +813,10 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         functions: vec![FunctionProto {
             name: "fuzz".to_owned(),
             module_id: None,
-            parameter_count,
-            local_count,
+            parameters,
+            local_slots,
+            return_contract: None,
+            typed: false,
             max_stack: u32::from(take_byte(input, &mut cursor) % 64),
             code,
         }],
