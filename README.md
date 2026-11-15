@@ -20,7 +20,7 @@ HK is an experimental general-purpose programming language implemented in Rust. 
 - Bounded parser/runtime nesting and function recursion
 - Explicit named imports and exports in HK 0.3.0
 - Isolated file-level module scopes, canonical relative-path resolution, dependency-first initialization, and cycle rejection
-- Initial standard-library module `std:math` in the 0.3.0 development branch
+- Initial standard-library module `std:math` in HK 0.3.0
 
 ## Gradual typing
 
