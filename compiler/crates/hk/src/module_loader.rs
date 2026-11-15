@@ -420,13 +420,8 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
                         .clone()
                 };
                 for name in names {
-                    runtime::link_module_import(
-                        environment,
-                        &target,
-                        &name.local,
-                        &name.imported,
-                    )
-                    .map_err(|message| {
+                    runtime::link_module_import(environment, &target, &name.local, &name.imported)
+                        .map_err(|message| {
                         module_error(
                             "E4003",
                             message,
@@ -457,4 +452,3 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
     }
     Ok(output)
 }
-
