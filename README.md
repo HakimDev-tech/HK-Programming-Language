@@ -110,7 +110,7 @@ hk run examples/modules/main.hk
 
 ## Runtime limits
 
-The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. The module loader caps dependency depth at 128 and reachable filesystem modules at 1,024 per run. Cyclic array references and cyclic module dependencies are rejected. These are interpreter constraints, not guarantees of an optimizing/native compiler.
+The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. The module loader caps dependency depth at 128, reachable modules at 1,024 per run, each module source at 1 MiB, and the aggregate module graph at 16 MiB. Cyclic array references and cyclic module dependencies are rejected. These are interpreter constraints, not guarantees of an optimizing/native compiler.
 
 ## Scope
 
