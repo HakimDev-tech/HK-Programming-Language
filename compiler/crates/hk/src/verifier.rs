@@ -652,7 +652,11 @@ mod tests {
             2,
         );
         let error = verify(program).unwrap_err();
-        assert!(error.message.contains("inconsistent operand-stack height"));
+        assert!(
+            error.message.contains("inconsistent operand-stack height"),
+            "unexpected verifier error: {}",
+            error
+        );
     }
 
     #[test]
