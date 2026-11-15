@@ -973,12 +973,14 @@ mod tests {
             1,
         );
         let mut program = program;
-        program.functions[0].local_slots.push(super::super::bytecode::LocalSlot {
-            internal_name: "\0slot0".to_owned(),
-            source_name: "x".to_owned(),
-            mutable: true,
-            contract: None,
-        });
+        program.functions[0]
+            .local_slots
+            .push(super::super::bytecode::LocalSlot {
+                internal_name: "\0slot0".to_owned(),
+                source_name: "x".to_owned(),
+                mutable: true,
+                contract: None,
+            });
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("not definitely initialized"));
     }
