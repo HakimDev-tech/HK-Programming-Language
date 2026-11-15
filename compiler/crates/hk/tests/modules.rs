@@ -124,6 +124,7 @@ fn import_aliases_are_read_only() {
     )
     .unwrap_err();
 
+    assert_eq!(error.code, "E4007");
     assert!(error.message.contains("imported binding"));
 }
 
@@ -165,6 +166,23 @@ fn missing_exports_are_link_errors() {
 
     assert_eq!(error.code, "E4003");
     assert!(error.message.contains("does not export"));
+}
+
+#[test]
+fn typed_modules_use_the_same_imported_binding_diagnostic() {
+    let error = run_project(
+        &[
+            ("values.hk", "export let value: number = 1;"),
+            (
+                "main.hk",
+                "import { value } from \"./values.hk\"; let check: number = 2; value = check;",
+            ),
+        ],
+        "main.hk",
+    )
+    .unwrap_err();
+
+    assert_eq!(error.code, "E4007");
 }
 
 #[test]
