@@ -303,38 +303,25 @@ fn canonical_paths_deduplicate_the_same_dependency() {
 
 #[test]
 fn module_preflight_rejects_builtin_shadowing_and_duplicate_top_level_names() {
-    let builtin = run_project(
-        &[("main.hk", "export const print = 1;")],
-        "main.hk",
-    )
-    .unwrap_err();
+    let builtin = run_project(&[("main.hk", "export const print = 1;")], "main.hk").unwrap_err();
     assert_eq!(builtin.code, "E4001");
 
-    let duplicate = run_project(
-        &[("main.hk", "let value = 1; const value = 2;")],
-        "main.hk",
-    )
-    .unwrap_err();
+    let duplicate =
+        run_project(&[("main.hk", "let value = 1; const value = 2;")], "main.hk").unwrap_err();
     assert_eq!(duplicate.code, "E4001");
 }
 
 #[test]
 fn unsupported_and_missing_filesystem_specifiers_are_rejected() {
     let unsupported = run_project(
-        &[(
-            "main.hk",
-            "import { value } from \"./values.txt\";",
-        )],
+        &[("main.hk", "import { value } from \"./values.txt\";")],
         "main.hk",
     )
     .unwrap_err();
     assert_eq!(unsupported.code, "E4002");
 
     let missing = run_project(
-        &[(
-            "main.hk",
-            "import { value } from \"./missing.hk\";",
-        )],
+        &[("main.hk", "import { value } from \"./missing.hk\";")],
         "main.hk",
     )
     .unwrap_err();
