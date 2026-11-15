@@ -1,4 +1,4 @@
-use super::ast::{Param, TypeName, E, S};
+use super::ast::{ImportName, Param, TypeName, E, S};
 use super::lexer::{Lit, Token, K};
 use super::{HkError, Result};
 use std::collections::HashSet;
@@ -9,6 +9,8 @@ pub(super) struct Parser {
     name: String,
     source_text: String,
     depth: usize,
+    module_header_open: bool,
+    block_depth: usize,
 }
 impl Parser {
     pub(super) fn new(t: Vec<Token>, name: &str, source_text: &str) -> Self {
@@ -18,12 +20,19 @@ impl Parser {
             name: name.into(),
             source_text: source_text.into(),
             depth: 0,
+            module_header_open: true,
+            block_depth: 0,
         }
     }
     pub(super) fn parse(&mut self) -> Result<Vec<S>> {
         let mut s = vec![];
         while !self.check(K::Eof) {
+            if self.check(K::Import) && !self.module_header_open {
+                return Err(self.error("Import declarations must appear before every non-import top-level declaration."));
+            }
+            let is_import = self.check(K::Import);
             s.push(self.decl()?);
+            if !is_import { self.module_header_open = false; }
         }
         Ok(s)
     }
@@ -31,6 +40,27 @@ impl Parser {
         self.with_depth(|p| p.decl_inner())
     }
     fn decl_inner(&mut self) -> Result<S> {
+        if self.take(K::Import) {
+            if self.block_depth != 0 || !self.module_header_open {
+                return Err(self.error("Import declarations are only allowed in the module header."));
+            }
+            return self.import_decl();
+        }
+        if self.take(K::Export) {
+            if self.block_depth != 0 {
+                return Err(self.error("Export declarations are only allowed at module top level."));
+            }
+            let declaration = if self.take(K::Let) {
+                self.var(true)?
+            } else if self.take(K::Const) {
+                self.var(false)?
+            } else if self.take(K::Fn) {
+                self.function()?
+            } else {
+                return Err(self.error("Export must precede a top-level variable or function declaration."));
+            };
+            return Ok(S::Export(Box::new(declaration)));
+        }
         if self.take(K::Let) {
             return self.var(true);
         }
@@ -41,6 +71,36 @@ impl Parser {
             return self.function();
         }
         self.stmt()
+    }
+    fn import_decl(&mut self) -> Result<S> {
+        let start = self.prev().clone();
+        self.expect(K::LBrace, "Expected '{' after import.")?;
+        let mut names = Vec::new();
+        let mut locals = HashSet::new();
+        if !self.check(K::RBrace) {
+            loop {
+                let imported = self.id("Expected imported name.")?;
+                let local = if self.take(K::As) {
+                    self.id("Expected local alias after 'as'")?
+                } else {
+                    imported.clone()
+                };
+                if !locals.insert(local.text.clone()) {
+                    return Err(HkError::new("E2001", format!("Duplicate imported local name '{}'.", local.text), &self.name, local.line, local.col, &self.source_text));
+                }
+                names.push(ImportName { imported: imported.text, local: local.text, line: local.line, column: local.col });
+                if !self.take(K::Comma) { break; }
+            }
+        }
+        self.expect(K::RBrace, "Expected '}' after imported names.")?;
+        self.expect(K::From, "Expected 'from' after imported names.")?;
+        let path = self.advance().clone();
+        let path = match path.literal {
+            Some(Lit::String(value)) if !value.trim().is_empty() => value,
+            _ => return Err(HkError::new("E2000", "Expected a non-empty string module specifier.", &self.name, path.line, path.col, &self.source_text)),
+        };
+        self.expect(K::Semi, "Expected ';' after import declaration.")?;
+        Ok(S::Import(path, names, start.line, start.col))
     }
     fn var(&mut self, m: bool) -> Result<S> {
         let n = self.id("Expected variable name.")?;
@@ -215,11 +275,14 @@ impl Parser {
         }
     }
     fn block_body(&mut self) -> Result<Vec<S>> {
+        self.block_depth += 1;
         let mut s = vec![];
         while !self.check(K::RBrace) && !self.check(K::Eof) {
             s.push(self.decl()?);
         }
-        self.expect(K::RBrace, "Expected '}' after block.")?;
+        let close = self.expect(K::RBrace, "Expected '}' after block.");
+        self.block_depth -= 1;
+        close?;
         Ok(s)
     }
     fn expr(&mut self) -> Result<E> {
