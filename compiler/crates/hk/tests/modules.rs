@@ -21,7 +21,7 @@ fn project(files: &[(&str, &str)], entry: &str) -> (PathBuf, PathBuf) {
     (root.clone(), root.join(entry))
 }
 
-fn run_project(files: &[(&str, &str)], entry: &str) -> hk::Result<Vec<String>> {
+fn run_project(files: &[(&str, &str)], entry: &str) -> std::result::Result<Vec<String>, hk::HkError> {
     let (root, path) = project(files, entry);
     let result = run_path(path);
     fs::remove_dir_all(root).unwrap();
