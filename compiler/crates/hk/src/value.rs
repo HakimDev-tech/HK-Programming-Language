@@ -123,7 +123,11 @@ pub(super) fn value_matches(expected: Type, value: &V) -> bool {
     }
 }
 
-pub(super) fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std::result::Result<(), String> {
+pub(super) fn ensure_contract(
+    expected: Type,
+    value: &V,
+    boundary: &str,
+) -> std::result::Result<(), String> {
     if value_matches(expected, value) {
         Ok(())
     } else {
@@ -141,7 +145,11 @@ pub(super) fn ensure_contract(expected: Type, value: &V, boundary: &str) -> std:
     }
 }
 
-pub(super) fn contains_array_reference(value: &V, target: usize, visited: &mut HashSet<usize>) -> bool {
+pub(super) fn contains_array_reference(
+    value: &V,
+    target: usize,
+    visited: &mut HashSet<usize>,
+) -> bool {
     let mut pending = vec![value.clone()];
     while let Some(current) = pending.pop() {
         if let V::Arr(array) = current {
