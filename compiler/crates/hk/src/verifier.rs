@@ -235,6 +235,7 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             if export.name.is_empty()
                 || !export_names.insert(export.name.as_str())
                 || export.slot as usize >= module.bindings.len()
+                || module.bindings[export.slot as usize].source_name != export.name
             {
                 return Err(VerifyError::program(format!(
                     "module {module_index} has invalid or duplicate exports"
@@ -288,7 +289,9 @@ fn verify_function_tables(
                 "parameter local slot is out of range",
             ));
         };
-        if !parameter_slots.insert(parameter.slot)
+        if parameter.name.is_empty()
+            || !slot.mutable
+            || !parameter_slots.insert(parameter.slot)
             || slot.source_name != parameter.name
             || slot.contract != parameter.annotation.map(Type::from)
         {
