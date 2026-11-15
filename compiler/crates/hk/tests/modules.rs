@@ -470,10 +470,7 @@ fn malformed_module_declarations_are_rejected_by_the_parser() {
 #[test]
 fn duplicate_export_names_are_rejected_before_execution() {
     let error = run_project(
-        &[(
-            "main.hk",
-            "export const value = 1; export let value = 2;",
-        )],
+        &[("main.hk", "export const value = 1; export let value = 2;")],
         "main.hk",
     )
     .unwrap_err();
