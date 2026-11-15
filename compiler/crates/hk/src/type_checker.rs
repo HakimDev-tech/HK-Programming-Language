@@ -98,7 +98,14 @@ impl<'a> TypeChecker<'a> {
         match statement {
             S::Import(_, names, _, _) => {
                 for name in names {
-                    self.define_binding(&name.local, Binding { ty: Type::Any, contract: None, mutable: false });
+                    self.define_binding(
+                        &name.local,
+                        Binding {
+                            ty: Type::Any,
+                            contract: None,
+                            mutable: false,
+                        },
+                    );
                 }
             }
             S::Export(declaration) => self.check_statement(declaration)?,
