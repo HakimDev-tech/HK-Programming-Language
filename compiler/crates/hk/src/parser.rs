@@ -135,8 +135,8 @@ impl Parser {
                     "E2000",
                     "Expected a non-empty string module specifier.",
                     &self.name,
-                    path.line,
-                    path.col,
+                    path_token.line,
+                    path_token.col,
                     &self.source_text,
                 ))
             }
