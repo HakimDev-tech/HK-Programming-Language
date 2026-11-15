@@ -1,3 +1,4 @@
+#![allow(dead_code)] // The compiler and VM will consume these definitions in subsequent milestones.
 //! In-memory bytecode representation for HK 0.4.x.
 //!
 //! This is an internal format, not a serialized or stable public ABI.
