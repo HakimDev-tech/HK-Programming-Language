@@ -222,7 +222,7 @@ The existing corpus is strong for V0.3 semantics but does not yet establish VM c
 
 The current verifier implementation adds explicit checks for:
 
-- bytecode major/minor version and unsupported required-feature bits;
+- bytecode major/minor version, compiler ABI version, and unsupported required-feature bits;
 - bounded constant, function, module, aggregate instruction, and aggregate module-binding tables;
 - valid entry-function identity and zero-argument entry contract;
 - source-file and function metadata, source-map indexes, primary and operand source positions, and one-based line/column validation;
