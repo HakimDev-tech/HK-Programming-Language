@@ -228,8 +228,8 @@ The current verifier implementation adds explicit checks for:
 - source-file and function metadata, source-map indexes, and one-based source positions;
 - constant kinds/indexes, property-name constants, function prototype indexes, and jump targets;
 - local-slot and parameter metadata consistency, duplicate internal slot identities, and parameter-slot bounds;
-- immutable local/module writes and local definite-initialization across control-flow merges;
-- imported binding slots being read through the import table, not redefined or accessed as ordinary module slots;
+- local definite-initialization across control-flow merges; mutability and imported-alias write failures remain runtime-enforced so unreachable invalid writes do not become eager verifier errors;
+- imported binding slots are read-only live aliases; verifier checks import/export metadata and disallows re-exporting imported aliases, while actual reads/writes/duplicate-definition behavior is enforced by the runtime environment;
 - dependency-first module ordering, initializer ownership/arity, import target export identity, read-only import slots, and export metadata;
 - operand-stack underflow, exact stack-height merges, scope-depth merges, scope underflow, return stack shape, and bounded operand-stack height.
 
