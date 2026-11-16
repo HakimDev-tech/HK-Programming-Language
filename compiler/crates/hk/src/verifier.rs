@@ -379,8 +379,9 @@ fn verify_function_tables(
                         "module binding opcode used by a source-only function",
                     ));
                 };
-                let Some(metadata) =
-                    program.modules[module_id as usize].bindings.get(slot as usize)
+                let Some(metadata) = program.modules[module_id as usize]
+                    .bindings
+                    .get(slot as usize)
                 else {
                     return Err(VerifyError::at(
                         function_index,
@@ -1136,7 +1137,9 @@ mod tests {
     #[test]
     fn rejects_assignment_to_immutable_local_slots() {
         let mut program = function(vec![Opcode::Null, Opcode::SetLocal(0), Opcode::Return], 1);
-        program.functions[0].local_slots.push(local_slot("const-slot", "constant", false));
+        program.functions[0]
+            .local_slots
+            .push(local_slot("const-slot", "constant", false));
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("immutable local slot"));
     }
@@ -1145,7 +1148,9 @@ mod tests {
     fn rejects_assignment_to_immutable_module_bindings() {
         let mut program = module_program(false);
         program.modules[0].bindings[0].mutable = false;
-        program.functions[1].code.insert(0, instruction(Opcode::SetModule(0)));
+        program.functions[1]
+            .code
+            .insert(0, instruction(Opcode::SetModule(0)));
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("immutable module binding"));
     }
