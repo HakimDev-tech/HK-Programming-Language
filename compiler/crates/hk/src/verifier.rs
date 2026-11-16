@@ -149,7 +149,11 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
     if program.entry_function as usize >= program.functions.len() {
         return Err(VerifyError::program("entry function index is out of range"));
     }
-    if program.source_files.iter().any(|source| source.name.is_empty()) {
+    if program
+        .source_files
+        .iter()
+        .any(|source| source.name.is_empty())
+    {
         return Err(VerifyError::program("source-file names must not be empty"));
     }
     let entry = &program.functions[program.entry_function as usize];
@@ -281,7 +285,11 @@ fn verify_function_tables(
     function: &FunctionProto,
 ) -> Result<(), VerifyError> {
     if function.name.is_empty() {
-        return Err(VerifyError::at(function_index, None, "function name must not be empty"));
+        return Err(VerifyError::at(
+            function_index,
+            None,
+            "function name must not be empty",
+        ));
     }
     if function.parameters.len() > MAX_CALL_ARGUMENTS as usize {
         return Err(VerifyError::at(
