@@ -987,12 +987,6 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                 contract: None,
             })
             .collect::<Vec<_>>();
-        let exports = (0..binding_count)
-            .map(|slot| ExportBinding {
-                name: format!("export{slot}"),
-                slot: slot as u16,
-            })
-            .collect::<Vec<_>>();
         let import_count = if module_index == 0 {
             0
         } else {
@@ -1021,6 +1015,17 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                 target_slot,
             });
         }
+        let exports = (0..binding_count)
+            .filter(|slot| {
+                !imports
+                    .iter()
+                    .any(|import| import.local_slot as usize == *slot)
+            })
+            .map(|slot| ExportBinding {
+                name: format!("export{slot}"),
+                slot: slot as u16,
+            })
+            .collect::<Vec<_>>();
         let initializer = functions.len() as u32;
         functions.push(FunctionProto {
             name: format!("fuzz-module-init-{module_index}"),
