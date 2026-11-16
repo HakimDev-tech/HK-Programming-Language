@@ -452,7 +452,12 @@ fn verify_function_tables(
                     .imports
                     .iter()
                     .any(|import| import.local_slot == slot);
-                if is_import && matches!(instruction.opcode, Opcode::DefineModule(_) | Opcode::GetModule(_)) {
+                if is_import
+                    && matches!(
+                        instruction.opcode,
+                        Opcode::DefineModule(_) | Opcode::GetModule(_)
+                    )
+                {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
