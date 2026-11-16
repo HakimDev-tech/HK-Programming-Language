@@ -68,7 +68,7 @@ The VM must never execute unverified bytecode. Verification happens after compil
 The in-memory program contains:
 - `BytecodeHeader`: bytecode format major/minor version, required feature bits, and compiler compatibility metadata;
 - `ConstantPool`: finite numbers, strings, and other immutable literal payloads;
-- `FunctionProto`: function identity/name, parameter metadata and contracts, local-slot count, maximum operand stack, code range, source-map range, and module identity;
+- `FunctionProto`: function identity/name, parameter-to-slot metadata, local-slot descriptors (internal/source name, mutability, optional contract), optional return contract, typed-function provenance, maximum operand stack, instruction vector, and module identity;
 - `InstructionStream`: compact opcode plus typed operands;
 - `ModuleTable`: module identity, initializer function, import links, export binding slots, and source identity;
 - `SourceMap`: instruction-offset to source identity, line, and column mappings;
@@ -163,7 +163,7 @@ The verifier is a mandatory security and correctness boundary, even though 0.4.0
 It must validate:
 1. Header version and required features.
 2. Opcode validity and operand encoding.
-3. Constant, function, module, binding, and source-map indexes.
+3. Constant, function, module, binding, and primary/operand source-map indexes.
 4. Jump targets are within the current function and land on instruction boundaries.
 5. Control-flow stack-height consistency at every merge point.
 6. No stack underflow on any reachable path.
@@ -176,7 +176,7 @@ It must validate:
 
 Verification uses a worklist over the control-flow graph and propagates abstract operand-stack heights plus definite-initialization state for local slots. Jump targets are instruction indexes in the in-memory instruction stream, never arbitrary byte offsets. If future opcodes require richer abstract state, the verifier must extend the abstract domain explicitly.
 
-The verifier must not trust compiler-supplied `max_stack`; it recomputes the maximum and rejects mismatches.
+The verifier must not trust compiler-supplied `max_stack`; it recomputes the maximum and rejects mismatches. It validates every primary and operand source location. Mutability, imported-alias write failures, and duplicate declaration behavior remain runtime semantics; rejecting such writes statically would change behavior for unreachable code.
 
 ## 9. Runtime values and environments
 
