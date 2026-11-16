@@ -1194,6 +1194,7 @@ mod tests {
         let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
         program.functions[0].local_slots.push(local_slot("slot", "x", true));
         program.functions[0].code = vec![
+            instruction(Opcode::Null),
             instruction(Opcode::DefineLocal(0)),
             instruction(Opcode::SetLocal(0)),
             instruction(Opcode::Null),
