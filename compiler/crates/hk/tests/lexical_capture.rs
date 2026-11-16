@@ -34,5 +34,8 @@ fn nested_named_function_does_not_extend_expired_environment_lifetime() {
 
     let error = run("expired-capture.hk", source).unwrap_err();
     assert_eq!(error.code, "E3000");
-    assert_eq!(error.message, "Function environment is no longer available.");
+    assert_eq!(
+        error.message,
+        "Function environment is no longer available."
+    );
 }
