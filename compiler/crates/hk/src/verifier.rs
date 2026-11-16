@@ -6,6 +6,7 @@ use super::types::Type;
 const SUPPORTED_MAJOR: u16 = 1;
 const SUPPORTED_MINOR: u16 = 0;
 const SUPPORTED_FEATURES: u64 = 0;
+const SUPPORTED_COMPILER_ABI: u32 = 1;
 const MAX_CONSTANTS: usize = 1_000_000;
 const MAX_FUNCTIONS: usize = 65_535;
 const MAX_MODULES: usize = 1_024;
@@ -122,6 +123,12 @@ fn verify_header(program: &BytecodeProgram) -> Result<(), VerifyError> {
         return Err(VerifyError::program(format!(
             "unsupported bytecode minor version {}",
             program.header.minor
+        )));
+    }
+    if program.header.compiler_abi != SUPPORTED_COMPILER_ABI {
+        return Err(VerifyError::program(format!(
+            "unsupported compiler ABI version {}",
+            program.header.compiler_abi
         )));
     }
     let unsupported = program.header.required_features & !SUPPORTED_FEATURES;
@@ -834,6 +841,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         },
         minor: u16::from(take_byte(input, &mut cursor) % 2),
         required_features: u64::from(take_byte(input, &mut cursor) & 1),
+        compiler_abi: u32::from(take_byte(input, &mut cursor) % 2),
     };
 
     let constant_count = (take_byte(input, &mut cursor) % 16) as usize;
@@ -1469,6 +1477,14 @@ mod tests {
         });
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("operand source-map metadata is invalid"));
+    }
+
+    #[test]
+    fn rejects_unsupported_compiler_abi_versions() {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.header.compiler_abi = 99;
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("unsupported compiler ABI version"));
     }
 
     #[test]
