@@ -225,7 +225,7 @@ The current verifier implementation adds explicit checks for:
 - bytecode major/minor version and unsupported required-feature bits;
 - bounded constant, function, module, aggregate instruction, and aggregate module-binding tables;
 - valid entry-function identity and zero-argument entry contract;
-- source-file and function metadata, source-map indexes, and one-based source positions;
+- source-file and function metadata, source-map indexes, primary and operand source positions, and one-based line/column validation;
 - constant kinds/indexes, property-name constants, function prototype indexes, and jump targets;
 - local-slot and parameter metadata consistency, duplicate internal slot identities, and parameter-slot bounds;
 - local definite-initialization across control-flow merges; mutability and imported-alias write failures remain runtime-enforced so unreachable invalid writes do not become eager verifier errors;
