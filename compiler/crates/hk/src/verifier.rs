@@ -1019,6 +1019,7 @@ mod tests {
                 Vec::new()
             } else {
                 vec![ImportBinding {
+                    imported_name: "x".to_owned(),
                     local_slot: 0,
                     target_module: 0,
                     target_slot: 0,
