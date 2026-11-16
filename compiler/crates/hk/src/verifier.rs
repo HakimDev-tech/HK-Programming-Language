@@ -146,9 +146,12 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             "module table exceeds the configured limit",
         ));
     }
-    let total_instructions = program.functions.iter().try_fold(0usize, |total, function| {
-        total.checked_add(function.code.len())
-    });
+    let total_instructions = program
+        .functions
+        .iter()
+        .try_fold(0usize, |total, function| {
+            total.checked_add(function.code.len())
+        });
     if total_instructions.is_none_or(|total| total > MAX_CODE_INSTRUCTIONS) {
         return Err(VerifyError::program(
             "aggregate bytecode instruction count exceeds the configured limit",
