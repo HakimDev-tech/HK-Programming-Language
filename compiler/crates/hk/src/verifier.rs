@@ -448,6 +448,17 @@ fn verify_function_tables(
                         "module binding slot is out of range",
                     ));
                 };
+                let is_import = program.modules[module_id as usize]
+                    .imports
+                    .iter()
+                    .any(|import| import.local_slot == slot);
+                if is_import && matches!(instruction.opcode, Opcode::DefineModule(_) | Opcode::GetModule(_)) {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "imported bindings must be accessed through the import table and cannot be defined",
+                    ));
+                }
                 if matches!(instruction.opcode, Opcode::SetModule(_)) && !metadata.mutable {
                     return Err(VerifyError::at(
                         function_index,
@@ -1245,6 +1256,32 @@ mod tests {
             .push(local_slot("const-slot", "constant", false));
         let error = verify(program).unwrap_err();
         assert!(error.message.contains("immutable local slot"));
+    }
+
+    #[test]
+    fn rejects_redefinition_of_imported_module_bindings() {
+        let mut program = module_program(false);
+        program.functions[2].code = vec![
+            instruction(Opcode::Null),
+            instruction(Opcode::DefineModule(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("cannot be defined"));
+    }
+
+    #[test]
+    fn rejects_direct_module_reads_of_import_alias_slots() {
+        let mut program = module_program(false);
+        program.functions[2].code = vec![
+            instruction(Opcode::GetModule(0)),
+            instruction(Opcode::Pop),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("accessed through the import table"));
     }
 
     #[test]
