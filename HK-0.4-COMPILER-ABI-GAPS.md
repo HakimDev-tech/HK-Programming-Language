@@ -6,16 +6,23 @@ that the compiler or VM is implemented.
 
 ## 1. Existing named functions require lexical capture
 
-The V0.3 interpreter stores a function's defining lexical environment in
-`Fun::env`. A function declared inside another function can therefore read and
-mutate bindings from its defining environment, and those bindings remain alive
-after the defining call returns.
+The V0.3 interpreter stores a function's defining lexical environment as a
+`Weak<RefCell<Env>>` in `Fun::env`. Nested named functions can resolve and
+mutate ancestor bindings while the defining environment is alive. The module
+loader separately keeps defining module environments alive for imported
+functions during one `run_path` execution.
+
+The VM must preserve those exact ownership and lifetime boundaries. In
+particular, it must not silently turn the V0.3 weak lexical-environment
+relationship into an indefinitely strong escaping-closure guarantee. A function
+whose defining environment has expired must retain the reference runtime's
+controlled `Function environment is no longer available` failure.
 
 The current bytecode model has `MakeFunction`, `GetLocal`, and `SetLocal`,
 but no explicit capture layout or upvalue access. A child function's local-slot
 indices cannot identify a slot in its parent frame. Treating captured variables
 as globals or copying their values would break shadowing, mutation, recursion,
-and lifetime semantics.
+and binding identity.
 
 This is not a request to add anonymous closures: it is a requirement to preserve
 existing named-function semantics.
@@ -30,13 +37,14 @@ Before compiling nested functions, add:
 - `UpvalueDescriptor` entries that distinguish capture from an enclosing local
   slot versus forwarding an enclosing upvalue;
 - `GetUpvalue(u16)` and `SetUpvalue(u16)` opcodes;
-- closure construction semantics for `MakeFunction` that capture shared binding
-  cells, not copied values.
+- closure construction semantics for `MakeFunction` that reference shared
+  binding cells with ownership/lifetime matching V0.3, not copied values.
 
 A binding cell must preserve mutability and any runtime type contract. Capturing
 the same binding more than once must preserve identity. Recursive local named
-functions must capture their own predeclared cell. Transitive captures must be
-forwarded through intermediate functions.
+functions must resolve their own predeclared cell. Transitive captures must be
+forwarded through intermediate functions. The capture representation must not
+keep a lexical environment alive longer than V0.3 does.
 
 ### Verifier obligations
 
@@ -95,4 +103,5 @@ M3 is not complete until compiler tests cover every AST variant, nested scopes,
 shadowing, recursion, captured mutable/immutable bindings, typed captures,
 short-circuiting, arrays/indexing/properties, source locations, and malformed
 program rejection. M4 is not complete until these programs execute in the VM and
-match the reference interpreter's values, output, and diagnostic boundaries.
+match the reference interpreter's values, output, diagnostic boundaries, and
+environment-lifetime behavior.
