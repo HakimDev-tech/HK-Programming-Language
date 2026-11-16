@@ -551,6 +551,9 @@ fn verify_control_flow(
                 next.stack_height += 1;
             }
             Opcode::SetLocal(slot) => {
+                if next.stack_height < 1 {
+                    return Err(underflow(1));
+                }
                 if !next.initialized_locals[slot as usize] {
                     return Err(VerifyError::at(
                         function_index,
@@ -1184,6 +1187,32 @@ mod tests {
         assert!(error
             .message
             .contains("dependencies must precede their importer"));
+    }
+
+    #[test]
+    fn rejects_local_assignment_stack_underflow() {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.functions[0].local_slots.push(local_slot("slot", "x", true));
+        program.functions[0].code = vec![
+            instruction(Opcode::DefineLocal(0)),
+            instruction(Opcode::SetLocal(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("underflow"));
+    }
+
+    #[test]
+    fn rejects_module_assignment_stack_underflow() {
+        let mut program = module_program(false);
+        program.functions[1].code = vec![
+            instruction(Opcode::SetModule(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("underflow"));
     }
 
     #[test]
