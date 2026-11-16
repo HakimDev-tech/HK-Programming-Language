@@ -804,7 +804,10 @@ fn merge_state(
 
 #[cfg(feature = "fuzzing")]
 pub(super) fn fuzz_verify(input: &[u8]) {
-    use super::bytecode::{BytecodeHeader, FunctionProto, Instruction, SourceFile, SourceLocation};
+    use super::bytecode::{
+        BytecodeHeader, ExportBinding, FunctionProto, ImportBinding, Instruction, LocalSlot,
+        ModuleProto, SourceFile, SourceLocation,
+    };
 
     fn take_byte(input: &[u8], cursor: &mut usize) -> u8 {
         let value = input.get(*cursor).copied().unwrap_or(0);
@@ -840,9 +843,9 @@ pub(super) fn fuzz_verify(input: &[u8]) {
 
     let mut cursor = 0usize;
     let header = BytecodeHeader {
-        major: take_u16(input, &mut cursor),
-        minor: take_u16(input, &mut cursor),
-        required_features: take_u64(input, &mut cursor),
+        major: if take_byte(input, &mut cursor) & 3 == 0 { 0 } else { 1 },
+        minor: u16::from(take_byte(input, &mut cursor) % 2),
+        required_features: u64::from(take_byte(input, &mut cursor) & 1),
     };
 
     let constant_count = (take_byte(input, &mut cursor) % 16) as usize;
@@ -938,23 +941,123 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         });
     }
 
+    let entry = FunctionProto {
+        name: "entry".to_owned(),
+        module_id: None,
+        parameters: Vec::new(),
+        local_slots: Vec::new(),
+        return_contract: None,
+        typed: false,
+        max_stack: u32::from(take_byte(input, &mut cursor) % 64),
+        code,
+    };
+    let auxiliary = FunctionProto {
+        name: "fuzz-function".to_owned(),
+        module_id: None,
+        parameters,
+        local_slots,
+        return_contract: None,
+        typed: false,
+        max_stack: 1,
+        code: vec![
+            Instruction {
+                opcode: Opcode::Null,
+                source: SourceLocation { source_id: 0, line: 1, column: 1 },
+            },
+            Instruction {
+                opcode: Opcode::Return,
+                source: SourceLocation { source_id: 0, line: 1, column: 1 },
+            },
+        ],
+    };
+    let mut functions = vec![entry, auxiliary];
+    let module_count = (take_byte(input, &mut cursor) % 4) as usize;
+    let mut modules = Vec::with_capacity(module_count);
+    let mut prior_binding_counts = Vec::with_capacity(module_count);
+
+    for module_index in 0..module_count {
+        let binding_count = (take_byte(input, &mut cursor) % 4) as usize;
+        let mut bindings = (0..binding_count)
+            .map(|slot| LocalSlot {
+                internal_name: format!("\\0fuzz:module{module_index}:slot{slot}"),
+                source_name: format!("export{slot}"),
+                mutable: true,
+                contract: None,
+            })
+            .collect::<Vec<_>>();
+        let exports = (0..binding_count)
+            .map(|slot| ExportBinding {
+                name: format!("export{slot}"),
+                slot: slot as u16,
+            })
+            .collect::<Vec<_>>();
+        let import_count = if module_index == 0 {
+            0
+        } else {
+            (take_byte(input, &mut cursor) % 4) as usize
+        };
+        let mut imports = Vec::with_capacity(import_count);
+        for _ in 0..import_count {
+            let local_slot = if binding_count == 0 {
+                take_byte(input, &mut cursor) as u16
+            } else {
+                u16::from(take_byte(input, &mut cursor)) % binding_count as u16
+            };
+            let target_module = if module_count == 0 {
+                0
+            } else {
+                u32::from(take_byte(input, &mut cursor)) % module_count as u32
+            };
+            let target_slot = u16::from(take_byte(input, &mut cursor) % 4);
+            if let Some(binding) = bindings.get_mut(local_slot as usize) {
+                binding.mutable = false;
+            }
+            imports.push(ImportBinding {
+                imported_name: format!("export{target_slot}"),
+                local_slot,
+                target_module,
+                target_slot,
+            });
+        }
+        let initializer = functions.len() as u32;
+        functions.push(FunctionProto {
+            name: format!("fuzz-module-init-{module_index}"),
+            module_id: Some(module_index as u32),
+            parameters: Vec::new(),
+            local_slots: Vec::new(),
+            return_contract: None,
+            typed: false,
+            max_stack: 1,
+            code: vec![
+                Instruction {
+                    opcode: Opcode::Null,
+                    source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                },
+                Instruction {
+                    opcode: Opcode::Return,
+                    source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                },
+            ],
+        });
+        prior_binding_counts.push(binding_count);
+        modules.push(ModuleProto {
+            name: format!("fuzz-module-{module_index}.hk"),
+            initializer,
+            bindings,
+            imports,
+            exports,
+        });
+    }
+
+    let _ = prior_binding_counts;
     let program = BytecodeProgram {
         header,
         constants,
         source_files: vec![SourceFile {
             name: "<fuzz-bytecode>".to_owned(),
         }],
-        functions: vec![FunctionProto {
-            name: "fuzz".to_owned(),
-            module_id: None,
-            parameters,
-            local_slots,
-            return_contract: None,
-            typed: false,
-            max_stack: u32::from(take_byte(input, &mut cursor) % 64),
-            code,
-        }],
-        modules: Vec::new(),
+        functions,
+        modules,
         entry_function: 0,
     };
     let _ = verify(program);
