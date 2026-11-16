@@ -928,16 +928,16 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
         };
         let source = SourceLocation {
-            source_id: 0,
-            line: u32::from(take_byte(input, &mut cursor)) + 1,
-            column: u32::from(take_byte(input, &mut cursor)) + 1,
+            source_id: u32::from(take_byte(input, &mut cursor) % 2),
+            line: u32::from(take_byte(input, &mut cursor)),
+            column: u32::from(take_byte(input, &mut cursor)),
         };
         let operand_count = (take_byte(input, &mut cursor) % 4) as usize;
         let operands = (0..operand_count)
             .map(|_| SourceLocation {
-                source_id: 0,
-                line: u32::from(take_byte(input, &mut cursor)) + 1,
-                column: u32::from(take_byte(input, &mut cursor)) + 1,
+                source_id: u32::from(take_byte(input, &mut cursor) % 2),
+                line: u32::from(take_byte(input, &mut cursor)),
+                column: u32::from(take_byte(input, &mut cursor)),
             })
             .collect();
         code.push(Instruction {
@@ -1465,6 +1465,14 @@ mod tests {
             instruction(Opcode::Return),
         ];
         verify(program).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_primary_source_map_entries() {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.functions[0].code[0].source.line = 0;
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("source positions must be one-based"));
     }
 
     #[test]
