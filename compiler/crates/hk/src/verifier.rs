@@ -1290,6 +1290,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_assignment_to_imported_alias_slots() {
+        let mut program = module_program(false);
+        program.functions[2].code = vec![
+            instruction(Opcode::Null),
+            instruction(Opcode::SetModule(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("immutable module binding"));
+    }
+
+    #[test]
     fn rejects_assignment_to_immutable_module_bindings() {
         let mut program = module_program(false);
         program.modules[0].bindings[0].mutable = false;
