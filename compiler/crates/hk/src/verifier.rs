@@ -1484,7 +1484,9 @@ mod tests {
             column: 1,
         });
         let error = verify(program).unwrap_err();
-        assert!(error.message.contains("operand source-map metadata is invalid"));
+        assert!(error
+            .message
+            .contains("operand source-map metadata is invalid"));
     }
 
     #[test]
