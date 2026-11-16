@@ -977,7 +977,11 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             },
             Instruction {
                 opcode: Opcode::Return,
-                source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                source: SourceLocation {
+                    source_id: 0,
+                    line: 1,
+                    column: 1,
+                },
             },
         ],
     };
@@ -1046,11 +1050,19 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             code: vec![
                 Instruction {
                     opcode: Opcode::Null,
-                    source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                    source: SourceLocation {
+                        source_id: 0,
+                        line: 1,
+                        column: 1,
+                    },
                 },
                 Instruction {
                     opcode: Opcode::Return,
-                    source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                    source: SourceLocation {
+                        source_id: 0,
+                        line: 1,
+                        column: 1,
+                    },
                 },
             ],
         });
