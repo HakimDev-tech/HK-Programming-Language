@@ -227,10 +227,12 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             )));
         }
         let mut internal_names = std::collections::HashSet::new();
+        let mut source_names = std::collections::HashSet::new();
         for binding in &module.bindings {
             if binding.internal_name.is_empty()
                 || binding.source_name.is_empty()
                 || !internal_names.insert(binding.internal_name.as_str())
+                || !source_names.insert(binding.source_name.as_str())
             {
                 return Err(VerifyError::program(format!(
                     "module {module_index} has invalid binding metadata"
@@ -288,6 +290,7 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                 || !export_names.insert(export.name.as_str())
                 || export.slot as usize >= module.bindings.len()
                 || module.bindings[export.slot as usize].source_name != export.name
+                || import_slots.contains(&export.slot)
             {
                 return Err(VerifyError::program(format!(
                     "module {module_index} has invalid or duplicate exports"
