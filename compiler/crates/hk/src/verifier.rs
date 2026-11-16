@@ -905,7 +905,6 @@ mod tests {
             entry_function: 0,
         }
     }
-
     fn local_slot(internal_name: &str, source_name: &str, mutable: bool) -> LocalSlot {
         LocalSlot {
             internal_name: internal_name.to_owned(),
@@ -1105,7 +1104,6 @@ mod tests {
             error
         );
     }
-
     #[test]
     fn accepts_dependency_first_module_binding_and_import_metadata() {
         verify(module_program(false)).unwrap();
