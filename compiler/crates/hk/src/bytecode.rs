@@ -117,6 +117,7 @@ pub(super) struct FunctionProto {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ImportBinding {
+    pub(super) imported_name: String,
     pub(super) local_slot: u16,
     pub(super) target_module: u32,
     pub(super) target_slot: u16,
