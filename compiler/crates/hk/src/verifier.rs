@@ -146,6 +146,22 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             "module table exceeds the configured limit",
         ));
     }
+    let total_instructions = program.functions.iter().try_fold(0usize, |total, function| {
+        total.checked_add(function.code.len())
+    });
+    if total_instructions.is_none_or(|total| total > MAX_CODE_INSTRUCTIONS) {
+        return Err(VerifyError::program(
+            "aggregate bytecode instruction count exceeds the configured limit",
+        ));
+    }
+    let total_bindings = program.modules.iter().try_fold(0usize, |total, module| {
+        total.checked_add(module.bindings.len())
+    });
+    if total_bindings.is_none_or(|total| total > MAX_CONSTANTS) {
+        return Err(VerifyError::program(
+            "aggregate module binding count exceeds the configured limit",
+        ));
+    }
     if program.entry_function as usize >= program.functions.len() {
         return Err(VerifyError::program("entry function index is out of range"));
     }
