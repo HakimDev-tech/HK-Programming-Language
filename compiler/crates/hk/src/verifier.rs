@@ -1310,6 +1310,27 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_top_level_module_binding_names() {
+        let mut program = module_program(false);
+        program.modules[0]
+            .bindings
+            .push(local_slot("another-internal-id", "x", true));
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("invalid binding metadata"));
+    }
+
+    #[test]
+    fn rejects_re_exporting_an_imported_alias() {
+        let mut program = module_program(false);
+        program.modules[1].exports.push(ExportBinding {
+            name: "x".to_owned(),
+            slot: 0,
+        });
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("invalid or duplicate exports"));
+    }
+
+    #[test]
     fn rejects_imports_that_target_private_bindings() {
         let mut program = module_program(false);
         program.modules[1].imports[0].imported_name = "private".to_owned();
