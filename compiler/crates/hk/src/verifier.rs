@@ -1154,6 +1154,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_imports_that_target_private_bindings() {
+        let mut program = module_program(false);
+        program.modules[1].imports[0].imported_name = "private".to_owned();
+        let error = verify(program).unwrap_err();
+        assert!(error
+            .message
+            .contains("does not reference a declared target export"));
+    }
+
+    #[test]
     fn rejects_modules_that_are_not_ordered_dependency_first() {
         let error = verify(module_program(true)).unwrap_err();
         assert!(error
