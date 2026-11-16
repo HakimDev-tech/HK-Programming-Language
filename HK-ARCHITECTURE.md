@@ -1,6 +1,6 @@
 # HK Architecture
 
-## Current baseline: HK 0.2.0
+## Current baseline: HK 0.3.0
 
 HK is a Rust modular monolith in one Cargo package. The interpreter and gradual-typing implementation are separated into focused modules:
 
@@ -11,7 +11,7 @@ HK is a Rust modular monolith in one Cargo package. The interpreter and gradual-
 | `parser.rs` | Parsing declarations, control flow, expressions, imports, and exports |
 | `types.rs` | Source-level type representation and compatibility relation |
 | `type_checker.rs` | Lexical type scopes, static expression checks, function signatures, and return-path analysis |
-| `runtime.rs` | Tree-walking execution, lexical environments, contracts, import aliases, and native math functions |
+| `runtime.rs` | Reference tree-walking execution, lexical environments, contracts, import aliases, and native math functions |
 | `module_loader.rs` | Filesystem resolution, graph discovery, import/export linking, cycle validation, and dependency-first execution |
 | `diagnostics.rs` | Structured diagnostics with source excerpts and caret positions |
 | `lib.rs` | Public source and filesystem execution APIs |
@@ -21,19 +21,13 @@ The crate remains intentionally unified. Splitting it into multiple crates is de
 
 ## Execution pipelines
 
-### Single-source API (`hk::run`)
+### Current execution baseline (HK 0.3.0)
 
 ~~~text
-UTF-8 source
-  -> Lexer
-  -> Parser
-  -> AST
-  -> Type Checker (when annotations are present)
-  -> Tree-walking Runtime
-  -> output
+UTF-8 source -> Lexer -> Parser -> AST -> Type Checker (when annotated) -> Tree-walking Runtime -> output
 ~~~
 
-### Filesystem API (`hk::run_path`)
+### Filesystem API (`hk::run_path`, HK 0.3.0)
 
 ~~~text
 Entry path
@@ -102,6 +96,10 @@ The interpreter propagates return control flow explicitly. Parser/runtime depth 
 - Do not execute module bodies during graph discovery or link validation.
 - Do not claim bytecode, optimization, native compilation, or performance characteristics that are not implemented and benchmarked.
 
-## Deferred architecture
+## Proposed HK 0.4.0 architecture
 
-HIR/MIR, bytecode, optimizer, VM, LLVM/native backend, WASM, package manager, LSP, formatter, debugger, concurrency primitives, and C/C++ FFI are future work. They are not prerequisites for 0.3.0.
+The design baseline is [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md), with milestones and release gates in [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md). This is a proposal only; no bytecode compiler or VM implementation is part of the current `main` baseline.
+
+The proposed pipeline is source -> lexer -> parser -> AST -> gradual type checker -> AST-to-bytecode compiler -> mandatory bytecode verifier -> versioned in-memory bytecode program -> stack VM. The tree-walking runtime remains the reference engine during migration and differential validation. The public `hk::run` and `hk::run_path` signatures are preserved; they switch to VM execution only after all semantic and quality gates pass.
+
+The bytecode is versioned in memory but is not a stable serialized artifact in 0.4.0. Persistent bytecode files, external bytecode loading, JIT, native compilation, WASM, and FFI remain deferred.

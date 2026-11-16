@@ -1,8 +1,8 @@
 # HK Programming Language
 
-HK is an experimental general-purpose programming language implemented in Rust. It provides a tree-walking interpreter with gradual typing and a file-based module system.
+HK is an experimental general-purpose programming language implemented in Rust. HK 0.3.0 provides a tree-walking interpreter with gradual typing and a file-based module system.
 
-> **Status:** HK 0.2.0 and HK 0.3.0 are integrated into `main`. HK 0.3.0 is validated and merged by commit `644cee85f839764b146c024ab04972861bd677fe`; the Git tag and GitHub Release are the remaining publication steps. HK remains an interpreter, not an optimizing or native compiler.
+> **Status:** HK 0.3.0 is integrated into `main` by commit `644cee85f839764b146c024ab04972861bd677fe`. Its Git tag and GitHub Release remain unpublished. HK 0.4.0 is currently a design proposal; the shipped engine remains tree-walking.
 
 ## Language capabilities
 
@@ -104,6 +104,8 @@ hk run examples/modules/main.hk
 - [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implementation architecture
 - [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md) — 0.2.0 finalization
 - [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) — 0.3.0 implementation and release gates
+- [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md) — proposed 0.4.0 bytecode and VM specification
+- [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md) — proposed 0.4.0 implementation milestones and release gates
 - [ROADMAP.md](ROADMAP.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [examples/](examples/)
@@ -114,7 +116,7 @@ The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression 
 
 ## Scope
 
-HK 0.3.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, bytecode, native compilation, WebAssembly, concurrency, or native FFI. Imported names are statically treated as `any` in this release; runtime contracts on exported values and functions remain authoritative.
+HK 0.3.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, bytecode, native compilation, WebAssembly, concurrency, or native FFI. The proposed V0.4 design is not implemented and does not change the current runtime. Imported names are statically treated as `any` in this release; runtime contracts on exported values and functions remain authoritative.
 
 ## License
 
