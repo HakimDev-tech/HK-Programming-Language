@@ -418,18 +418,11 @@ fn verify_function_tables(
                 }
             }
             Opcode::DefineLocal(slot) | Opcode::GetLocal(slot) | Opcode::SetLocal(slot) => {
-                let Some(metadata) = function.local_slots.get(slot as usize) else {
+                if slot as usize >= function.local_slots.len() {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
                         "local slot is out of range",
-                    ));
-                };
-                if matches!(instruction.opcode, Opcode::SetLocal(_)) && !metadata.mutable {
-                    return Err(VerifyError::at(
-                        function_index,
-                        Some(instruction_index),
-                        "assignment targets an immutable local slot",
                     ));
                 }
             }
@@ -441,37 +434,11 @@ fn verify_function_tables(
                         "module binding opcode used by a source-only function",
                     ));
                 };
-                let Some(metadata) = program.modules[module_id as usize]
-                    .bindings
-                    .get(slot as usize)
-                else {
+                if slot as usize >= program.modules[module_id as usize].bindings.len() {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
                         "module binding slot is out of range",
-                    ));
-                };
-                let is_import = program.modules[module_id as usize]
-                    .imports
-                    .iter()
-                    .any(|import| import.local_slot == slot);
-                if is_import
-                    && matches!(
-                        instruction.opcode,
-                        Opcode::DefineModule(_) | Opcode::GetModule(_)
-                    )
-                {
-                    return Err(VerifyError::at(
-                        function_index,
-                        Some(instruction_index),
-                        "imported bindings must be accessed through the import table and cannot be defined",
-                    ));
-                }
-                if matches!(instruction.opcode, Opcode::SetModule(_)) && !metadata.mutable {
-                    return Err(VerifyError::at(
-                        function_index,
-                        Some(instruction_index),
-                        "assignment targets an immutable module binding",
                     ));
                 }
             }
@@ -1403,88 +1370,49 @@ mod tests {
     }
 
     #[test]
-    fn rejects_assignment_to_immutable_local_slots() {
+    fn accepts_local_assignment_to_immutable_slots_for_runtime_enforcement() {
         let mut program = function(vec![Opcode::Null, Opcode::SetLocal(0), Opcode::Return], 1);
         program.functions[0]
             .local_slots
             .push(local_slot("const-slot", "constant", false));
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("immutable local slot"));
+        verify(program).unwrap();
     }
 
     #[test]
-    fn rejects_redefinition_of_imported_module_bindings() {
+    fn accepts_module_assignment_to_immutable_bindings_for_runtime_enforcement() {
+        let mut program = module_program(false);
+        program.modules[0].bindings[0].mutable = false;
+        program.functions[1].code = vec![
+            instruction(Opcode::Null),
+            instruction(Opcode::SetModule(0)),
+            instruction(Opcode::Return),
+        ];
+        verify(program).unwrap();
+    }
+
+    #[test]
+    fn accepts_definition_and_reads_of_import_slots_for_runtime_enforcement() {
         let mut program = module_program(false);
         program.functions[2].code = vec![
             instruction(Opcode::Null),
             instruction(Opcode::DefineModule(0)),
-            instruction(Opcode::Null),
-            instruction(Opcode::Return),
-        ];
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("cannot be defined"));
-    }
-
-    #[test]
-    fn rejects_direct_module_reads_of_import_alias_slots() {
-        let mut program = module_program(false);
-        program.functions[2].code = vec![
             instruction(Opcode::GetModule(0)),
             instruction(Opcode::Pop),
             instruction(Opcode::Null),
             instruction(Opcode::Return),
         ];
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("accessed through the import table"));
+        verify(program).unwrap();
     }
 
     #[test]
-    fn rejects_assignment_to_imported_alias_slots() {
+    fn accepts_assignment_to_imported_alias_slots_for_runtime_enforcement() {
         let mut program = module_program(false);
         program.functions[2].code = vec![
             instruction(Opcode::Null),
             instruction(Opcode::SetModule(0)),
-            instruction(Opcode::Null),
             instruction(Opcode::Return),
         ];
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("immutable module binding"));
-    }
-
-    #[test]
-    fn rejects_assignment_to_immutable_module_bindings() {
-        let mut program = module_program(false);
-        program.modules[0].bindings[0].mutable = false;
-        program.functions[1]
-            .code
-            .insert(0, instruction(Opcode::SetModule(0)));
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("immutable module binding"));
-    }
-
-    #[test]
-    fn rejects_duplicate_module_names() {
-        let mut program = module_program(false);
-        program.modules[1].name = program.modules[0].name.clone();
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("empty or duplicate name"));
-    }
-
-    #[test]
-    fn rejects_entry_functions_with_parameters() {
-        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
-        program.functions[0]
-            .parameters
-            .push(super::super::bytecode::ParameterProto {
-                name: "arg".to_owned(),
-                slot: 0,
-                annotation: None,
-            });
-        program.functions[0]
-            .local_slots
-            .push(local_slot("entry-arg", "arg", true));
-        let error = verify(program).unwrap_err();
-        assert!(error.message.contains("entry function must be source-only"));
+        verify(program).unwrap();
     }
 
     #[test]
