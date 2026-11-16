@@ -175,7 +175,13 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             ));
         }
     }
+    let mut module_names = std::collections::HashSet::new();
     for (module_index, module) in program.modules.iter().enumerate() {
+        if module.name.is_empty() || !module_names.insert(module.name.as_str()) {
+            return Err(VerifyError::program(format!(
+                "module {module_index} has an empty or duplicate name"
+            )));
+        }
         if module.initializer as usize >= program.functions.len() {
             return Err(VerifyError::program(format!(
                 "module {module_index} initializer index is out of range"
