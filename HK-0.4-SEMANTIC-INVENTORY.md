@@ -160,7 +160,7 @@ This inventory is not sufficient by itself to prove bytecode conformance. M0/M6 
 M0 is complete only when:
 - [x] Every current AST variant is enumerated.
 - [x] Runtime value, binding, evaluation, operation, and module semantics are documented.
-- [ ] Existing tests are mapped to named semantic cases (not merely inferred from file presence).
+- [x] Existing tests are mapped to named semantic cases (not merely inferred from file presence).
 - [ ] Missing differential regressions are added before VM rollout.
 - [ ] VM-specific resource ceilings are selected from measured stress tests.
 - [ ] The exact baseline commit and CI status are recorded with reproducible links.
@@ -216,3 +216,21 @@ The existing corpus is strong for V0.3 semantics but does not yet establish VM c
 - CI status must be checked on the exact head commit after the relevant GitHub Actions run completes; empty status arrays are not evidence of success.
 
 **M0 status remains open.** The named regression mapping is now recorded, but missing differential tests and measured VM limits have not been implemented.
+
+
+## 11. M2 verifier invariants implemented on the feature branch
+
+The current verifier implementation adds explicit checks for:
+
+- bytecode major/minor version and unsupported required-feature bits;
+- bounded constant, function, module, aggregate instruction, and aggregate module-binding tables;
+- valid entry-function identity and zero-argument entry contract;
+- source-file and function metadata, source-map indexes, and one-based source positions;
+- constant kinds/indexes, property-name constants, function prototype indexes, and jump targets;
+- local-slot and parameter metadata consistency, duplicate internal slot identities, and parameter-slot bounds;
+- immutable local/module writes and local definite-initialization across control-flow merges;
+- imported binding slots being read through the import table, not redefined or accessed as ordinary module slots;
+- dependency-first module ordering, initializer ownership/arity, import target export identity, read-only import slots, and export metadata;
+- operand-stack underflow, exact stack-height merges, scope-depth merges, scope underflow, return stack shape, and bounded operand-stack height.
+
+Regression tests cover these invariants. A fuzz target decodes bounded arbitrary byte sequences into malformed bytecode programs and invokes the verifier. This is still a verifier foundation: it does not prove compiler correctness or VM execution conformance, and no VM is currently available to consume verified programs.
