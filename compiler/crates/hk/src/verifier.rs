@@ -1208,6 +1208,29 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_module_names() {
+        let mut program = module_program(false);
+        program.modules[1].name = program.modules[0].name.clone();
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("empty or duplicate name"));
+    }
+
+    #[test]
+    fn rejects_entry_functions_with_parameters() {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.functions[0].parameters.push(super::super::bytecode::ParameterProto {
+            name: "arg".to_owned(),
+            slot: 0,
+            annotation: None,
+        });
+        program.functions[0]
+            .local_slots
+            .push(local_slot("entry-arg", "arg", true));
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("entry function must be source-only"));
+    }
+
+    #[test]
     fn rejects_non_finite_constants() {
         let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
         program.constants[0] = Constant::Number(f64::INFINITY);
