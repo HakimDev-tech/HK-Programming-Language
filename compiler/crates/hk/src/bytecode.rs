@@ -18,7 +18,7 @@ impl Default for BytecodeHeader {
             major: 1,
             minor: 0,
             required_features: 0,
-            compiler_abi: 1,
+            compiler_abi: 2,
         }
     }
 }
@@ -47,6 +47,8 @@ pub(super) enum Opcode {
     DefineLocal(u16),
     GetLocal(u16),
     SetLocal(u16),
+    GetUpvalue(u16),
+    SetUpvalue(u16),
     DefineModule(u16),
     GetModule(u16),
     SetModule(u16),
@@ -108,12 +110,29 @@ pub(super) struct ParameterProto {
     pub(super) annotation: Option<TypeName>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) enum UpvalueSource {
+    EnclosingLocal(u16),
+    EnclosingUpvalue(u16),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct UpvalueDescriptor {
+    pub(super) source: UpvalueSource,
+    pub(super) mutable: bool,
+    pub(super) contract: Option<Type>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FunctionProto {
     pub(super) name: String,
     pub(super) module_id: Option<u32>,
     pub(super) parameters: Vec<ParameterProto>,
     pub(super) local_slots: Vec<LocalSlot>,
+    /// Lexical parent prototype; absent only for module initializers and entry functions.
+    pub(super) enclosing_function: Option<u32>,
+    /// Captured lexical bindings, indexed by GetUpvalue/SetUpvalue.
+    pub(super) upvalues: Vec<UpvalueDescriptor>,
     pub(super) return_contract: Option<Type>,
     pub(super) typed: bool,
     /// Must equal the maximum reachable operand-stack height recomputed by the verifier.
@@ -167,6 +186,8 @@ impl BytecodeProgram {
                 module_id: None,
                 parameters: Vec::new(),
                 local_slots: Vec::new(),
+                enclosing_function: None,
+                upvalues: Vec::new(),
                 return_contract: None,
                 typed: false,
                 max_stack: 0,

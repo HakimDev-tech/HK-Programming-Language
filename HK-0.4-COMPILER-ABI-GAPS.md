@@ -1,107 +1,82 @@
-# HK 0.4.x — Compiler ABI gaps that must be resolved before M3
+# HK 0.4.x — Compiler ABI gaps and lexical-capture contract
 
-Status: engineering addendum, derived from the existing AST, semantic inventory,
-bytecode model, verifier, and reference interpreter. This document does not claim
-that the compiler or VM is implemented.
+Status: the bytecode representation and verifier now contain the lexical-capture
+foundation on feat/hk-v0.4.0-bytecode-vm. The AST compiler and VM do not yet
+exist. This document records the constraints the compiler and VM must implement;
+it is not a claim that closure execution is already available.
 
-## 1. Existing named functions require lexical capture
+## 1. V0.3 lexical-environment contract
 
 The V0.3 interpreter stores a function's defining lexical environment as a
-`Weak<RefCell<Env>>` in `Fun::env`. Nested named functions can resolve and
-mutate ancestor bindings while the defining environment is alive. The module
-loader separately keeps defining module environments alive for imported
-functions during one `run_path` execution.
+Weak<RefCell<Env>> in Fun::env. Nested named functions can resolve and mutate
+ancestor bindings while the defining environment is alive. The module loader
+separately keeps defining module environments alive for imported functions
+during one run_path execution.
 
-The VM must preserve those exact ownership and lifetime boundaries. In
-particular, it must not silently turn the V0.3 weak lexical-environment
-relationship into an indefinitely strong escaping-closure guarantee. A function
-whose defining environment has expired must retain the reference runtime's
-controlled `Function environment is no longer available` failure.
+The VM must preserve those ownership and lifetime boundaries. It must not turn
+the V0.3 weak lexical-environment relationship into an indefinitely strong
+escaping-closure guarantee. A function whose defining environment has expired
+must retain the reference runtime's controlled
+Function environment is no longer available failure.
 
-The current bytecode model has `MakeFunction`, `GetLocal`, and `SetLocal`,
-but no explicit capture layout or upvalue access. A child function's local-slot
-indices cannot identify a slot in its parent frame. Treating captured variables
-as globals or copying their values would break shadowing, mutation, recursion,
-and binding identity.
+## 2. Bytecode ABI now present in this branch
 
-This is not a request to add anonymous closures: it is a requirement to preserve
-existing named-function semantics.
+FunctionProto now contains:
+- enclosing_function: Option<u32> — lexical parent prototype, absent for roots;
+- upvalues: Vec<UpvalueDescriptor> — ordered capture table;
+- each descriptor records UpvalueSource::EnclosingLocal(slot) or
+  UpvalueSource::EnclosingUpvalue(slot), mutability, and optional type contract.
 
-### Required ABI extension
+The opcode set now contains:
+- GetUpvalue(u16) — push a captured binding's current value;
+- SetUpvalue(u16) — assign the top stack value while preserving the expression
+  result, with constant/import write enforcement left to runtime semantics.
 
-Before compiling nested functions, add:
+The compiler ABI version is 2. Programs using upvalues must declare feature bit
+FEATURE_LEXICAL_UPVALUES. The verifier rejects unsupported ABI/features.
 
-- `FunctionProto.enclosing_function: Option<u32>` (none for entry/top-level
-  functions; otherwise the lexical parent prototype);
-- an ordered `upvalues: Vec<UpvalueDescriptor>` table per function;
-- `UpvalueDescriptor` entries that distinguish capture from an enclosing local
-  slot versus forwarding an enclosing upvalue;
-- `GetUpvalue(u16)` and `SetUpvalue(u16)` opcodes;
-- closure construction semantics for `MakeFunction` that reference shared
-  binding cells with ownership/lifetime matching V0.3, not copied values.
+## 3. Verifier guarantees now present
 
-A binding cell must preserve mutability and any runtime type contract. Capturing
-the same binding more than once must preserve identity. Recursive local named
-functions must resolve their own predeclared cell. Transitive captures must be
-forwarded through intermediate functions. The capture representation must not
-keep a lexical environment alive longer than V0.3 does.
+- A capture-bearing function must identify a valid earlier lexical parent.
+- Local captures and forwarded captures must resolve to existing parent slots.
+- Capture mutability and type-contract metadata must exactly match the source.
+- Duplicate capture descriptors are rejected.
+- A nested prototype can only be instantiated by its declared lexical parent.
+- A nested function cannot capture a parent local before definite initialization.
+- Upvalue opcode indices and stack effects are verified.
+- Assignment to immutable captures remains a runtime decision, matching the
+  existing verifier policy for local/module/import writes and preserving
+  unreachable-code behavior.
+- The malformed-bytecode fuzzer now emits upvalue opcodes and lexical-capture
+  metadata, including invalid cases.
 
-### Verifier obligations
+## 4. Remaining compiler/VM obligations
 
-The verifier must reject:
+The compiler and VM must implement all of the following; the verifier metadata
+alone is insufficient:
 
-- an upvalue descriptor without a valid lexical parent;
-- local captures outside the parent's local-slot table;
-- forwarded captures outside the parent's upvalue table;
-- upvalue reads/writes outside the child's descriptor table;
-- writes to immutable captured bindings, unless the established V0.3 runtime
-  contract intentionally defers that diagnostic to execution;
-- inconsistent parent/child function relationships.
-
-The verifier's abstract state must account for upvalue operations and their
-stack effects. It must not infer lexical validity from source names.
-
-## 2. Built-in bindings need a defined bytecode path
-
-The current opcode set has `LoadPrint`, but the V0.3 runtime also exposes seven
-`std:math` functions (`abs`, `ceil`, `floor`, `round`, `sqrt`, `min`,
-`max`). The compiler/VM contract must define how these native values enter
-execution and how local shadowing takes precedence. Do not silently compile a
-math identifier as an ordinary unresolved local.
-
-The implementation must either define a verified native-load opcode/table or
-represent built-ins as explicit immutable prelude bindings with stable,
-verifiable identities. The latter must preserve existing diagnostics and
-shadowing behavior.
-
-## 3. Compilation scope must be explicit
-
-The AST includes imports and exports, while the current bytecode model already
-contains module/import/export tables. M3 must state whether it compiles a single
-module AST or a complete dependency graph. The complete graph linker/loader
-integration belongs to M5, but M3 must not silently drop import/export nodes.
-
-Every AST variant must have one of:
-- a defined lowering;
-- a deliberate, diagnostic rejection at a documented API boundary; or
-- an explicit later milestone with tests proving it cannot be mistaken for
-  successfully compiled code.
-
-## 4. Required sequencing
-
-1. Amend bytecode ABI and verifier for lexical captures and native bindings.
-2. Add verifier-focused adversarial tests for malformed capture metadata.
-3. Implement AST lowering with exhaustive matches and explicit source mapping.
-4. Compile every accepted AST construct and verify the resulting program.
-5. Implement VM frames, closure cells, contracts, and native dispatch.
-6. Differentially compare VM and tree-walking reference behavior before routing
-   any public execution API through the VM.
+- Capture shared bindings, not copied values. Repeated references to the same
+  binding must preserve identity, mutation, and contracts.
+- Forward transitive captures through intermediate functions.
+- Preserve self-recursive and mutually recursive named-function declarations.
+- Preserve lexical shadowing, scope exit, and weak environment expiration.
+- Ensure captured const/import assignment fails at the same runtime boundary
+  and with the same diagnostic as V0.3.
+- Preserve typed variable, parameter, and return contracts through captures.
+- Define native prelude resolution for print and all std:math functions,
+  including lexical shadowing and existing arity/type/domain diagnostics.
+- Compile every AST node or return an explicit diagnostic at a documented
+  unsupported boundary. Imports/exports must never be silently discarded.
+- Verify every compiled program before execution.
 
 ## 5. Acceptance gate
 
 M3 is not complete until compiler tests cover every AST variant, nested scopes,
 shadowing, recursion, captured mutable/immutable bindings, typed captures,
 short-circuiting, arrays/indexing/properties, source locations, and malformed
-program rejection. M4 is not complete until these programs execute in the VM and
-match the reference interpreter's values, output, diagnostic boundaries, and
-environment-lifetime behavior.
+program rejection.
+
+M4 is not complete until VM tests execute these programs and match the
+reference interpreter's values, output, error codes/messages/positions, and
+environment-lifetime behavior. M5/M6 module integration, differential testing,
+fuzzing, and resource stress gates remain mandatory before release.

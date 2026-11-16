@@ -1,6 +1,6 @@
 # HK 0.4.0 — Implementation Plan and Release Gates
 
-**Status:** Design baseline only. No V0.4 runtime or compiler implementation has been merged.
+**Status:** Design baseline plus partial M0–M2 foundations on the implementation branch. The AST compiler and VM are not implemented; V0.4.0 is not releasable.
 **Target:** HK 0.4.0 — Versioned Bytecode and Virtual Machine
 **Base:** HK 0.3.0 on `main`
 **Normative contract:** [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md)
@@ -17,6 +17,22 @@
 8. Tree-walking execution remains as an internal reference until differential validation is complete.
 9. Public `run` and `run_path` signatures remain unchanged; they switch to VM only after all release gates pass.
 10. No unsafe Rust, JIT, native backend, persistent bytecode format, or speculative language features.
+
+## Current implementation status (branch feat/hk-v0.4.0-bytecode-vm)
+
+| Milestone | Current state | Release status |
+|---|---|---|
+| M0 — semantic inventory | Inventory and reference tests exist; full differential corpus and measured VM resource ceilings remain open | Open |
+| M1 — shared runtime core | Values, environments, contracts, and pure operations have been extracted while the tree-walker remains authoritative | Partial |
+| M2 — bytecode/verifier | In-memory representation, control-flow verifier, malformed-bytecode fuzzer, and lexical-capture ABI foundation exist | Partial |
+| M3 — AST compiler | No compiler implementation yet | Not started |
+| M4 — VM | No VM execution engine yet | Not started |
+| M5 — module/type integration | No bytecode module linker or VM contract integration yet | Not started |
+| M6 — differential/fuzz/robustness | Reference tests and verifier fuzzing exist; VM differential/fuzz/resource tests do not | Not started |
+| M7 — benchmarks/rollout | No VM benchmarks or release candidate | Not started |
+
+This table is intentionally conservative. Passing tests for the reference
+interpreter and verifier does not count as compiler or VM validation.
 
 ## 2. Implementation milestones
 

@@ -1,12 +1,13 @@
 #![allow(dead_code)] // Verifier entry points are integrated by the compiler/VM milestone.
 //! Mandatory verifier for compiler-produced in-memory HK bytecode.
-use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode};
+use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode, UpvalueSource};
 use super::types::Type;
 
 const SUPPORTED_MAJOR: u16 = 1;
 const SUPPORTED_MINOR: u16 = 0;
-const SUPPORTED_FEATURES: u64 = 0;
-const SUPPORTED_COMPILER_ABI: u32 = 1;
+const SUPPORTED_FEATURES: u64 = FEATURE_LEXICAL_UPVALUES;
+const SUPPORTED_COMPILER_ABI: u32 = 2;
+const FEATURE_LEXICAL_UPVALUES: u64 = 1 << 0;
 const MAX_CONSTANTS: usize = 1_000_000;
 const MAX_FUNCTIONS: usize = 65_535;
 const MAX_MODULES: usize = 1_024;
@@ -131,6 +132,20 @@ fn verify_header(program: &BytecodeProgram) -> Result<(), VerifyError> {
             program.header.compiler_abi
         )));
     }
+    let uses_lexical_upvalues = program.functions.iter().any(|function| {
+        !function.upvalues.is_empty()
+            || function.code.iter().any(|instruction| {
+                matches!(
+                    instruction.opcode,
+                    Opcode::GetUpvalue(_) | Opcode::SetUpvalue(_)
+                )
+            })
+    });
+    if uses_lexical_upvalues && program.header.required_features & FEATURE_LEXICAL_UPVALUES == 0 {
+        return Err(VerifyError::program(
+            "lexical upvalue instructions require the lexical-capture feature bit",
+        ));
+    }
     let unsupported = program.header.required_features & !SUPPORTED_FEATURES;
     if unsupported != 0 {
         return Err(VerifyError::program(format!(
@@ -184,7 +199,10 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
         return Err(VerifyError::program("source-file names must not be empty"));
     }
     let entry = &program.functions[program.entry_function as usize];
-    if entry.module_id.is_some() || !entry.parameters.is_empty() {
+    if entry.module_id.is_some()
+        || !entry.parameters.is_empty()
+        || entry.enclosing_function.is_some()
+    {
         return Err(VerifyError::program(
             "entry function must be source-only and accept no parameters",
         ));
@@ -222,6 +240,11 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
         if !initializer.parameters.is_empty() {
             return Err(VerifyError::program(format!(
                 "module {module_index} initializer must not accept parameters"
+            )));
+        }
+        if initializer.enclosing_function.is_some() {
+            return Err(VerifyError::program(format!(
+                "module {module_index} initializer must be a lexical root"
             )));
         }
         if initializer.module_id != Some(module_index as u32) {
@@ -321,6 +344,73 @@ fn verify_function_tables(
             "function name must not be empty",
         ));
     }
+    if function.upvalues.len() > u16::MAX as usize + 1 {
+        return Err(VerifyError::at(
+            function_index,
+            None,
+            "upvalue table exceeds the slot limit",
+        ));
+    }
+    match function.enclosing_function {
+        None if !function.upvalues.is_empty() => {
+            return Err(VerifyError::at(
+                function_index,
+                None,
+                "function with upvalues has no lexical parent",
+            ));
+        }
+        None => {}
+        Some(parent_index) => {
+            let parent_index = parent_index as usize;
+            if parent_index >= function_index {
+                return Err(VerifyError::at(
+                    function_index,
+                    None,
+                    "lexical parent must precede its child function",
+                ));
+            }
+            let parent = &program.functions[parent_index];
+            let mut captures = std::collections::HashSet::new();
+            for descriptor in &function.upvalues {
+                let (mutable, contract) = match descriptor.source {
+                    UpvalueSource::EnclosingLocal(slot) => {
+                        let Some(binding) = parent.local_slots.get(slot as usize) else {
+                            return Err(VerifyError::at(
+                                function_index,
+                                None,
+                                "upvalue captures an out-of-range enclosing local",
+                            ));
+                        };
+                        (binding.mutable, binding.contract)
+                    }
+                    UpvalueSource::EnclosingUpvalue(slot) => {
+                        let Some(binding) = parent.upvalues.get(slot as usize) else {
+                            return Err(VerifyError::at(
+                                function_index,
+                                None,
+                                "upvalue forwards an out-of-range enclosing capture",
+                            ));
+                        };
+                        (binding.mutable, binding.contract)
+                    }
+                };
+                if descriptor.mutable != mutable || descriptor.contract != contract {
+                    return Err(VerifyError::at(
+                        function_index,
+                        None,
+                        "upvalue mutability or type contract differs from its source binding",
+                    ));
+                }
+                if !captures.insert(descriptor.source) {
+                    return Err(VerifyError::at(
+                        function_index,
+                        None,
+                        "duplicate lexical capture descriptor",
+                    ));
+                }
+            }
+        }
+    }
     if function.parameters.len() > MAX_CALL_ARGUMENTS as usize {
         return Err(VerifyError::at(
             function_index,
@@ -418,12 +508,33 @@ fn verify_function_tables(
                 }
             }
             Opcode::MakeFunction(index) => {
-                if index as usize >= program.functions.len() {
+                let Some(child) = program.functions.get(index as usize) else {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
                         "function prototype index is out of range",
                     ));
+                };
+                if child
+                    .enclosing_function
+                    .is_some_and(|parent| parent as usize != function_index)
+                {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "nested function can only be instantiated by its lexical parent",
+                    ));
+                }
+                for capture in &child.upvalues {
+                    if let UpvalueSource::EnclosingLocal(slot) = capture.source {
+                        if slot as usize >= function.local_slots.len() {
+                            return Err(VerifyError::at(
+                                function_index,
+                                Some(instruction_index),
+                                "nested function captures a local outside its lexical parent",
+                            ));
+                        }
+                    }
                 }
             }
             Opcode::GetProperty(index) => {
@@ -444,6 +555,15 @@ fn verify_function_tables(
                         function_index,
                         Some(instruction_index),
                         "local slot is out of range",
+                    ));
+                }
+            }
+            Opcode::GetUpvalue(slot) | Opcode::SetUpvalue(slot) => {
+                if function.upvalues.get(slot as usize).is_none() {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "upvalue slot is out of range",
                     ));
                 }
             }
@@ -502,7 +622,7 @@ fn verify_function_tables(
 }
 
 fn verify_control_flow(
-    _program: &BytecodeProgram,
+    program: &BytecodeProgram,
     function_index: usize,
     function: &FunctionProto,
 ) -> Result<u32, VerifyError> {
@@ -576,6 +696,14 @@ fn verify_control_flow(
                 }
                 next.stack_height += 1;
             }
+            Opcode::GetUpvalue(_) => {
+                next.stack_height += 1;
+            }
+            Opcode::SetUpvalue(_) => {
+                if next.stack_height < 1 {
+                    return Err(underflow(1));
+                }
+            }
             Opcode::SetLocal(slot) => {
                 if next.stack_height < 1 {
                     return Err(underflow(1));
@@ -597,10 +725,22 @@ fn verify_control_flow(
                 }
                 next.stack_height -= 1;
             }
-            Opcode::GetModule(_)
-            | Opcode::GetImport(_)
-            | Opcode::LoadPrint
-            | Opcode::MakeFunction(_) => {
+            Opcode::GetModule(_) | Opcode::GetImport(_) | Opcode::LoadPrint => {
+                next.stack_height += 1;
+            }
+            Opcode::MakeFunction(prototype) => {
+                let child = &program.functions[prototype as usize];
+                for capture in &child.upvalues {
+                    if let UpvalueSource::EnclosingLocal(slot) = capture.source {
+                        if !next.initialized_locals[slot as usize] {
+                            return Err(VerifyError::at(
+                                function_index,
+                                Some(index),
+                                "nested function captures a local before initialization",
+                            ));
+                        }
+                    }
+                }
                 next.stack_height += 1;
             }
             Opcode::SetModule(_) => {
@@ -797,7 +937,7 @@ fn merge_state(
 pub(super) fn fuzz_verify(input: &[u8]) {
     use super::bytecode::{
         BytecodeHeader, ExportBinding, FunctionProto, ImportBinding, Instruction, LocalSlot,
-        ModuleProto, SourceFile, SourceLocation,
+        ModuleProto, SourceFile, SourceLocation, UpvalueDescriptor, UpvalueSource,
     };
 
     fn take_byte(input: &[u8], cursor: &mut usize) -> u8 {
@@ -833,7 +973,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
     }
 
     let mut cursor = 0usize;
-    let header = BytecodeHeader {
+    let mut header = BytecodeHeader {
         major: if take_byte(input, &mut cursor) & 3 == 0 {
             0
         } else {
@@ -841,7 +981,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         },
         minor: u16::from(take_byte(input, &mut cursor) % 2),
         required_features: u64::from(take_byte(input, &mut cursor) & 1),
-        compiler_abi: u32::from(take_byte(input, &mut cursor) % 2),
+        compiler_abi: u32::from(take_byte(input, &mut cursor) % 3),
     };
 
     let constant_count = (take_byte(input, &mut cursor) % 16) as usize;
@@ -871,7 +1011,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             annotation: None,
         })
         .collect();
-    let local_slots = (0..local_count)
+    let local_slots: Vec<LocalSlot> = (0..local_count)
         .map(|slot| super::bytecode::LocalSlot {
             internal_name: format!("\\0fuzz:{slot}"),
             source_name: if slot < parameter_count {
@@ -883,11 +1023,27 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             contract: None,
         })
         .collect();
+    let upvalue_count = if local_count == 0 {
+        0
+    } else {
+        (take_byte(input, &mut cursor) % 5) as usize
+    };
+    let upvalues = (0..upvalue_count)
+        .map(|_| {
+            let slot = u16::from(take_byte(input, &mut cursor)) % local_count as u16;
+            let binding = &local_slots[slot as usize];
+            UpvalueDescriptor {
+                source: UpvalueSource::EnclosingLocal(slot),
+                mutable: binding.mutable,
+                contract: binding.contract,
+            }
+        })
+        .collect::<Vec<_>>();
     let instruction_count = 1 + (take_byte(input, &mut cursor) % 64) as usize;
     let mut code = Vec::with_capacity(instruction_count);
 
     for _ in 0..instruction_count {
-        let opcode = match take_byte(input, &mut cursor) % 38 {
+        let opcode = match take_byte(input, &mut cursor) % 40 {
             0 => Opcode::Constant(take_u32(input, &mut cursor)),
             1 => Opcode::Null,
             2 => Opcode::True,
@@ -925,6 +1081,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             34 => Opcode::SetIndex,
             36 => Opcode::MakeFunction(take_u32(input, &mut cursor)),
             37 => Opcode::LoadPrint,
+            38 => Opcode::GetUpvalue(take_u16(input, &mut cursor)),
+            39 => Opcode::SetUpvalue(take_u16(input, &mut cursor)),
             _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
         };
         let source = SourceLocation {
@@ -952,7 +1110,9 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         name: "entry".to_owned(),
         module_id: None,
         parameters: Vec::new(),
-        local_slots: Vec::new(),
+        local_slots: local_slots.clone(),
+        enclosing_function: None,
+        upvalues: Vec::new(),
         return_contract: None,
         typed: false,
         max_stack: u32::from(take_byte(input, &mut cursor) % 64),
@@ -963,6 +1123,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         module_id: None,
         parameters,
         local_slots,
+        enclosing_function: Some(0),
+        upvalues,
         return_contract: None,
         typed: false,
         max_stack: 1,
@@ -1048,6 +1210,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             module_id: Some(module_index as u32),
             parameters: Vec::new(),
             local_slots: Vec::new(),
+            enclosing_function: None,
+            upvalues: Vec::new(),
             return_contract: None,
             typed: false,
             max_stack: 1,
@@ -1083,6 +1247,12 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         });
     }
 
+    if functions
+        .get(1)
+        .is_some_and(|function| !function.upvalues.is_empty())
+    {
+        header.required_features |= FEATURE_LEXICAL_UPVALUES;
+    }
     let program = BytecodeProgram {
         header,
         constants,
@@ -1101,7 +1271,7 @@ mod tests {
     use super::*;
     use crate::bytecode::{
         BytecodeHeader, ExportBinding, FunctionProto, ImportBinding, Instruction, LocalSlot,
-        ModuleProto, SourceFile, SourceLocation,
+        ModuleProto, SourceFile, SourceLocation, UpvalueDescriptor, UpvalueSource,
     };
 
     fn instruction(opcode: Opcode) -> Instruction {
@@ -1129,6 +1299,8 @@ mod tests {
                 module_id: None,
                 parameters: Vec::new(),
                 local_slots: Vec::new(),
+                enclosing_function: None,
+                upvalues: Vec::new(),
                 return_contract: None,
                 typed: false,
                 max_stack,
@@ -1153,6 +1325,8 @@ mod tests {
             module_id: Some(module_id),
             parameters: Vec::new(),
             local_slots: Vec::new(),
+            enclosing_function: None,
+            upvalues: Vec::new(),
             return_contract: None,
             typed: false,
             max_stack: 1,
@@ -1205,6 +1379,183 @@ mod tests {
         };
         program.modules = vec![dependency, root];
         program
+    }
+
+    fn lexical_capture_program(
+        capture: UpvalueSource,
+        mutable: bool,
+        parent_local_initialized: bool,
+    ) -> BytecodeProgram {
+        let mut program = function(
+            if parent_local_initialized {
+                vec![
+                    Opcode::Null,
+                    Opcode::DefineLocal(0),
+                    Opcode::MakeFunction(1),
+                    Opcode::Pop,
+                    Opcode::Null,
+                    Opcode::Return,
+                ]
+            } else {
+                vec![
+                    Opcode::MakeFunction(1),
+                    Opcode::Pop,
+                    Opcode::Null,
+                    Opcode::Return,
+                ]
+            },
+            1,
+        );
+        program.functions[0].local_slots = vec![local_slot("\\0parent:x", "x", mutable)];
+        program.functions.push(FunctionProto {
+            name: "nested".to_owned(),
+            module_id: None,
+            parameters: Vec::new(),
+            local_slots: Vec::new(),
+            enclosing_function: Some(0),
+            upvalues: vec![UpvalueDescriptor {
+                source: capture,
+                mutable,
+                contract: None,
+            }],
+            return_contract: None,
+            typed: false,
+            max_stack: 1,
+            code: vec![
+                instruction(Opcode::GetUpvalue(0)),
+                instruction(Opcode::Return),
+            ],
+        });
+        program.header.required_features |= FEATURE_LEXICAL_UPVALUES;
+        program
+    }
+
+    #[test]
+    fn accepts_a_well_formed_lexical_capture() {
+        let program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        assert!(verify(program).is_ok());
+    }
+
+    #[test]
+    fn rejects_lexical_capture_before_parent_local_initialization() {
+        let error = verify(lexical_capture_program(
+            UpvalueSource::EnclosingLocal(0),
+            true,
+            false,
+        ))
+        .unwrap_err();
+        assert!(error
+            .message
+            .contains("captures a local before initialization"));
+    }
+
+    #[test]
+    fn rejects_lexical_capture_without_feature_declaration() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        program.header.required_features &= !FEATURE_LEXICAL_UPVALUES;
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("feature bit"));
+    }
+
+    #[test]
+    fn rejects_out_of_range_lexical_capture_source() {
+        let error = verify(lexical_capture_program(
+            UpvalueSource::EnclosingLocal(9),
+            true,
+            true,
+        ))
+        .unwrap_err();
+        assert!(
+            error.message.contains("outside its lexical parent")
+                || error.message.contains("out-of-range enclosing local")
+        );
+    }
+
+    #[test]
+    fn accepts_assignment_to_immutable_upvalue_for_runtime_enforcement() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), false, true);
+        program.functions[1].code = vec![
+            instruction(Opcode::Null),
+            instruction(Opcode::SetUpvalue(0)),
+            instruction(Opcode::Pop),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        program.functions[1].max_stack = 1;
+        assert!(verify(program).is_ok());
+    }
+
+    #[test]
+    fn accepts_transitive_upvalue_forwarding() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        program.functions[1].name = "middle".to_owned();
+        program.functions[1].code = vec![
+            instruction(Opcode::MakeFunction(2)),
+            instruction(Opcode::Return),
+        ];
+        program.functions[1].max_stack = 1;
+        program.functions.push(FunctionProto {
+            name: "leaf".to_owned(),
+            module_id: None,
+            parameters: Vec::new(),
+            local_slots: Vec::new(),
+            enclosing_function: Some(1),
+            upvalues: vec![UpvalueDescriptor {
+                source: UpvalueSource::EnclosingUpvalue(0),
+                mutable: true,
+                contract: None,
+            }],
+            return_contract: None,
+            typed: false,
+            max_stack: 1,
+            code: vec![
+                instruction(Opcode::GetUpvalue(0)),
+                instruction(Opcode::Return),
+            ],
+        });
+        assert!(verify(program).is_ok());
+    }
+
+    #[test]
+    fn rejects_upvalue_assignment_stack_underflow() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        program.functions[1].code = vec![
+            instruction(Opcode::SetUpvalue(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("underflow"));
+    }
+
+    #[test]
+    fn rejects_upvalue_instruction_outside_capture_table() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        program.functions[1].code = vec![
+            instruction(Opcode::GetUpvalue(1)),
+            instruction(Opcode::Return),
+        ];
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("upvalue slot is out of range"));
+    }
+
+    #[test]
+    fn rejects_nested_function_instantiation_from_non_parent() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), true, true);
+        program.functions[0].code = vec![
+            instruction(Opcode::Null),
+            instruction(Opcode::DefineLocal(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        program.functions[0].max_stack = 1;
+        let mut third = program.functions[1].clone();
+        third.name = "other".to_owned();
+        third.enclosing_function = Some(1);
+        program.functions.push(third);
+        program.functions[0].code[2] = instruction(Opcode::MakeFunction(2));
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("lexical parent"));
     }
 
     #[test]
