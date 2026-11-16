@@ -9,6 +9,7 @@ pub(super) struct BytecodeHeader {
     pub(super) major: u16,
     pub(super) minor: u16,
     pub(super) required_features: u64,
+    pub(super) compiler_abi: u32,
 }
 
 impl Default for BytecodeHeader {
@@ -17,6 +18,7 @@ impl Default for BytecodeHeader {
             major: 1,
             minor: 0,
             required_features: 0,
+            compiler_abi: 1,
         }
     }
 }
