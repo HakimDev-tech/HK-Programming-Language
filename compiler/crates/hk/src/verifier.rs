@@ -973,7 +973,6 @@ pub(super) fn fuzz_verify(input: &[u8]) {
     let mut functions = vec![entry, auxiliary];
     let module_count = (take_byte(input, &mut cursor) % 4) as usize;
     let mut modules = Vec::with_capacity(module_count);
-    let mut prior_binding_counts = Vec::with_capacity(module_count);
 
     for module_index in 0..module_count {
         let binding_count = (take_byte(input, &mut cursor) % 4) as usize;
@@ -1039,7 +1038,6 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                 },
             ],
         });
-        prior_binding_counts.push(binding_count);
         modules.push(ModuleProto {
             name: format!("fuzz-module-{module_index}.hk"),
             initializer,
@@ -1049,7 +1047,6 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         });
     }
 
-    let _ = prior_binding_counts;
     let program = BytecodeProgram {
         header,
         constants,
