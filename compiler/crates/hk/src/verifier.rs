@@ -1371,7 +1371,16 @@ mod tests {
 
     #[test]
     fn accepts_local_assignment_to_immutable_slots_for_runtime_enforcement() {
-        let mut program = function(vec![Opcode::Null, Opcode::SetLocal(0), Opcode::Return], 1);
+        let mut program = function(
+            vec![
+                Opcode::Null,
+                Opcode::DefineLocal(0),
+                Opcode::Null,
+                Opcode::SetLocal(0),
+                Opcode::Return,
+            ],
+            1,
+        );
         program.functions[0]
             .local_slots
             .push(local_slot("const-slot", "constant", false));
