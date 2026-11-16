@@ -356,11 +356,18 @@ fn verify_function_tables(
                 }
             }
             Opcode::DefineLocal(slot) | Opcode::GetLocal(slot) | Opcode::SetLocal(slot) => {
-                if slot as usize >= function.local_slots.len() {
+                let Some(metadata) = function.local_slots.get(slot as usize) else {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
                         "local slot is out of range",
+                    ));
+                };
+                if matches!(instruction.opcode, Opcode::SetLocal(_)) && !metadata.mutable {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "assignment targets an immutable local slot",
                     ));
                 }
             }
@@ -372,11 +379,20 @@ fn verify_function_tables(
                         "module binding opcode used by a source-only function",
                     ));
                 };
-                if slot as usize >= program.modules[module_id as usize].bindings.len() {
+                let Some(metadata) =
+                    program.modules[module_id as usize].bindings.get(slot as usize)
+                else {
                     return Err(VerifyError::at(
                         function_index,
                         Some(instruction_index),
                         "module binding slot is out of range",
+                    ));
+                };
+                if matches!(instruction.opcode, Opcode::SetModule(_)) && !metadata.mutable {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "assignment targets an immutable module binding",
                     ));
                 }
             }
@@ -1115,6 +1131,23 @@ mod tests {
         assert!(error
             .message
             .contains("dependencies must precede their importer"));
+    }
+
+    #[test]
+    fn rejects_assignment_to_immutable_local_slots() {
+        let mut program = function(vec![Opcode::Null, Opcode::SetLocal(0), Opcode::Return], 1);
+        program.functions[0].local_slots.push(local_slot("const-slot", "constant", false));
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("immutable local slot"));
+    }
+
+    #[test]
+    fn rejects_assignment_to_immutable_module_bindings() {
+        let mut program = module_program(false);
+        program.modules[0].bindings[0].mutable = false;
+        program.functions[1].code.insert(0, instruction(Opcode::SetModule(0)));
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("immutable module binding"));
     }
 
     #[test]
