@@ -14,6 +14,7 @@ const MAX_OPERAND_STACK: u32 = 65_536;
 // Aligns with the parser's existing maximum syntactic nesting depth.
 const MAX_SCOPE_DEPTH: u32 = 128;
 const MAX_CALL_ARGUMENTS: u16 = 255;
+const MAX_OPERAND_SOURCES: usize = u16::MAX as usize;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct VerifyError {
@@ -386,7 +387,7 @@ fn verify_function_tables(
                 "source positions must be one-based",
             ));
         }
-        if instruction.operands.len() > MAX_CALL_ARGUMENTS as usize + 1
+        if instruction.operands.len() > MAX_OPERAND_SOURCES
             || instruction.operands.iter().any(|position| {
                 position.source_id as usize >= program.source_files.len()
                     || position.line == 0
@@ -1050,6 +1051,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                         line: 1,
                         column: 1,
                     },
+                    operands: Vec::new(),
+                    typed_context: false,
                 },
                 Instruction {
                     opcode: Opcode::Return,
@@ -1058,6 +1061,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                         line: 1,
                         column: 1,
                     },
+                    operands: Vec::new(),
+                    typed_context: false,
                 },
             ],
         });
@@ -1452,6 +1457,18 @@ mod tests {
             instruction(Opcode::Return),
         ];
         verify(program).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_operand_source_map_entries() {
+        let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
+        program.functions[0].code[0].operands.push(SourceLocation {
+            source_id: 1,
+            line: 1,
+            column: 1,
+        });
+        let error = verify(program).unwrap_err();
+        assert!(error.message.contains("operand source-map metadata is invalid"));
     }
 
     #[test]
