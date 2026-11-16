@@ -386,6 +386,19 @@ fn verify_function_tables(
                 "source positions must be one-based",
             ));
         }
+        if instruction.operands.len() > MAX_CALL_ARGUMENTS as usize + 1
+            || instruction.operands.iter().any(|position| {
+                position.source_id as usize >= program.source_files.len()
+                    || position.line == 0
+                    || position.column == 0
+            })
+        {
+            return Err(VerifyError::at(
+                function_index,
+                Some(instruction_index),
+                "operand source-map metadata is invalid",
+            ));
+        }
         match instruction.opcode {
             Opcode::Constant(index) => {
                 if index as usize >= program.constants.len() {
@@ -905,13 +918,24 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             37 => Opcode::LoadPrint,
             _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
         };
-        code.push(Instruction {
-            opcode,
-            source: SourceLocation {
+        let source = SourceLocation {
+            source_id: 0,
+            line: u32::from(take_byte(input, &mut cursor)) + 1,
+            column: u32::from(take_byte(input, &mut cursor)) + 1,
+        };
+        let operand_count = (take_byte(input, &mut cursor) % 4) as usize;
+        let operands = (0..operand_count)
+            .map(|_| SourceLocation {
                 source_id: 0,
                 line: u32::from(take_byte(input, &mut cursor)) + 1,
                 column: u32::from(take_byte(input, &mut cursor)) + 1,
-            },
+            })
+            .collect();
+        code.push(Instruction {
+            opcode,
+            source,
+            operands,
+            typed_context: take_byte(input, &mut cursor) & 1 == 1,
         });
     }
 
@@ -941,6 +965,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                     line: 1,
                     column: 1,
                 },
+                operands: Vec::new(),
+                typed_context: false,
             },
             Instruction {
                 opcode: Opcode::Return,
@@ -949,6 +975,8 @@ pub(super) fn fuzz_verify(input: &[u8]) {
                     line: 1,
                     column: 1,
                 },
+                operands: Vec::new(),
+                typed_context: false,
             },
         ],
     };
@@ -1071,6 +1099,8 @@ mod tests {
                 line: 1,
                 column: 1,
             },
+            operands: Vec::new(),
+            typed_context: false,
         }
     }
 
