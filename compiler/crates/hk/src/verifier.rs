@@ -1192,7 +1192,9 @@ mod tests {
     #[test]
     fn rejects_local_assignment_stack_underflow() {
         let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
-        program.functions[0].local_slots.push(local_slot("slot", "x", true));
+        program.functions[0]
+            .local_slots
+            .push(local_slot("slot", "x", true));
         program.functions[0].code = vec![
             instruction(Opcode::Null),
             instruction(Opcode::DefineLocal(0)),
@@ -1248,11 +1250,13 @@ mod tests {
     #[test]
     fn rejects_entry_functions_with_parameters() {
         let mut program = function(vec![Opcode::Null, Opcode::Return], 1);
-        program.functions[0].parameters.push(super::super::bytecode::ParameterProto {
-            name: "arg".to_owned(),
-            slot: 0,
-            annotation: None,
-        });
+        program.functions[0]
+            .parameters
+            .push(super::super::bytecode::ParameterProto {
+                name: "arg".to_owned(),
+                slot: 0,
+                annotation: None,
+            });
         program.functions[0]
             .local_slots
             .push(local_slot("entry-arg", "arg", true));
