@@ -149,6 +149,15 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
     if program.entry_function as usize >= program.functions.len() {
         return Err(VerifyError::program("entry function index is out of range"));
     }
+    if program.source_files.iter().any(|source| source.name.is_empty()) {
+        return Err(VerifyError::program("source-file names must not be empty"));
+    }
+    let entry = &program.functions[program.entry_function as usize];
+    if entry.module_id.is_some() || !entry.parameters.is_empty() {
+        return Err(VerifyError::program(
+            "entry function must be source-only and accept no parameters",
+        ));
+    }
     for constant in &program.constants {
         if matches!(constant, Constant::Number(number) if !number.is_finite()) {
             return Err(VerifyError::program(
@@ -173,6 +182,11 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
             )));
         }
         let initializer = &program.functions[module.initializer as usize];
+        if !initializer.parameters.is_empty() {
+            return Err(VerifyError::program(format!(
+                "module {module_index} initializer must not accept parameters"
+            )));
+        }
         if initializer.module_id != Some(module_index as u32) {
             return Err(VerifyError::program(format!(
                 "module {module_index} initializer belongs to a different module"
@@ -224,6 +238,15 @@ fn verify_program_tables(program: &BytecodeProgram) -> Result<(), VerifyError> {
                     "module {module_index} import target slot is out of range"
                 )));
             };
+            if import.imported_name.is_empty()
+                || !target.exports.iter().any(|export| {
+                    export.slot == import.target_slot && export.name == import.imported_name
+                })
+            {
+                return Err(VerifyError::program(format!(
+                    "module {module_index} import does not reference a declared target export"
+                )));
+            }
             if local_binding.contract != target_binding.contract {
                 return Err(VerifyError::program(format!(
                     "module {module_index} import contract metadata does not match its target"
@@ -251,6 +274,9 @@ fn verify_function_tables(
     function_index: usize,
     function: &FunctionProto,
 ) -> Result<(), VerifyError> {
+    if function.name.is_empty() {
+        return Err(VerifyError::at(function_index, None, "function name must not be empty"));
+    }
     if function.parameters.len() > MAX_CALL_ARGUMENTS as usize {
         return Err(VerifyError::at(
             function_index,
