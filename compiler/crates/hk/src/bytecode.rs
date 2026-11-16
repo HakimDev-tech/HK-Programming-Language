@@ -80,6 +80,10 @@ pub(super) enum Opcode {
 pub(super) struct Instruction {
     pub(super) opcode: Opcode,
     pub(super) source: SourceLocation,
+    /// Additional expression/operand positions used to preserve reference-engine diagnostics.
+    pub(super) operands: Vec<SourceLocation>,
+    /// Whether this instruction executes within a typed expression context.
+    pub(super) typed_context: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
