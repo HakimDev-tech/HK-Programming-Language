@@ -980,6 +980,7 @@ mod tests {
             bindings: vec![local_slot("\\0dependency:x", "x", !reverse_dependency)],
             imports: if reverse_dependency {
                 vec![ImportBinding {
+                    imported_name: "x".to_owned(),
                     local_slot: 0,
                     target_module: 1,
                     target_slot: 0,
