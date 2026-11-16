@@ -846,7 +846,11 @@ pub(super) fn fuzz_verify(input: &[u8]) {
 
     let mut cursor = 0usize;
     let header = BytecodeHeader {
-        major: if take_byte(input, &mut cursor) & 3 == 0 { 0 } else { 1 },
+        major: if take_byte(input, &mut cursor) & 3 == 0 {
+            0
+        } else {
+            1
+        },
         minor: u16::from(take_byte(input, &mut cursor) % 2),
         required_features: u64::from(take_byte(input, &mut cursor) & 1),
     };
@@ -965,7 +969,11 @@ pub(super) fn fuzz_verify(input: &[u8]) {
         code: vec![
             Instruction {
                 opcode: Opcode::Null,
-                source: SourceLocation { source_id: 0, line: 1, column: 1 },
+                source: SourceLocation {
+                    source_id: 0,
+                    line: 1,
+                    column: 1,
+                },
             },
             Instruction {
                 opcode: Opcode::Return,
