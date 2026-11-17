@@ -11,7 +11,8 @@
 - Add source and module differential tests against the retained tree-walking reference engine.
 - Add a reproducible end-to-end VM benchmark harness and record an initial release-build baseline.
 - Complete local 12-second fuzz smoke campaigns for source execution, module resolution, and malformed-bytecode verification; longer CI fuzz campaigns and final cross-platform CI on the exact release candidate remain required.
-- V0.4.0 remains unreleased pending final CI review, a same-host V0.3/V0.4 benchmark comparison, and release approval.
+- Same-host V0.3/V0.4 end-to-end benchmark comparison completed; the current V0.4 candidate is 13.9–42.3% slower on the measured workloads. This is documented for explicit release acceptance or optimization; no performance-improvement claim is made.
+- V0.4.0 remains unreleased pending final CI/fuzz review, performance-regression acceptance or remediation, and release approval.
 
 ## HK 0.3.0 — 2026-11-15
 

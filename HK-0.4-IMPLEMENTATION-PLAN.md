@@ -27,7 +27,7 @@
 | M4 — VM | Verified stack-machine execution, bounded frames/stack, calls/returns, mutable captures, short-circuiting, diagnostics, and V0.3 weak environment lifetime | Complete |
 | M5 — modules and typing | Dependency-first module compilation/linking, imports/exports/aliases/live bindings, std:math, source identity, and gradual contracts through VM | Complete |
 | M6 — differential/fuzz/robustness | Source and module differential suites; targeted local fuzz campaigns; resource and malformed-input regressions | Partial: longer CI fuzz campaign and final CI run on the release candidate remain |
-| M7 — documentation/benchmarks/release | Documentation and reproducible VM benchmark harness/baseline added | Partial: V0.3 comparison, final PR CI review, release approval, tag and GitHub Release remain |
+| M7 — documentation/benchmarks/release | Documentation and reproducible VM benchmark harness/baseline added | Partial: benchmark comparison is complete and shows a 14–42% end-to-end regression on the measured workloads; explicit performance acceptance/optimization, final PR CI review, release approval, tag and GitHub Release remain |
 
 ## Compatibility requirements
 
@@ -68,7 +68,7 @@ See HK-0.4-BENCHMARKS.md. The harness measures end-to-end public execution, incl
 
 1. Run the full CI workflow on the exact final PR head, including Linux/Windows/macOS.
 2. Complete the longer CI fuzz durations (source: 45 s; modules: 30 s; verifier: 30 s) on the exact final PR head.
-3. Establish a reproducible V0.3 tree-walker versus V0.4 VM benchmark comparison on the same host and toolchain; do not make speed claims without it.
+3. Review the measured 14–42% end-to-end regression. Explicitly accept it for the V0.4 architectural release or profile and optimize before approval; do not claim a speedup.
 4. Review the full diff and public API/docs for unintended changes; ensure generated build artifacts and fuzz discoveries are not accidentally committed.
 5. Update PR #16 from Draft only after the above gates pass. Keep it unmerged until the explicit release decision.
 6. Create the V0.4.0 tag and GitHub Release only after merge and final approval.
