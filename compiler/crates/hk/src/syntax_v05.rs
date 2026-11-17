@@ -284,7 +284,7 @@ fn parse_type_expr_at(
             "Maximum type-expression nesting depth (64) exceeded.",
         ));
     }
-    
+
     let token = tokens
         .get(*cursor)
         .ok_or_else(|| parse_error(tokens, *cursor, "Expected a type name."))?;
