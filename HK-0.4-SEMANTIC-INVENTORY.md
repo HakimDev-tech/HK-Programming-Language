@@ -7,7 +7,7 @@
 
 ## 1. Baseline identity
 
-The V0.4 implementation branch is based directly on the V0.3 `main` commit above. The crate manifest at `compiler/crates/hk/Cargo.toml` declares version `0.3.0`. The source front end is the existing lexer/parser/AST and the reference executor is `runtime.rs`.
+The V0.4 implementation branch is based directly on the V0.3 `main` commit above. The V0.3 baseline crate version was `0.3.0`; the V0.4 implementation branch declares `0.4.0`. The source front end remains the existing lexer/parser/AST, while `runtime.rs` is retained as the test-only reference executor.
 
 The current public execution paths are:
 - `hk::run(source_name, source)`: lex, parse, optionally type-check, then tree-walk.
@@ -205,17 +205,9 @@ The following names were verified in the V0.3.0 source tree. They form the initi
 
 ## 10. M0 closure record
 
-The existing corpus is strong for V0.3 semantics but does not yet establish VM correctness. The following are still implementation work:
-- A test-only reference entry point that can run the exact parsed/checked input through the tree-walking engine without changing public APIs.
-- A differential test harness that compares success output or structured error fields between reference and VM.
-- Per-AST-variant compiler coverage tests, including malformed/internal AST states where reachable from internal tests.
-- Side-effect ordering tests for callee/argument evaluation and array receiver/index/value evaluation.
-- Verifier unit/property tests for invalid opcodes, indexes, jumps, stack underflow, merge-height mismatch, uninitialized locals, function boundaries, and module links.
-- Verifier fuzz target and VM/compiler fuzz targets.
-- Empirically selected bytecode instruction-count, operand-stack, frame, and code-size ceilings. Existing parser/module limits must remain independently enforced.
-- CI status must be checked on the exact head commit after the relevant GitHub Actions run completes; empty status arrays are not evidence of success.
+The V0.3 semantic inventory and named regression mapping are complete. The implementation that followed added the test-only reference path, source and module differential suites, compiler AST-family tests, side-effect-ordering coverage, verifier adversarial tests, bounded VM execution, and dedicated source/module/bytecode fuzz targets. Exact-head CI and fuzz evidence is recorded in `HK-0.4-IMPLEMENTATION-PLAN.md`.
 
-**M0 status remains open.** The named regression mapping is now recorded, but missing differential tests and measured VM limits have not been implemented.
+**M0 status: complete.** This inventory remains the semantic baseline; it is not the release checklist.
 
 
 ## 11. M2 verifier invariants implemented on the feature branch
