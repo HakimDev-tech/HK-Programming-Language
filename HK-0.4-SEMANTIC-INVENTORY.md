@@ -1,9 +1,9 @@
 # HK 0.4.0 — Semantic Inventory (M0)
 
-**Status:** Baseline inventory, implementation gate in progress  
+**Status:** M0 baseline inventory completed; implementation and conformance work tracked in the V0.4 implementation plan  
 **Baseline commit:** `a3ffadb923fef7032fdb6fbc5983b4cf5957886a`  
 **Baseline crate:** `hk 0.3.0`  
-**Purpose:** Make the existing language surface explicit before introducing bytecode. This document is an implementation checklist, not a claim that the VM exists.
+**Purpose:** Record the V0.3 semantic baseline against which the V0.4 bytecode compiler and VM are validated.
 
 ## 1. Baseline identity
 
@@ -203,7 +203,7 @@ The following names were verified in the V0.3.0 source tree. They form the initi
 - `compiler/crates/hk/tests/examples_smoke.rs`: `all_documented_examples_execute_with_expected_output`, `module_example_executes_through_filesystem_loader`.
 - `compiler/crates/hk/tests/gradual_typing_matrix.rs`: includes positive/negative matrices, dynamic-boundary diagnostic provenance, array contract non-propagation, return-path analysis, operand-position checks, nested shadowing, mutually recursive typed functions, loop/block scope behavior, and typed-vs-dynamic call boundaries. The full file remains the source of truth; individual cases must be ported to the differential harness rather than replaced with a smaller hand-picked subset.
 
-## 10. Explicit M0 gaps after test mapping
+## 10. M0 closure record
 
 The existing corpus is strong for V0.3 semantics but does not yet establish VM correctness. The following are still implementation work:
 - A test-only reference entry point that can run the exact parsed/checked input through the tree-walking engine without changing public APIs.
@@ -233,4 +233,4 @@ The current verifier implementation adds explicit checks for:
 - dependency-first module ordering, initializer ownership/arity, import target export identity, read-only import slots, and export metadata;
 - operand-stack underflow, exact stack-height merges, scope-depth merges, scope underflow, return stack shape, and bounded operand-stack height.
 
-Regression tests cover these invariants. A fuzz target decodes bounded arbitrary byte sequences into malformed bytecode programs and invokes the verifier. This is still a verifier foundation: it does not prove compiler correctness or VM execution conformance, and no VM is currently available to consume verified programs.
+Regression tests cover these invariants. The compiler lowers source programs into this verified representation, and the VM consumes only verified programs. The dedicated malformed-bytecode fuzz target exercises bounded arbitrary byte sequences. Compiler/VM conformance is additionally checked against the retained tree-walking reference engine.
