@@ -226,10 +226,10 @@ mod tests {
     fn preserves_utf8_byte_spans_and_line_columns() {
         let source = "// commentaire\nstruct Café {}";
         let tokens = lex_v05(source).unwrap();
-        let cafe = tokens.iter().find(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "Caf")).unwrap();
+        let cafe = tokens.iter().find(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "Cafe")).unwrap();
         assert_eq!(cafe.line, 2);
         assert_eq!(cafe.column, 8);
-        assert_eq!(&source[cafe.span.clone()], "Caf");
+        assert_eq!(&source[cafe.span.clone()], "Cafe");
     }
 
     #[test]
