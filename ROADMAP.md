@@ -29,7 +29,7 @@ Integrated into main at c47a06cec1120edd33114cce1857c40f10b7f333 (PR #16). Post-
 
 ## 0.5.0
 
-The normative specification and implementation plan are on branch design/hk-v0.5.0-advanced-language-features (PR #19). D0 semantic decisions are closed in HK-0.5-SPEC.md. Implementation has not started; M1.1 is the next milestone. No 0.5 feature is shipped.
+The normative specification and implementation plan are maintained in PR #19 and carried into the implementation branch. D0 semantic decisions are closed in HK-0.5-SPEC.md. M1.1 has a first, isolated source-code foundation in PR #21: v0.5 token vocabulary, source spans, recursive type-expression/bound models, and initial type/bound parsers. This is not a complete parser or an executable language feature. M1.1 remains in progress; M1.2–M8 have not been implemented. No 0.5 feature is shipped.
 
 ## Deferred
 
