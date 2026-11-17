@@ -1,6 +1,6 @@
 # HK 0.5.0 — Implementation Plan
 
-**Current phase:** M1.1 — front-end model and grammar.
+**Current phase:** M1.1 — front-end model and grammar (next implementation milestone; code not yet started).
 **Normative contract:** HK-0.5-SPEC.md.
 **Base:** HK 0.4.0 merge commit c47a06cec1120edd33114cce1857c40f10b7f333.
 **Release status:** not implemented; not released.
