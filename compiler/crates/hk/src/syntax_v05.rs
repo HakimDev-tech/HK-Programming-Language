@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn preserves_utf8_byte_spans_and_line_columns() {
-        let source = "// commentaire\nstruct Café {}";
+        let source = "// café\nstruct Cafe {}";
         let tokens = lex_v05(source).unwrap();
         let cafe = tokens.iter().find(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "Cafe")).unwrap();
         assert_eq!(cafe.line, 2);
