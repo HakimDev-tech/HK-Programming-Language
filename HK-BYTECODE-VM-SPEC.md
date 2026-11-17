@@ -40,7 +40,7 @@ The VM must preserve the observable semantics of HK 0.3.0 for every accepted pro
 
 The parser and AST remain the source-language front end. The VM must not re-parse source or infer semantics from source text.
 
-The existing tree-walking engine remains available internally as the reference implementation throughout 0.4.x. Public `run` and `run_path` switch to VM execution only after the complete release gate passes. An internal/test-only reference entry point is retained for differential tests; it is not required to become a permanent public API.
+The existing tree-walking engine remains available internally as the reference implementation throughout 0.4.x. On the V0.4 implementation branch, public `run` and `run_path` execute through the compiler, mandatory verifier, and VM. An internal/test-only reference entry point is retained for differential tests; it is not a permanent public API.
 
 ## 3. Execution pipeline
 
