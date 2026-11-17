@@ -197,6 +197,128 @@ pub struct GenericBound {
     pub span: Range<usize>,
 }
 
+/// A parser failure with a precise token location.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05ParseError {
+    pub message: String,
+    pub span: Range<usize>,
+    pub line: usize,
+    pub column: usize,
+}
+
+/// Parses one recursive type expression at `*cursor` and advances the cursor
+/// only after successfully consuming the complete expression.
+pub fn parse_type_expr(tokens: &[V05Token], cursor: &mut usize) -> Result<TypeExpr, V05ParseError> {
+    parse_type_expr_at(tokens, cursor, 0)
+}
+
+fn parse_type_expr_at(tokens: &[V05Token], cursor: &mut usize, depth: usize) -> Result<TypeExpr, V05ParseError> {
+    if depth >= 64 {
+        return Err(parse_error(tokens, *cursor, "Maximum type-expression nesting depth (64) exceeded."));
+    }
+    let start_index = *cursor;
+    let token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a type name."))?;
+    let name = match &token.kind {
+        V05TokenKind::Identifier(name) => name.clone(),
+        _ => return Err(parse_error(tokens, *cursor, "Expected a type name.")),
+    };
+    *cursor += 1;
+
+    if name == "any" {
+        return Ok(TypeExpr::Any { span: token.span.clone() });
+    }
+
+    let mut arguments = Vec::new();
+    if is_punctuation(tokens.get(*cursor), V05Punctuation::Less) {
+        *cursor += 1;
+        if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
+            return Err(parse_error(tokens, *cursor, "Generic argument lists cannot be empty."));
+        }
+        loop {
+            arguments.push(parse_type_expr_at(tokens, cursor, depth + 1)?);
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+                *cursor += 1;
+                if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
+                    return Err(parse_error(tokens, *cursor, "Expected a type after ','."));
+                }
+            } else {
+                break;
+            }
+        }
+        if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
+            return Err(parse_error(tokens, *cursor, "Expected '>' after generic arguments."));
+        }
+        *cursor += 1;
+    }
+
+    let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
+    let _ = start_index;
+    Ok(TypeExpr::Named { name, arguments, span: token.span.start..end })
+}
+
+/// Parses generic parameters in `<T: Trait + Debug, U>` form.
+pub fn parse_generic_parameters(tokens: &[V05Token], cursor: &mut usize) -> Result<Vec<GenericBound>, V05ParseError> {
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::Less) {
+        return Ok(Vec::new());
+    }
+    *cursor += 1;
+    let mut parameters = Vec::new();
+    loop {
+        let start = *cursor;
+        let token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a generic parameter."))?;
+        let parameter = match &token.kind {
+            V05TokenKind::Identifier(name) => name.clone(),
+            _ => return Err(parse_error(tokens, *cursor, "Expected a generic parameter name.")),
+        };
+        *cursor += 1;
+        let mut traits = Vec::new();
+        if is_punctuation(tokens.get(*cursor), V05Punctuation::Colon) {
+            *cursor += 1;
+            loop {
+                let bound = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a trait bound."))?;
+                match &bound.kind {
+                    V05TokenKind::Identifier(name) => traits.push(name.clone()),
+                    _ => return Err(parse_error(tokens, *cursor, "Expected a trait name in generic bound.")),
+                }
+                *cursor += 1;
+                if is_punctuation(tokens.get(*cursor), V05Punctuation::Plus) {
+                    *cursor += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+        let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
+        parameters.push(GenericBound { parameter, traits, span: token.span.start..end });
+        if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+            *cursor += 1;
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
+                return Err(parse_error(tokens, *cursor, "Expected a generic parameter after ','."));
+            }
+        } else {
+            break;
+        }
+        if *cursor - start > 256 {
+            return Err(parse_error(tokens, *cursor, "Generic parameter list exceeds the supported limit."));
+        }
+    }
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
+        return Err(parse_error(tokens, *cursor, "Expected '>' after generic parameters."));
+    }
+    *cursor += 1;
+    Ok(parameters)
+}
+
+fn is_punctuation(token: Option<&V05Token>, expected: V05Punctuation) -> bool {
+    matches!(token.map(|t| &t.kind), Some(V05TokenKind::Punctuation(actual)) if *actual == expected)
+}
+
+fn parse_error(tokens: &[V05Token], cursor: usize, message: &str) -> V05ParseError {
+    let token = tokens.get(cursor).or_else(|| tokens.last());
+    let (span, line, column) = token.map(|t| (t.span.clone(), t.line, t.column)).unwrap_or((0..0, 1, 1));
+    V05ParseError { message: message.into(), span, line, column }
+}
+
 /// A lexical failure with stable source coordinates.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct V05LexError {
