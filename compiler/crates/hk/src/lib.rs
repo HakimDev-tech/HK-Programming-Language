@@ -14,7 +14,7 @@ mod lexer;
 mod module_loader;
 mod parser;
 mod runtime;
-mod runtime_ops;
+mod runtime_ops;\npub mod syntax_v05;
 mod type_checker;
 mod types;
 mod value;
