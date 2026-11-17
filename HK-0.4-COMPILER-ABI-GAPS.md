@@ -1,82 +1,59 @@
-# HK 0.4.x — Compiler ABI gaps and lexical-capture contract
+# HK 0.4.0 — Lexical capture implementation and ABI invariants
 
-Status: the bytecode representation and verifier now contain the lexical-capture
-foundation on feat/hk-v0.4.0-bytecode-vm. The AST compiler and VM do not yet
-exist. This document records the constraints the compiler and VM must implement;
-it is not a claim that closure execution is already available.
+**Status:** Implemented across M2 (bytecode/verifier), M3 (compiler), and M4 (VM). This document records the compatibility contract and the implementation now present on `feat/hk-v0.4.0-bytecode-vm`; it is no longer a list of unimplemented compiler/VM obligations.
 
 ## 1. V0.3 lexical-environment contract
 
-The V0.3 interpreter stores a function's defining lexical environment as a
-Weak<RefCell<Env>> in Fun::env. Nested named functions can resolve and mutate
-ancestor bindings while the defining environment is alive. The module loader
-separately keeps defining module environments alive for imported functions
-during one run_path execution.
+The V0.3 interpreter stores a function's defining lexical environment as a `Weak<RefCell<Env>>` in `Fun::env`. Nested named functions can resolve and mutate ancestor bindings while the defining environment is alive. The module loader separately keeps defining module environments alive for imported functions during one `run_path` execution.
 
-The VM must preserve those ownership and lifetime boundaries. It must not turn
-the V0.3 weak lexical-environment relationship into an indefinitely strong
-escaping-closure guarantee. A function whose defining environment has expired
-must retain the reference runtime's controlled
-Function environment is no longer available failure.
+HK 0.4 preserves these ownership and lifetime boundaries. It does not turn the V0.3 weak lexical-environment relationship into an indefinitely strong escaping-closure guarantee. If the defining environment expires, execution retains the reference runtime's controlled `Function environment is no longer available` failure.
 
-## 2. Bytecode ABI now present in this branch
+## 2. Bytecode ABI
 
-FunctionProto now contains:
-- enclosing_function: Option<u32> — lexical parent prototype, absent for roots;
-- upvalues: Vec<UpvalueDescriptor> — ordered capture table;
-- each descriptor records UpvalueSource::EnclosingLocal(slot) or
-  UpvalueSource::EnclosingUpvalue(slot), mutability, and optional type contract.
+`FunctionProto` contains:
+- `enclosing_function: Option<u32>` — lexical parent prototype, absent for roots;
+- `upvalues: Vec<UpvalueDescriptor>` — ordered capture table;
+- each descriptor records `UpvalueSource::EnclosingLocal(slot)` or `UpvalueSource::EnclosingUpvalue(slot)`, mutability, and an optional type contract.
 
-The opcode set now contains:
-- GetUpvalue(u16) — push a captured binding's current value;
-- SetUpvalue(u16) — assign the top stack value while preserving the expression
-  result, with constant/import write enforcement left to runtime semantics.
+The opcode set contains `GetUpvalue(u16)` and `SetUpvalue(u16)`. Captures refer to shared binding cells rather than copied values. The compiler ABI version is 2; programs using upvalues declare `FEATURE_LEXICAL_UPVALUES`. The verifier rejects unsupported ABI versions and required feature bits.
 
-The compiler ABI version is 2. Programs using upvalues must declare feature bit
-FEATURE_LEXICAL_UPVALUES. The verifier rejects unsupported ABI/features.
+## 3. Verifier guarantees
 
-## 3. Verifier guarantees now present
+The verifier enforces:
+- valid earlier lexical parent prototypes for capture-bearing functions;
+- valid local and forwarded capture sources;
+- exact capture mutability and type-contract metadata;
+- unique capture descriptors;
+- nested-prototype instantiation only by the declared lexical parent;
+- definite initialization before a parent local is captured;
+- valid upvalue indexes and stack effects;
+- control-flow, operand-stack, and lexical-scope invariants for capture instructions.
 
-- A capture-bearing function must identify a valid earlier lexical parent.
-- Local captures and forwarded captures must resolve to existing parent slots.
-- Capture mutability and type-contract metadata must exactly match the source.
-- Duplicate capture descriptors are rejected.
-- A nested prototype can only be instantiated by its declared lexical parent.
-- A nested function cannot capture a parent local before definite initialization.
-- Upvalue opcode indices and stack effects are verified.
-- Assignment to immutable captures remains a runtime decision, matching the
-  existing verifier policy for local/module/import writes and preserving
-  unreachable-code behavior.
-- The malformed-bytecode fuzzer now emits upvalue opcodes and lexical-capture
-  metadata, including invalid cases.
+Writes to immutable bindings remain runtime-enforced, preserving the reference interpreter's behavior for unreachable writes.
 
-## 4. Remaining compiler/VM obligations
+## 4. Compiler and VM obligations — implemented
 
-The compiler and VM must implement all of the following; the verifier metadata
-alone is insufficient:
+The compiler and VM now implement and test:
+- shared mutable binding cells, capture identity, and contract preservation;
+- nested and transitive capture forwarding;
+- self-recursive and mutually recursive named functions;
+- lexical shadowing, scope exit, and weak environment expiration;
+- captured const/import write failures at the runtime boundary;
+- typed variable, parameter, and return contracts through captures;
+- native `print` and all `std:math` functions, with lexical shadowing and arity/type/domain diagnostics;
+- lowering for supported AST expression and statement families, with explicit diagnostics at the source-only import boundary;
+- mandatory verification before public VM execution.
 
-- Capture shared bindings, not copied values. Repeated references to the same
-  binding must preserve identity, mutation, and contracts.
-- Forward transitive captures through intermediate functions.
-- Preserve self-recursive and mutually recursive named-function declarations.
-- Preserve lexical shadowing, scope exit, and weak environment expiration.
-- Ensure captured const/import assignment fails at the same runtime boundary
-  and with the same diagnostic as V0.3.
-- Preserve typed variable, parameter, and return contracts through captures.
-- Define native prelude resolution for print and all std:math functions,
-  including lexical shadowing and existing arity/type/domain diagnostics.
-- Compile every AST node or return an explicit diagnostic at a documented
-  unsupported boundary. Imports/exports must never be silently discarded.
-- Verify every compiled program before execution.
+The compiler emits source-aware instructions and gradual-typing provenance. Public `hk::run` and `hk::run_path` execute through the verified VM; the tree-walking implementation remains available as the differential reference.
 
-## 5. Acceptance gate
+## 5. Evidence and remaining release controls
 
-M3 is not complete until compiler tests cover every AST variant, nested scopes,
-shadowing, recursion, captured mutable/immutable bindings, typed captures,
-short-circuiting, arrays/indexing/properties, source locations, and malformed
-program rejection.
+The compiler-focused tests include AST-family coverage, typed metadata, loop scopes, module-boundary diagnostics, and top-level return diagnostics. VM and module integration tests compare output or structured failures against the reference engine, including capture lifetime, mutable captures, cross-module functions, aliases, live bindings, source identity, and gradual-contract boundaries.
 
-M4 is not complete until VM tests execute these programs and match the
-reference interpreter's values, output, error codes/messages/positions, and
-environment-lifetime behavior. M5/M6 module integration, differential testing,
-fuzzing, and resource stress gates remain mandatory before release.
+On commit `392fe58c04392a32ef20df5549f5fe172b1ad490`, GitHub Actions completed successfully:
+- CI on Ubuntu, macOS, and Windows;
+- source execution fuzzing: 875,697 runs;
+- module resolver fuzzing: 88,958 runs;
+- malformed bytecode verifier fuzzing: 906,550 runs.
+
+These results close the implementation obligations described here. They do not by themselves authorize release: the final PR diff/documentation review, draft-to-ready transition, merge, tag, and GitHub Release remain governed by `HK-0.4-IMPLEMENTATION-PLAN.md`.
