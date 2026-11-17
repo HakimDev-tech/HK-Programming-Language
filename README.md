@@ -2,7 +2,7 @@
 
 HK is an experimental general-purpose programming language implemented in Rust. HK 0.4.0 provides gradual typing, file-based modules, a verified in-memory bytecode format, and a stack-based virtual machine.
 
-> **Status:** HK 0.3.0 is the semantic compatibility baseline. HK 0.4.0 implementation is on PR #16 and remains unreleased pending final CI, fuzz, and release gates. The public `run` and `run_path` entry points use the verified bytecode VM; bytecode is in-memory only and has no stable serialized file format.
+> **Status:** HK 0.3.0 is the semantic compatibility baseline. HK 0.4.0 implementation is on PR #16. Exact-head CI and fuzz campaigns passed on the implementation commit; documentation corrections require a final rerun and review before release. The public `run` and `run_path` entry points use the verified bytecode VM; bytecode is in-memory only and has no stable serialized file format.
 
 ## Language capabilities
 
