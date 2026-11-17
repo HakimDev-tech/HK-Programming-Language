@@ -12,7 +12,7 @@
 - Add a reproducible end-to-end VM benchmark harness and record an initial release-build baseline.
 - Complete local 12-second fuzz smoke campaigns for source execution, module resolution, and malformed-bytecode verification; longer CI fuzz campaigns and final cross-platform CI on the exact release candidate remain required.
 - Add compiler/verification-versus-VM benchmark separation and a same-host V0.3/V0.4 end-to-end comparison. The current V0.4 candidate is 5.3–29.4% slower on the measured workloads; this is accepted as an architectural trade-off, documented, and not presented as a performance improvement.
-- V0.4.0 remains unreleased pending final CI/fuzz review, final CI/fuzz review and release approval.
+- V0.4.0 remains unreleased pending final PR diff/documentation review, release approval, merge, tag, and GitHub Release publication.
 
 ## HK 0.3.0 — 2026-11-15
 
