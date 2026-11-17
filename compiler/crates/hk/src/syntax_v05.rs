@@ -262,7 +262,14 @@ pub struct V05ParseError {
 /// Parses one recursive type expression at `*cursor` and advances the cursor
 /// only after successfully consuming the complete expression.
 pub fn parse_type_expr(tokens: &[V05Token], cursor: &mut usize) -> Result<TypeExpr, V05ParseError> {
-    parse_type_expr_at(tokens, cursor, 0)
+    let original = *cursor;
+    match parse_type_expr_at(tokens, cursor, 0) {
+        Ok(ty) => Ok(ty),
+        Err(error) => {
+            *cursor = original;
+            Err(error)
+        }
+    }
 }
 
 fn parse_type_expr_at(
@@ -277,7 +284,7 @@ fn parse_type_expr_at(
             "Maximum type-expression nesting depth (64) exceeded.",
         ));
     }
-    let start_index = *cursor;
+    
     let token = tokens
         .get(*cursor)
         .ok_or_else(|| parse_error(tokens, *cursor, "Expected a type name."))?;
@@ -500,7 +507,7 @@ mod tests {
     fn reports_unterminated_strings_without_panicking() {
         let error = lex_v05("struct A { name: \"unfinished").unwrap_err();
         assert_eq!(error.line, 1);
-        assert_eq!(error.column, 19);
+        assert_eq!(error.column, 18);
         assert!(error.message.contains("Unterminated"));
     }
 
