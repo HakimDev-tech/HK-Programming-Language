@@ -120,7 +120,7 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
                 let current = source[offset..].chars().next().expect("valid UTF-8 boundary");
                 advance_position(current, &mut offset, &mut line, &mut column);
                 if escaped { escaped = false; }
-                else if current == '\\\\' { escaped = true; }
+                else if current == '\\' { escaped = true; }
                 else if current == '"' { closed = true; break; }
             }
             if !closed {
