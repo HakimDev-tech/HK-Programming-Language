@@ -335,7 +335,6 @@ fn parse_type_expr_at(
         .get(cursor.saturating_sub(1))
         .map(|t| t.span.end)
         .unwrap_or(token.span.end);
-    let _ = start_index;
     Ok(TypeExpr::Named {
         name,
         arguments,
