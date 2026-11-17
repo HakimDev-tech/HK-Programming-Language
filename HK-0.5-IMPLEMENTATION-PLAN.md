@@ -1,6 +1,6 @@
 # HK 0.5.0 — Implementation Plan
 
-**Current phase:** M1.1 — front-end model and grammar (next implementation milestone; code not yet started).
+**Current phase:** M1.1 — front-end model and grammar (in progress; isolated lexical/type-expression foundation exists in PR #21, but the full declaration AST and parser are outstanding).
 **Normative contract:** HK-0.5-SPEC.md.
 **Base:** HK 0.4.0 merge commit c47a06cec1120edd33114cce1857c40f10b7f333.
 **Release status:** not implemented; not released.
@@ -11,7 +11,7 @@ Implement in dependency order. Each milestone is a focused reviewable change and
 
 | ID | Scope | Mandatory exit evidence |
 |---|---|---|
-| M1.1 | Tokens, type-expression AST, declarations, impl AST, patterns, parser | Grammar tests for valid/invalid/ambiguous input and source spans |
+| M1.1 | Tokens, type-expression AST, declarations, impl AST, patterns, parser | Grammar tests for valid/invalid/ambiguous input and source spans. Partial foundation: token vocabulary, spans, TypeExpr/GenericBound, initial type/bound parsers; full grammar remains open. |
 | M1.2 | Whole-graph declaration collection and symbol tables | Duplicate/unknown declaration tests; deterministic resolution; no initializers executed |
 | M2.1 | Nominal types, generic type resolution, field/constructor checking | Positive/negative checker matrix and dynamic boundary tests |
 | M2.2 | Trait conformance, orphan/coherence, generic inference/bounds | Multi-module coherence and inference ambiguity/limit tests |
@@ -26,6 +26,8 @@ Implement in dependency order. Each milestone is a focused reviewable change and
 | M8 | Release readiness | Docs/API review, exact-head CI/fuzz, merge, tag and GitHub Release |
 
 ## M1.1 checklist
+
+**Progress note (2026-11-17):** PR #21 adds an isolated lexer/type-expression foundation. Its exact head `9c1edf6a1e0d1592b6df1dfe099952c33aa863df` passes the repository CI matrix on Linux, macOS and Windows and the configured fuzz workflow. These checks validate the current code slice only; they do not close M1.1 or establish feature-level parser/runtime correctness.
 
 - Add keywords and punctuation without changing existing tokenization.
 - Represent recursive type expressions: primitive, nominal path, generic application and type parameter.
