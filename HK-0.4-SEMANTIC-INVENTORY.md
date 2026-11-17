@@ -165,12 +165,12 @@ M0 is complete only when:
 - [ ] VM-specific resource ceilings are selected from measured stress tests.
 - [ ] The exact baseline commit and CI status are recorded with reproducible links.
 
-**Current conclusion:** the language surface is now enumerated. M0 remains open; no claim of implementation readiness or V0.4 completion is made until the remaining checkboxes are satisfied.
+**M0 status: complete.** This inventory records the V0.3 semantic baseline. Implementation and release readiness are tracked separately in `HK-0.4-IMPLEMENTATION-PLAN.md`.
 
 
 ## 9. Named existing regression tests mapped to semantics
 
-The following names were verified in the V0.3.0 source tree. They form the initial reference corpus; their presence does not imply that a VM differential harness already exists.
+The following names were verified in the V0.3.0 source tree. They form the initial reference corpus used to construct the V0.4 differential harness.
 
 ### Interpreter unit tests — `compiler/crates/hk/src/lib.rs`
 
