@@ -1,222 +1,116 @@
-# HK 0.5.0 — Advanced Language Features (Design Draft)
+# HK 0.5.0 — Advanced Language Features Specification
 
-**Status:** design draft; no source-language or runtime changes are authorized by this document alone.
-**Baseline:** HK 0.4.0, merged at `c47a06cec1120edd33114cce1857c40f10b7f333`.
-**Purpose:** introduce nominal aggregate types and statically checked abstraction without weakening HK's gradual-typing guarantees or the verified-bytecode boundary.
+**Status:** normative design baseline for implementation; implementation not yet complete.
+**Baseline:** HK 0.4.0, merge commit c47a06cec1120edd33114cce1857c40f10b7f333.
+**Compatibility:** existing HK 0.4 programs retain their behavior unless an explicit compatibility amendment is approved.
 
-## 1. Release objective
+## 1. Release contract
 
-HK 0.5.0 adds a coherent, minimal object-and-abstraction model:
+HK 0.5.0 adds nominal structs with methods, nominal enums with unit and tuple-payload variants, exhaustive statement-level pattern matching, explicit traits and coherent implementations, bounded generic functions/structs/enums, and integration with modules, closures, verified bytecode and the VM. Closures already exist in 0.4; 0.5 integrates them with aggregate values and generic calls rather than claiming to introduce them.
 
-1. nominal structs with named fields and methods;
-2. enums with explicitly named variants and payloads;
-3. traits as compile-time interfaces, implemented explicitly;
-4. bounded generic functions, structs, and enums;
-5. inference for generic call sites where constraints determine a unique solution.
+## 2. Type and compatibility model
 
-Closures are already supported by the 0.4 VM. This release must preserve and broaden their compatibility with aggregate values and generic functions; it must not describe closures as a newly introduced feature.
+Primitive types remain number, string, bool, null, array and any. New types are nominal declarations and generic applications.
 
-This is not a general object-oriented runtime, a dynamic dispatch system, or a replacement of the gradual type model.
+- Nominal identity is declaration identity, never structural shape.
+- Generic applications are invariant: Box<number> is not assignable to Box<any> or Box<string>.
+- There is no inheritance, subtyping, structural conversion or user-defined coercion.
+- any remains the gradual escape hatch but is not evidence that a generic constraint or trait bound is satisfied.
+- Concrete nominal contracts compare runtime descriptor identity, including concrete generic arguments.
+- A statically known concrete value receives static member checking. A receiver typed any may use runtime field/method lookup against its actual nominal descriptor; failure is a runtime diagnostic, never silent null.
+- Variance, unions, optional, higher-kinded, associated and existential types are deferred.
 
-## 2. Normative design principles
+## 3. Structs
 
-- **Nominal identity:** two separately declared structs/enums are distinct even if their fields/variants match.
-- **Gradual compatibility:** existing unannotated programs retain their 0.4 behavior. New declarations are statically checked; dynamic values crossing typed boundaries are guarded at runtime where a concrete check is possible.
-- **No implicit structural conformance:** a type implements a trait only through an explicit `impl Trait for Type` declaration.
-- **No hidden allocation model:** struct/enum values follow the VM's existing tagged-value and shared-identity model. No unsafe Rust is introduced.
-- **Verifier-first:** new bytecode instructions, constants, type descriptors, and call forms must be represented in the bytecode format and validated by the mandatory verifier before execution.
-- **Determinism:** type resolution, trait selection, method lookup, diagnostics, and module linking must not depend on hash-map iteration order.
-- **Source fidelity:** every declaration, field, variant, method, and generic constraint retains source identity and spans for diagnostics.
-- **No silent language drift:** syntax and semantics are specified before implementation; unresolved choices are recorded as blockers, not guessed in the compiler.
-
-## 3. Proposed source syntax
-
-The following syntax is the design target and must be validated against the existing parser conventions before it becomes normative.
-
-### 3.1 Structs
-
-```hk
-struct Point {
-    x: number,
-    y: number,
-}
-
+~~~hk
+struct Point { x: number, y: number, }
 let origin: Point = Point { x: 0, y: 0 };
-let shifted = Point { x: origin.x + 1, y: origin.y };
-```
+struct Box<T> { value: T, }
+let box: Box<number> = Box<number> { value: 42 };
+~~~
 
-- Fields are declared in source order and initialized exactly once in a struct literal.
-- Missing, duplicate, and unknown fields are compile-time errors.
-- Field access uses `value.field`.
-- Field assignment uses `value.field = expression` only when the value is a mutable struct instance and the field is not declared immutable by the final syntax decision.
-- Struct identity is nominal. Struct equality remains identity-based unless a future explicit equality protocol is designed.
-- No implicit default constructor, inheritance, visibility system, or structural object conversion in 0.5.
+Structs are module-top-level declarations. Fields are ordered, unique, named and typed. Construction initializes every field exactly once; missing, duplicate or unknown fields are compile-time errors when statically knowable. Generic arguments may be inferred only when the expected type or field initializers uniquely determine every argument.
 
-### 3.2 Methods and implementations
+A struct instance is a heap-backed, reference-counted nominal object. Cloning a runtime value clones the reference; aliases observe the same fields. Fields are mutable. Field assignment mutates the object, not the variable binding. let and const continue to control rebinding only, matching the existing array model. Struct equality is identity equality. Display is deterministic and cycle/depth bounded. Recursive struct references are allowed; allocation and formatting are bounded. No defaults, visibility modifiers, inheritance, spread construction or structural literals.
 
-```hk
+## 4. Methods and receivers
+
+~~~hk
 impl Point {
-    fn magnitude(self) -> number {
-        return std:math.sqrt(self.x * self.x + self.y * self.y);
+    fn translate(self, dx: number, dy: number) {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
     }
 }
-```
-
-- Methods are associated with exactly one nominal type.
-- The receiver convention (`self` by value/reference) is an explicit design gate: the spec must settle ownership/aliasing behavior before implementation.
-- No method overloading by return type.
-- Duplicate method names within the same implementation are rejected.
-- Method lookup is deterministic and must not silently fall back to arbitrary dynamic property lookup for statically known nominal values.
-
-### 3.3 Enums
-
-```hk
-enum Result<T, E> {
-    Ok(T),
-    Err(E),
+impl<T> Box<T> {
+    fn get(self) -> T { return self.value; }
 }
+~~~
 
-let value: Result<number, string> = Result::Ok(42);
-```
+An inherent impl associates methods with one nominal type. Every instance method has exactly one first parameter named self; its type is inferred and it cannot be rebound. self is a shared receiver, not a move or copy; mutating self.field changes the shared instance and is visible through aliases. There are no static functions, method overloading or method-local type parameters. Method names are unique per nominal type after substitution. Statically known calls resolve at compile time. A receiver typed any uses runtime nominal method lookup, but this does not create trait objects. Method bodies preserve their defining module environment and source identity.
 
-- Variants are qualified by enum name.
-- Unit and tuple-payload variants are in scope; named-field variants are deferred unless they can be specified without ambiguity.
-- Each variant has fixed arity and declared payload types.
-- Construction checks variant identity and payload types.
-- Exhaustive pattern matching is a separate language feature and is not implicitly included. The 0.5 design must choose a minimal, safe inspection/matching syntax or explicitly defer destructuring and provide only construction plus tag/payload access.
-- Invalid variant names and payload arity/type mismatches are rejected before execution when statically knowable.
+## 5. Enums and match
 
-### 3.4 Traits
-
-```hk
-trait Display {
-    fn display(self) -> string;
+~~~hk
+enum Result<T, E> { Ok(T), Err(E), }
+enum Direction { North, South, East, West }
+let result: Result<number, string> = Result<number, string>::Ok(42);
+let north = Direction::North;
+match result {
+    Result<number, string>::Ok(value) => { print(value); }
+    Result<number, string>::Err(message) => { print(message); }
 }
+~~~
 
+Enums are module-top-level and nominal. Variants are unique and either unit-like or fixed-arity tuple payloads; named-field variants are deferred. Payload variants require exact arity. Generic arguments may be inferred only from a unique expected type or payload solution. Enum values are immutable tagged values; payload aliasing follows contained-value semantics. Enum equality is identity equality.
+
+match is a statement, not an expression. Each arm is a fully qualified enum variant pattern followed by => and a block. Payload names bind positional values; unit variants have no binders. A wildcard arm is allowed once and must be last. Without a wildcard, every variant must appear exactly once. Duplicate, missing, unknown or wrong-arity patterns are compile-time errors for statically known enums. Matching any requires a wildcard arm; dynamic inspection fails safely if the runtime value is not the expected enum. Each arm has a lexical scope, bindings are immutable and there is no fallthrough. Guards, nested/or-patterns and match expressions are deferred.
+
+## 6. Traits and coherence
+
+~~~hk
+trait Display { fn display(self) -> string; }
 impl Display for Point {
     fn display(self) -> string {
         return "Point(" + self.x + ", " + self.y + ")";
     }
 }
-```
+~~~
 
-- Traits define method signatures, not fields or stored state.
-- Implementations are explicit and checked for missing, extra, duplicate, and incompatible methods.
-- Orphan/coherence policy: an implementation may be declared only in the module that owns the trait or the implementing type. Duplicate implementations for the same trait/type pair are rejected across the reachable module graph.
-- Trait objects and runtime dynamic dispatch are out of scope for 0.5 unless separately justified and specified.
-- Default trait methods are deferred.
-- Method dispatch for statically known types is resolved before bytecode execution.
+Traits declare instance method signatures only; every method has self first. No fields, associated types/constants, default methods or trait inheritance. Implementations provide every method exactly once with compatible signatures; missing, extra or duplicate methods are errors. At most one implementation exists for each trait/type pair across the reachable module graph. Orphan rule: an impl is legal only in the module declaring the trait or the module declaring the type. Trait resolution is static for concrete types and generic parameters with satisfied bounds. No trait objects or runtime trait dispatch. Inherent and trait methods with the same name on one type are rejected. Generic trait implementations are supported with explicit bounds. All coherence checks finish before module initialization.
 
-### 3.5 Generics
+## 7. Generics
 
-```hk
-fn identity<T>(value: T) -> T {
-    return value;
-}
+~~~hk
+fn identity<T>(value: T) -> T { return value; }
+fn render<T: Display>(value: T) -> string { return value.display(); }
+let n = identity::<number>(42);
+~~~
 
-fn show<T: Display>(value: T) -> string {
-    return value.display();
-}
+Type parameters are lexically scoped and unique per declaration. Bounds are one or more trait constraints separated by +. Generic functions, structs, enums, inherent impls and trait impls are supported. Type arguments are invariant. No specialization, defaults, const generics or higher-kinded parameters.
 
-struct Box<T> {
-    value: T,
-}
-```
+Function arguments are inferred by unifying declared parameter types with statically known argument types; a concrete expected return type may add constraints. Inference is deterministic and never inspects runtime values. Zero or multiple valid solutions are errors. Explicit arguments use turbofish syntax. A call through a statically any callee cannot infer arguments; explicit concrete arguments are required. Generic aggregate construction follows the same unique-solution rule.
 
-- Type parameters are lexically scoped to their declaration.
-- Bounds use explicit trait constraints.
-- Generic calls infer type arguments from argument and expected-result types when a unique solution exists; otherwise explicit type arguments are required.
-- Type inference must not inspect runtime values.
-- Generic constraints are checked statically; calls through `any` retain runtime checks only where meaningful.
-- Recursive generic instantiation and cyclic bounds require explicit termination/resource limits.
-- The implementation strategy (monomorphization versus erased generic descriptors) is an architectural decision gate. It must be benchmarked and assessed against bytecode verifier complexity, recursion, module linking, and diagnostics before selection. No strategy is pre-authorized here.
+**Compilation strategy: monomorphization.** Each concrete type-argument tuple creates a distinct function specialization/type descriptor. This preserves concrete runtime contracts and enables statically resolved trait calls without a runtime dictionary ABI. Hard limits: instantiation nesting 32; 128 specializations per generic declaration per program; 4,096 total specializations per program; type-expression nesting 64. Limit violations are deterministic compile-time diagnostics. Cycles are detected. Bytecode size and compile cost must be benchmarked.
 
-## 4. Type-system integration
+## 8. Modules and visibility
 
-The current primitive types remain: `number`, `string`, `bool`, `null`, `array`, and `any`.
+Types, traits and impls are module-top-level. Existing export/import syntax extends to struct, enum and trait declarations. Imported type/trait names are immutable and retain defining-module identity. All reachable declarations, bounds, impls and import links are resolved before any module body executes. Duplicate declarations and cross-module coherence conflicts fail deterministically before side effects. Inherent impls may occur only in the type's defining module; trait impls obey the orphan rule. Existing relative .hk imports, dependency order, module isolation and std:math remain unchanged. No package registry, cyclic imports or implicit prelude.
 
-0.5 adds nominal type references, generic type applications, and trait bounds. The checker must distinguish:
-- a declared nominal type;
-- a generic type parameter;
-- a trait constraint on that parameter;
-- an unknown/dynamic `any` expression;
-- a runtime value tag.
+## 9. Bytecode, verifier and runtime safety
 
-Required rules:
-- reject unknown types, duplicate type parameters, invalid bounds, and wrong generic arity;
-- validate field initializers, method receivers, method calls, enum payloads, and trait implementations;
-- preserve declaration-site and call-site source spans;
-- never treat `any` as proof that a trait bound is satisfied;
-- define precisely which runtime guards are possible when a dynamic value enters a concrete nominal boundary;
-- retain existing gradual typing and runtime contract semantics for all pre-0.5 programs.
+Every nominal type, specialization, field layout, enum variant, method target and match dispatch table is represented in the versioned in-memory bytecode. The verifier validates descriptor indices, type argument counts, layouts, variant tags/arity, method targets, specialization references, match targets and stack effects. No VM entry occurs before complete verification. Runtime values remain tagged; source-provided IDs are never trusted as unchecked indices or pointer casts. Allocation, payload storage, formatting, recursive resolution and generic expansion are bounded. No unsafe Rust. The reference engine must implement the same semantics before differential parity is claimed. Runtime contracts compare exact nominal descriptors.
 
-Unions, optional types, variance annotations, higher-kinded types, associated types, and trait objects are deferred.
+## 10. Diagnostics
 
-## 5. Runtime and bytecode requirements
+Stable feature-specific diagnostic families distinguish declaration errors; field/variant construction and access errors; method/trait conformance, orphan and coherence errors; generic arity, bounds, inference and instantiation-limit errors; match exhaustiveness and binder errors; and dynamic nominal contract/member errors. Every diagnostic preserves source file, declaration/use-site span and source excerpt. Specified errors must not collapse into generic E3000/E4009.
 
-- Add explicit runtime representations for struct instances and enum instances; define clone/identity/mutation behavior.
-- Keep values safe and tagged; no unchecked casts from source-provided type identifiers.
-- Add bytecode operations or constant descriptors only after the instruction semantics are specified.
-- Extend the verifier to validate type/descriptor indices, field layouts, enum tags/payload arity, method targets, generic metadata, and all new control-flow/stack effects.
-- Malformed bytecode must be rejected before any user code executes.
-- VM resource limits must cover aggregate allocation, nesting, generic instantiation, and recursive type resolution.
-- The tree-walking reference engine must either gain equivalent semantics for differential tests or the exact unsupported comparison boundary must be justified and tested independently.
+## 11. Non-goals
 
-## 6. Modules and visibility
+Inheritance, subtyping, structural records, trait objects, dynamic trait dispatch, default trait methods, associated types, operator overloading, macros, reflection, visibility modifiers, named enum payloads, match guards, nested/or-pattern destructuring, match expressions, method-local generics, async/concurrency, ownership/borrow checking, lifetimes, native/JIT/WASM/FFI, package manager, LSP, formatter and debugger.
 
-- Struct, enum, trait, and generic declarations follow the existing explicit export/import model.
-- Imported type names are read-only symbols and preserve defining-module source identity.
-- Type/trait resolution must complete before any module body executes.
-- Cross-module duplicate trait implementations and coherence conflicts are rejected during graph validation.
-- No package registry, third-party dependency resolution, cyclic imports, or implicit prelude is introduced.
+## 12. Acceptance criteria
 
-## 7. Diagnostics
+The release is complete only when grammar, AST, parser, checker, runtime, compiler, verifier, VM, modules and public API implement this contract; every rule has positive/negative tests; all 0.1–0.4 regressions pass; all features work in source and filesystem execution; specializations and trait resolution are deterministic/bounded; adversarial verifier tests reject malformed metadata before VM entry; reference/VM differential tests pass; fuzzing covers parser, type resolution, instantiation, module coherence and malformed bytecode; Linux/macOS/Windows CI passes formatting, workspace tests, Clippy with warnings denied and rustdoc; benchmarks report compile/verify/execute/code-size/memory costs; docs/examples/changelog match behavior; and the exact merged commit is tagged and published.
 
-The design must allocate stable diagnostic codes and test:
-- unknown/duplicate nominal declarations;
-- unknown/duplicate/missing fields;
-- invalid enum variant, arity, or payload;
-- invalid receiver/method call;
-- missing/extra/incompatible trait methods;
-- conflicting or orphan trait implementation;
-- unknown generic parameter, wrong generic arity, unsatisfied bound, ambiguous inference, and recursive-instantiation limit;
-- dynamic value violating a nominal runtime contract.
-
-Diagnostics must identify the most useful declaration and use site, not only report a generic type mismatch.
-
-## 8. Explicit non-goals
-
-- Inheritance, subclasses, virtual method tables, reflection, macros, operator overloading.
-- Trait objects, runtime downcasting, dynamic dispatch.
-- Pattern matching unless explicitly added by an approved spec amendment.
-- Async/await, concurrency, ownership/borrow checker, lifetimes.
-- Native compilation, JIT, WASM, FFI, package manager, LSP, formatter, debugger.
-- Performance claims without reproducible baseline comparisons.
-
-## 9. Design gates before implementation
-
-Implementation is blocked until the following are decided and recorded:
-1. exact grammar and ambiguity tests for declarations, literals, methods, enum constructors, and generic arguments;
-2. receiver semantics and mutation/aliasing rules;
-3. enum inspection and pattern-matching boundary;
-4. generic compilation strategy and recursion/resource limits;
-5. trait coherence and cross-module rules;
-6. dynamic `any` boundary behavior;
-7. bytecode representation and verifier invariants;
-8. migration/compatibility policy and stable diagnostics.
-
-## 10. Acceptance criteria
-
-The release cannot be declared complete until:
-- every normative rule has positive and negative parser/type-checker/runtime tests;
-- all existing 0.1–0.4 regression suites pass unchanged unless an explicitly approved compatibility change exists;
-- structs, enums, traits, and generics work in source and filesystem module execution;
-- cross-module type imports and trait coherence are deterministic;
-- verifier adversarial tests reject malformed type/aggregate metadata;
-- source and module differential tests pass wherever both engines implement the feature;
-- fuzzing covers parsing, type resolution, generic instantiation, module graph/type linking, and malformed bytecode;
-- CI passes formatting, workspace tests, Clippy with warnings denied, and rustdoc on Linux, macOS, and Windows;
-- benchmarks document compile/verification/runtime costs and any regressions;
-- README, language spec, architecture, changelog, and release notes agree with actual implementation.
-
-**Status:** proposal for review. No implementation claim is made by this document.
+**Implementation status:** not implemented. This is the normative target, not a claim of shipped functionality.
