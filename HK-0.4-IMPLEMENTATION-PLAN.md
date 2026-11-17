@@ -3,7 +3,7 @@
 **Implementation branch:** feat/hk-v0.4.0-bytecode-vm
 **Base contract:** HK 0.3.0
 **Normative specification:** HK-BYTECODE-VM-SPEC.md
-**Release status:** implementation complete through M5; M6/M7 final release gates remain open. This branch is not yet a release.
+**Release status:** implementation and verification complete through M6. M7 release approval, merge, tag, and publication remain. This branch is not yet a release.
 
 ## Architectural decisions
 
@@ -26,7 +26,7 @@
 | M3 — AST compiler | Compiler covers all supported source expression/statement families, nested and transitive captures, control flow, arrays, source locations, and gradual-contract metadata | Complete |
 | M4 — VM | Verified stack-machine execution, bounded frames/stack, calls/returns, mutable captures, short-circuiting, diagnostics, and V0.3 weak environment lifetime | Complete |
 | M5 — modules and typing | Dependency-first module compilation/linking, imports/exports/aliases/live bindings, std:math, source identity, and gradual contracts through VM | Complete |
-| M6 — differential/fuzz/robustness | Source and module differential suites; resource and malformed-input regressions; exact-head cross-platform CI and full CI fuzz campaign | Complete on implementation commit `392fe58`; rerun after final documentation commits |
+| M6 — differential/fuzz/robustness | Source and module differential suites; resource and malformed-input regressions; cross-platform CI and full CI fuzz campaign | Complete on final implementation candidate `98fe982`; CI #742 and Fuzz #326 passed |
 | M7 — documentation/benchmarks/release | Normative specification, semantic inventory, implementation plan, lexical-capture record, changelog, README, and reproducible benchmark harnesses | Partial: benchmarks and trade-off documentation complete; final consistency review, release approval, tag and GitHub Release remain |
 
 ## Compatibility requirements
@@ -45,7 +45,7 @@ The V0.3 semantic inventory remains normative. In particular:
 
 ## Exact-head validation
 
-GitHub Actions completed on implementation commit `392fe58c04392a32ef20df5549f5fe172b1ad490`:
+GitHub Actions completed on implementation candidate `98fe9823e97c9c5813f029f45f42b4cd89cfea03`:
 
 | Check | Result |
 |---|---|
@@ -58,7 +58,7 @@ GitHub Actions completed on implementation commit `392fe58c04392a32ef20df5549f5f
 | Module resolver fuzzing | 88,958 runs, no finding |
 | Malformed bytecode verifier fuzzing | 906,550 runs, no finding |
 
-Workflow runs: CI #721 and Fuzz #317. All jobs and steps completed successfully. These results apply to the implementation commit above. Documentation-only commits followed to correct stale status statements; CI and fuzz must be rerun on the final updated PR head before release approval.
+Workflow runs: CI #742 and Fuzz #326. All jobs and steps completed successfully on the implementation candidate above. The candidate includes the documentation consistency corrections and the final compiler-module comment clarification.
 
 The earlier local validation recorded in PR history is supplementary; the exact-head GitHub Actions results above are the release-gate evidence.
 
