@@ -1,9 +1,9 @@
 [package]
 name = "hk"
-version = "0.3.0"
+version = "0.4.0"
 edition.workspace = true
 license.workspace = true
-description = "Gradually typed modular interpreter and CLI for the HK programming language."
+description = "Gradually typed modular programming language with a verified bytecode VM and CLI."
 
 [features]
 fuzzing = []

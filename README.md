@@ -1,8 +1,8 @@
 # HK Programming Language
 
-HK is an experimental general-purpose programming language implemented in Rust. HK 0.3.0 provides a tree-walking interpreter with gradual typing and a file-based module system.
+HK is an experimental general-purpose programming language implemented in Rust. HK 0.4.0 provides gradual typing, file-based modules, a verified in-memory bytecode format, and a stack-based virtual machine.
 
-> **Status:** HK 0.3.0 is integrated into `main` by commit `644cee85f839764b146c024ab04972861bd677fe`. Its Git tag and GitHub Release remain unpublished. HK 0.4.0 is currently a design proposal; the shipped engine remains tree-walking.
+> **Status:** HK 0.3.0 is the semantic compatibility baseline. HK 0.4.0 implementation is on PR #16 and remains unreleased pending final CI, fuzz, and release gates. The public `run` and `run_path` entry points use the verified bytecode VM; bytecode is in-memory only and has no stable serialized file format.
 
 ## Language capabilities
 
@@ -119,7 +119,7 @@ The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression 
 
 ## Scope
 
-HK 0.3.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, native compilation, WebAssembly, concurrency, or native FFI. V0.4 uses in-memory bytecode internally; it does not define a stable serialized bytecode file format or native backend. Imported names are statically treated as `any` in this release; runtime contracts on exported values and functions remain authoritative.
+HK 0.4.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, native compilation, WebAssembly, concurrency, native FFI, or a stable serialized bytecode file format. Bytecode is compiled and verified in memory before VM execution. Imported names are statically treated as `any`; runtime contracts on exported values and functions remain authoritative.
 
 ## License
 
