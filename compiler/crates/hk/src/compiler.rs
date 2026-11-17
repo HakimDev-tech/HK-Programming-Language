@@ -1,4 +1,4 @@
-#![allow(dead_code)] // Compiler entry points are integrated by the VM milestone.
+#![allow(dead_code)] // Internal lowering helpers are also exercised by compiler-focused tests.
 //! Deterministic AST-to-bytecode lowering for source-only HK programs.
 use super::ast::{TypeName, E, S};
 use super::bytecode::{
