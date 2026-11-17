@@ -1,0 +1,7 @@
+fn outer() {
+    let value = 1;
+    fn inner() { print(value); }
+    return inner;
+}
+let callback = outer();
+callback();

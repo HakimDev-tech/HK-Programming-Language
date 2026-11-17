@@ -14,3 +14,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "hk"
 path = "src/main.rs"
+
+[[bench]]
+name = "execution"
+harness = false

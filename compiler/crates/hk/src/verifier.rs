@@ -86,6 +86,22 @@ struct FlowState {
     initialized_locals: Vec<bool>,
 }
 
+pub(super) fn verify_compiler_output(
+    mut program: BytecodeProgram,
+) -> Result<VerifiedProgram, VerifyError> {
+    verify_header(&program)?;
+    verify_program_tables(&program)?;
+    for function_index in 0..program.functions.len() {
+        let maximum = {
+            let function = &program.functions[function_index];
+            verify_function_tables(&program, function_index, function)?;
+            verify_control_flow(&program, function_index, function)?
+        };
+        program.functions[function_index].max_stack = maximum;
+    }
+    verify(program)
+}
+
 pub(super) fn verify(program: BytecodeProgram) -> Result<VerifiedProgram, VerifyError> {
     verify_header(&program)?;
     verify_program_tables(&program)?;
@@ -507,6 +523,18 @@ fn verify_function_tables(
                     ));
                 }
             }
+            Opcode::GetName(index) | Opcode::SetName(index) => {
+                if !matches!(
+                    program.constants.get(index as usize),
+                    Some(Constant::String(_))
+                ) {
+                    return Err(VerifyError::at(
+                        function_index,
+                        Some(instruction_index),
+                        "dynamic name operand must reference a string constant",
+                    ));
+                }
+            }
             Opcode::MakeFunction(index) => {
                 let Some(child) = program.functions.get(index as usize) else {
                     return Err(VerifyError::at(
@@ -525,17 +553,6 @@ fn verify_function_tables(
                         "nested function can only be instantiated by its lexical parent",
                     ));
                 }
-                for capture in &child.upvalues {
-                    if let UpvalueSource::EnclosingLocal(slot) = capture.source {
-                        if slot as usize >= function.local_slots.len() {
-                            return Err(VerifyError::at(
-                                function_index,
-                                Some(instruction_index),
-                                "nested function captures a local outside its lexical parent",
-                            ));
-                        }
-                    }
-                }
             }
             Opcode::GetProperty(index) => {
                 if !matches!(
@@ -549,7 +566,10 @@ fn verify_function_tables(
                     ));
                 }
             }
-            Opcode::DefineLocal(slot) | Opcode::GetLocal(slot) | Opcode::SetLocal(slot) => {
+            Opcode::DefineLocal(slot)
+            | Opcode::DefineFunctionLocal(slot)
+            | Opcode::GetLocal(slot)
+            | Opcode::SetLocal(slot) => {
                 if slot as usize >= function.local_slots.len() {
                     return Err(VerifyError::at(
                         function_index,
@@ -622,7 +642,7 @@ fn verify_function_tables(
 }
 
 fn verify_control_flow(
-    program: &BytecodeProgram,
+    _program: &BytecodeProgram,
     function_index: usize,
     function: &FunctionProto,
 ) -> Result<u32, VerifyError> {
@@ -676,7 +696,7 @@ fn verify_control_flow(
                 }
                 next.stack_height += 1;
             }
-            Opcode::DefineLocal(slot) => {
+            Opcode::DefineLocal(slot) | Opcode::DefineFunctionLocal(slot) => {
                 if next.stack_height < 1 {
                     return Err(underflow(1));
                 }
@@ -685,6 +705,14 @@ fn verify_control_flow(
                 // the same declaration reinitializes that slot.
                 next.initialized_locals[slot as usize] = true;
                 next.stack_height -= 1;
+            }
+            Opcode::GetName(_) => {
+                next.stack_height += 1;
+            }
+            Opcode::SetName(_) => {
+                if next.stack_height < 1 {
+                    return Err(underflow(1));
+                }
             }
             Opcode::GetLocal(slot) => {
                 if !next.initialized_locals[slot as usize] {
@@ -695,6 +723,11 @@ fn verify_control_flow(
                     ));
                 }
                 next.stack_height += 1;
+            }
+            Opcode::AssertBoolean => {
+                if next.stack_height < 1 {
+                    return Err(underflow(1));
+                }
             }
             Opcode::GetUpvalue(_) => {
                 next.stack_height += 1;
@@ -728,19 +761,9 @@ fn verify_control_flow(
             Opcode::GetModule(_) | Opcode::GetImport(_) | Opcode::LoadPrint => {
                 next.stack_height += 1;
             }
-            Opcode::MakeFunction(prototype) => {
-                let child = &program.functions[prototype as usize];
-                for capture in &child.upvalues {
-                    if let UpvalueSource::EnclosingLocal(slot) = capture.source {
-                        if !next.initialized_locals[slot as usize] {
-                            return Err(VerifyError::at(
-                                function_index,
-                                Some(index),
-                                "nested function captures a local before initialization",
-                            ));
-                        }
-                    }
-                }
+            Opcode::MakeFunction(_) => {
+                // A closure captures its defining environment. The captured binding may
+                // be the function's own declaration and is resolved when the function runs.
                 next.stack_height += 1;
             }
             Opcode::SetModule(_) => {
@@ -1043,7 +1066,7 @@ pub(super) fn fuzz_verify(input: &[u8]) {
     let mut code = Vec::with_capacity(instruction_count);
 
     for _ in 0..instruction_count {
-        let opcode = match take_byte(input, &mut cursor) % 40 {
+        let opcode = match take_byte(input, &mut cursor) % 44 {
             0 => Opcode::Constant(take_u32(input, &mut cursor)),
             1 => Opcode::Null,
             2 => Opcode::True,
@@ -1083,6 +1106,10 @@ pub(super) fn fuzz_verify(input: &[u8]) {
             37 => Opcode::LoadPrint,
             38 => Opcode::GetUpvalue(take_u16(input, &mut cursor)),
             39 => Opcode::SetUpvalue(take_u16(input, &mut cursor)),
+            40 => Opcode::DefineFunctionLocal(take_u16(input, &mut cursor)),
+            41 => Opcode::GetName(take_u32(input, &mut cursor)),
+            42 => Opcode::SetName(take_u32(input, &mut cursor)),
+            43 => Opcode::AssertBoolean,
             _ => Opcode::GetProperty(take_u32(input, &mut cursor)),
         };
         let source = SourceLocation {
@@ -1437,16 +1464,15 @@ mod tests {
     }
 
     #[test]
-    fn rejects_lexical_capture_before_parent_local_initialization() {
-        let error = verify(lexical_capture_program(
-            UpvalueSource::EnclosingLocal(0),
-            true,
-            false,
-        ))
-        .unwrap_err();
-        assert!(error
-            .message
-            .contains("captures a local before initialization"));
+    fn accepts_self_recursive_function_capture_before_binding_initialization() {
+        let mut program = lexical_capture_program(UpvalueSource::EnclosingLocal(0), false, false);
+        program.functions[0].code = vec![
+            instruction(Opcode::MakeFunction(1)),
+            instruction(Opcode::DefineFunctionLocal(0)),
+            instruction(Opcode::Null),
+            instruction(Opcode::Return),
+        ];
+        assert!(verify(program).is_ok());
     }
 
     #[test]

@@ -257,6 +257,15 @@ fn load_module_graph(
 }
 
 pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
+    execute_file_impl(entry, true)
+}
+
+#[cfg(test)]
+fn execute_file_reference(entry: &Path) -> Result<Vec<String>> {
+    execute_file_impl(entry, false)
+}
+
+fn execute_file_impl(entry: &Path, use_vm: bool) -> Result<Vec<String>> {
     let mut modules = HashMap::<PathBuf, LoadedModule>::new();
     let mut order = Vec::<PathBuf>::new();
     let mut visiting = Vec::<PathBuf>::new();
@@ -436,19 +445,167 @@ pub(super) fn execute_file(entry: &Path) -> Result<Vec<String>> {
         }
     }
 
-    let mut output = Vec::new();
-    for path in &order {
-        let module = modules.get(path).expect("loaded module must exist");
-        let environment = environments
-            .get(path)
-            .expect("module environment must exist")
-            .clone();
-        output.extend(runtime::execute_module(
-            &module.path.display().to_string(),
-            &module.source,
-            &module.statements,
-            environment,
-        )?);
+    if use_vm {
+        let compiler_inputs: Vec<(String, String, Vec<S>)> = order
+            .iter()
+            .map(|path| {
+                let module = modules.get(path).expect("loaded module must exist");
+                (
+                    module.path.display().to_string(),
+                    module.source.clone(),
+                    module.statements.clone(),
+                )
+            })
+            .collect();
+        let (verified, initializers) = crate::compiler::compile_module_graph(&compiler_inputs)?;
+        let linked_modules: Vec<(String, String, runtime::ModuleEnv)> = order
+            .iter()
+            .map(|path| {
+                let module = modules.get(path).expect("loaded module must exist");
+                (
+                    module.path.display().to_string(),
+                    module.source.clone(),
+                    environments
+                        .get(path)
+                        .expect("module environment must exist")
+                        .clone(),
+                )
+            })
+            .collect();
+        crate::vm::execute_modules(verified, &initializers, &linked_modules)
+    } else {
+        let mut output = Vec::new();
+        for path in &order {
+            let module = modules.get(path).expect("loaded module must exist");
+            let environment = environments
+                .get(path)
+                .expect("module environment must exist")
+                .clone();
+            output.extend(runtime::execute_module(
+                &module.path.display().to_string(),
+                &module.source,
+                &module.statements,
+                environment,
+            )?);
+        }
+        Ok(output)
     }
-    Ok(output)
+}
+
+#[cfg(test)]
+mod differential_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
+
+    struct Fixture(PathBuf);
+
+    impl Fixture {
+        fn new(files: &[(&str, &str)]) -> Self {
+            let id = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+            let directory = std::env::temp_dir().join(format!(
+                "hk-v040-module-differential-{}-{id}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&directory).unwrap();
+            for (name, source) in files {
+                fs::write(directory.join(name), source).unwrap();
+            }
+            Self(directory)
+        }
+
+        fn entry(&self) -> PathBuf {
+            self.0.join("main.hk")
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn assert_same_outcome(fixture: &Fixture) {
+        let vm = execute_file(&fixture.entry());
+        let reference = execute_file_reference(&fixture.entry());
+        match (vm, reference) {
+            (Ok(vm), Ok(reference)) => assert_eq!(vm, reference),
+            (Err(vm), Err(reference)) => {
+                assert_eq!(vm.code, reference.code);
+                assert_eq!(vm.message, reference.message);
+                assert_eq!(vm.source, reference.source);
+                assert_eq!((vm.line, vm.column), (reference.line, reference.column));
+            }
+            (vm, reference) => {
+                panic!("module VM/reference outcome mismatch: VM={vm:?}, reference={reference:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn linked_module_vm_matches_reference_for_aliases_live_bindings_and_std_math() {
+        let fixture = Fixture::new(&[
+            (
+                "library.hk",
+                "export let count: number = 4; export fn add(value: number) -> number { count = count + value; return count; }",
+            ),
+            (
+                "main.hk",
+                "import { add as increment, count } from \"./library.hk\"; import { abs, sqrt } from \"std:math\"; print(increment(count)); print(abs(-3)); print(sqrt(16));",
+            ),
+        ]);
+        assert_same_outcome(&fixture);
+        assert_eq!(execute_file(&fixture.entry()).unwrap(), vec!["8", "3", "4"]);
+    }
+
+    #[test]
+    fn linked_module_vm_matches_reference_for_cross_module_closures_and_dependency_order() {
+        let fixture = Fixture::new(&[
+            (
+                "base.hk",
+                "print(\"base\"); export let value = 10; export fn next() { value = value + 1; return value; }",
+            ),
+            (
+                "middle.hk",
+                "import { next } from \"./base.hk\"; print(\"middle\"); export fn get() { return next(); }",
+            ),
+            (
+                "main.hk",
+                "import { get } from \"./middle.hk\"; print(get()); print(get());",
+            ),
+        ]);
+        assert_same_outcome(&fixture);
+        assert_eq!(
+            execute_file(&fixture.entry()).unwrap(),
+            vec!["base", "middle", "11", "12"]
+        );
+    }
+
+    #[test]
+    fn linked_module_vm_matches_reference_for_imported_contract_errors_and_source_identity() {
+        let fixture = Fixture::new(&[
+            (
+                "library.hk",
+                "export fn require_number(value: number) -> number { return value; }",
+            ),
+            (
+                "main.hk",
+                "import { require_number } from \"./library.hk\"; require_number(\"bad\");",
+            ),
+        ]);
+        assert_same_outcome(&fixture);
+    }
+
+    #[test]
+    fn linked_module_vm_matches_reference_for_imported_function_runtime_errors() {
+        let fixture = Fixture::new(&[
+            (
+                "library.hk",
+                "fn fail() { let value = 1; value(); } export fn call() { fail(); }",
+            ),
+            ("main.hk", "import { call } from \"./library.hk\"; call();"),
+        ]);
+        assert_same_outcome(&fixture);
+    }
 }

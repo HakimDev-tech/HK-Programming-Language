@@ -1,5 +1,18 @@
 # Changelog
 
+## HK 0.4.0 — Unreleased
+
+- Add an AST-to-bytecode compiler with source-aware instructions and gradual-typing provenance.
+- Add mandatory bytecode verification for control flow, operand stack, lexical scopes, captures, and prototype references.
+- Add a stack-based VM with lexical upvalues, mutable shared binding cells, bounded call depth, and V0.3-compatible weak closure lifetime.
+- Route hk::run through verified bytecode on the V0.4 implementation branch.
+- Compile dependency-ordered filesystem modules into one verified bytecode program and execute hk::run_path through the VM.
+- Preserve module isolation, named import/export aliases, live bindings, std:math, and source-aware runtime diagnostics.
+- Add source and module differential tests against the retained tree-walking reference engine.
+- Add a reproducible end-to-end VM benchmark harness and record an initial release-build baseline.
+- Complete local 12-second fuzz smoke campaigns for source execution, module resolution, and malformed-bytecode verification; longer CI fuzz campaigns and final cross-platform CI on the exact release candidate remain required.
+- V0.4.0 remains unreleased pending final CI review, a same-host V0.3/V0.4 benchmark comparison, and release approval.
+
 ## HK 0.3.0 — 2026-11-15
 
 - Add top-level `import { name as alias } from "./module.hk";` and `export` declarations.

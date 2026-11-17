@@ -37,6 +37,7 @@ struct Engine {
     exec_depth: usize,
 }
 impl Engine {
+    #[cfg(test)]
     fn new(source: &str, source_text: &str) -> Self {
         Self::new_with_env(source, source_text, Rc::new(RefCell::new(Env::default())))
     }
@@ -784,6 +785,7 @@ pub(super) fn execute_module(
     Ok(engine.output)
 }
 
+#[cfg(test)]
 pub(super) fn execute(
     source_name: &str,
     source_text: &str,
