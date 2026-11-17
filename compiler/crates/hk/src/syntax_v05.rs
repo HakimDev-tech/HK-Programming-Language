@@ -71,7 +71,10 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
         let start = offset;
         let start_line = line;
         let start_column = column;
-        let ch = source[offset..].chars().next().expect("valid UTF-8 boundary");
+        let ch = source[offset..]
+            .chars()
+            .next()
+            .expect("valid UTF-8 boundary");
 
         if ch.is_whitespace() {
             advance_position(ch, &mut offset, &mut line, &mut column);
@@ -79,9 +82,14 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
         }
         if ch == '/' && bytes.get(offset + 1) == Some(&b'/') {
             while offset < bytes.len() {
-                let current = source[offset..].chars().next().expect("valid UTF-8 boundary");
+                let current = source[offset..]
+                    .chars()
+                    .next()
+                    .expect("valid UTF-8 boundary");
                 advance_position(current, &mut offset, &mut line, &mut column);
-                if current == '\n' { break; }
+                if current == '\n' {
+                    break;
+                }
             }
             continue;
         }
@@ -89,7 +97,10 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
         let kind = if ch == '_' || ch.is_ascii_alphabetic() {
             advance_position(ch, &mut offset, &mut line, &mut column);
             while offset < bytes.len() {
-                let next = source[offset..].chars().next().expect("valid UTF-8 boundary");
+                let next = source[offset..]
+                    .chars()
+                    .next()
+                    .expect("valid UTF-8 boundary");
                 if next == '_' || next.is_ascii_alphanumeric() {
                     advance_position(next, &mut offset, &mut line, &mut column);
                 } else {
@@ -109,7 +120,12 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
         } else if ch.is_ascii_digit() {
             advance_position(ch, &mut offset, &mut line, &mut column);
             while offset < bytes.len() && bytes[offset].is_ascii_digit() {
-                advance_position(source[offset..].chars().next().expect("ASCII digit"), &mut offset, &mut line, &mut column);
+                advance_position(
+                    source[offset..].chars().next().expect("ASCII digit"),
+                    &mut offset,
+                    &mut line,
+                    &mut column,
+                );
             }
             V05TokenKind::Number(source[start..offset].to_owned())
         } else if ch == '"' {
@@ -117,25 +133,42 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
             let mut escaped = false;
             let mut closed = false;
             while offset < bytes.len() {
-                let current = source[offset..].chars().next().expect("valid UTF-8 boundary");
+                let current = source[offset..]
+                    .chars()
+                    .next()
+                    .expect("valid UTF-8 boundary");
                 advance_position(current, &mut offset, &mut line, &mut column);
-                if escaped { escaped = false; }
-                else if current == '\\' { escaped = true; }
-                else if current == '"' { closed = true; break; }
+                if escaped {
+                    escaped = false;
+                } else if current == '\\' {
+                    escaped = true;
+                } else if current == '"' {
+                    closed = true;
+                    break;
+                }
             }
             if !closed {
-                return Err(V05LexError { message: "Unterminated string literal.".into(), span: start..offset, line: start_line, column: start_column });
+                return Err(V05LexError {
+                    message: "Unterminated string literal.".into(),
+                    span: start..offset,
+                    line: start_line,
+                    column: start_column,
+                });
             }
             V05TokenKind::StringLiteral(source[start..offset].to_owned())
         } else {
-            let (punctuation, width) = match source[start..].chars().take(2).collect::<String>().as_str() {
-                "::" => (Some(V05Punctuation::DoubleColon), 2),
-                "->" => (Some(V05Punctuation::Arrow), 2),
-                _ => (None, 0),
-            };
+            let (punctuation, width) =
+                match source[start..].chars().take(2).collect::<String>().as_str() {
+                    "::" => (Some(V05Punctuation::DoubleColon), 2),
+                    "->" => (Some(V05Punctuation::Arrow), 2),
+                    _ => (None, 0),
+                };
             if let Some(punctuation) = punctuation {
                 for _ in 0..width {
-                    let current = source[offset..].chars().next().expect("valid UTF-8 boundary");
+                    let current = source[offset..]
+                        .chars()
+                        .next()
+                        .expect("valid UTF-8 boundary");
                     advance_position(current, &mut offset, &mut line, &mut column);
                 }
                 V05TokenKind::Punctuation(punctuation)
@@ -146,11 +179,21 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
                 advance_position(ch, &mut offset, &mut line, &mut column);
                 V05TokenKind::ExistingSyntax(ch.to_string())
             } else {
-                return Err(V05LexError { message: format!("Unexpected character '{ch}'."), span: start..start + ch.len_utf8(), line: start_line, column: start_column });
+                return Err(V05LexError {
+                    message: format!("Unexpected character '{ch}'."),
+                    span: start..start + ch.len_utf8(),
+                    line: start_line,
+                    column: start_column,
+                });
             }
         };
 
-        tokens.push(V05Token { kind, span: start..offset, line: start_line, column: start_column });
+        tokens.push(V05Token {
+            kind,
+            span: start..offset,
+            line: start_line,
+            column: start_column,
+        });
     }
 
     Ok(tokens)
@@ -178,15 +221,25 @@ fn single_punctuation(ch: char) -> Option<V05Punctuation> {
 
 fn advance_position(ch: char, offset: &mut usize, line: &mut usize, column: &mut usize) {
     *offset += ch.len_utf8();
-    if ch == '\n' { *line += 1; *column = 1; }
-    else { *column += 1; }
+    if ch == '\n' {
+        *line += 1;
+        *column = 1;
+    } else {
+        *column += 1;
+    }
 }
 
 /// A recursive type expression; semantic resolution is intentionally deferred.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeExpr {
-    Named { name: String, arguments: Vec<TypeExpr>, span: Range<usize> },
-    Any { span: Range<usize> },
+    Named {
+        name: String,
+        arguments: Vec<TypeExpr>,
+        span: Range<usize>,
+    },
+    Any {
+        span: Range<usize>,
+    },
 }
 
 /// A bounded trait constraint such as `T: Display + Debug`.
@@ -212,12 +265,22 @@ pub fn parse_type_expr(tokens: &[V05Token], cursor: &mut usize) -> Result<TypeEx
     parse_type_expr_at(tokens, cursor, 0)
 }
 
-fn parse_type_expr_at(tokens: &[V05Token], cursor: &mut usize, depth: usize) -> Result<TypeExpr, V05ParseError> {
+fn parse_type_expr_at(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+    depth: usize,
+) -> Result<TypeExpr, V05ParseError> {
     if depth >= 64 {
-        return Err(parse_error(tokens, *cursor, "Maximum type-expression nesting depth (64) exceeded."));
+        return Err(parse_error(
+            tokens,
+            *cursor,
+            "Maximum type-expression nesting depth (64) exceeded.",
+        ));
     }
     let start_index = *cursor;
-    let token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a type name."))?;
+    let token = tokens
+        .get(*cursor)
+        .ok_or_else(|| parse_error(tokens, *cursor, "Expected a type name."))?;
     let name = match &token.kind {
         V05TokenKind::Identifier(name) => name.clone(),
         _ => return Err(parse_error(tokens, *cursor, "Expected a type name.")),
@@ -225,14 +288,20 @@ fn parse_type_expr_at(tokens: &[V05Token], cursor: &mut usize, depth: usize) -> 
     *cursor += 1;
 
     if name == "any" {
-        return Ok(TypeExpr::Any { span: token.span.clone() });
+        return Ok(TypeExpr::Any {
+            span: token.span.clone(),
+        });
     }
 
     let mut arguments = Vec::new();
     if is_punctuation(tokens.get(*cursor), V05Punctuation::Less) {
         *cursor += 1;
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
-            return Err(parse_error(tokens, *cursor, "Generic argument lists cannot be empty."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Generic argument lists cannot be empty.",
+            ));
         }
         loop {
             arguments.push(parse_type_expr_at(tokens, cursor, depth + 1)?);
@@ -246,18 +315,32 @@ fn parse_type_expr_at(tokens: &[V05Token], cursor: &mut usize, depth: usize) -> 
             }
         }
         if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
-            return Err(parse_error(tokens, *cursor, "Expected '>' after generic arguments."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Expected '>' after generic arguments.",
+            ));
         }
         *cursor += 1;
     }
 
-    let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
+    let end = tokens
+        .get(cursor.saturating_sub(1))
+        .map(|t| t.span.end)
+        .unwrap_or(token.span.end);
     let _ = start_index;
-    Ok(TypeExpr::Named { name, arguments, span: token.span.start..end })
+    Ok(TypeExpr::Named {
+        name,
+        arguments,
+        span: token.span.start..end,
+    })
 }
 
 /// Parses generic parameters in `<T: Trait + Debug, U>` form.
-pub fn parse_generic_parameters(tokens: &[V05Token], cursor: &mut usize) -> Result<Vec<GenericBound>, V05ParseError> {
+pub fn parse_generic_parameters(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+) -> Result<Vec<GenericBound>, V05ParseError> {
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::Less) {
         return Ok(Vec::new());
     }
@@ -265,20 +348,36 @@ pub fn parse_generic_parameters(tokens: &[V05Token], cursor: &mut usize) -> Resu
     let mut parameters = Vec::new();
     loop {
         let start = *cursor;
-        let token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a generic parameter."))?;
+        let token = tokens
+            .get(*cursor)
+            .ok_or_else(|| parse_error(tokens, *cursor, "Expected a generic parameter."))?;
         let parameter = match &token.kind {
             V05TokenKind::Identifier(name) => name.clone(),
-            _ => return Err(parse_error(tokens, *cursor, "Expected a generic parameter name.")),
+            _ => {
+                return Err(parse_error(
+                    tokens,
+                    *cursor,
+                    "Expected a generic parameter name.",
+                ))
+            }
         };
         *cursor += 1;
         let mut traits = Vec::new();
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Colon) {
             *cursor += 1;
             loop {
-                let bound = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected a trait bound."))?;
+                let bound = tokens
+                    .get(*cursor)
+                    .ok_or_else(|| parse_error(tokens, *cursor, "Expected a trait bound."))?;
                 match &bound.kind {
                     V05TokenKind::Identifier(name) => traits.push(name.clone()),
-                    _ => return Err(parse_error(tokens, *cursor, "Expected a trait name in generic bound.")),
+                    _ => {
+                        return Err(parse_error(
+                            tokens,
+                            *cursor,
+                            "Expected a trait name in generic bound.",
+                        ))
+                    }
                 }
                 *cursor += 1;
                 if is_punctuation(tokens.get(*cursor), V05Punctuation::Plus) {
@@ -288,22 +387,41 @@ pub fn parse_generic_parameters(tokens: &[V05Token], cursor: &mut usize) -> Resu
                 }
             }
         }
-        let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
-        parameters.push(GenericBound { parameter, traits, span: token.span.start..end });
+        let end = tokens
+            .get(cursor.saturating_sub(1))
+            .map(|t| t.span.end)
+            .unwrap_or(token.span.end);
+        parameters.push(GenericBound {
+            parameter,
+            traits,
+            span: token.span.start..end,
+        });
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
             *cursor += 1;
             if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
-                return Err(parse_error(tokens, *cursor, "Expected a generic parameter after ','."));
+                return Err(parse_error(
+                    tokens,
+                    *cursor,
+                    "Expected a generic parameter after ','.",
+                ));
             }
         } else {
             break;
         }
         if *cursor - start > 256 {
-            return Err(parse_error(tokens, *cursor, "Generic parameter list exceeds the supported limit."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Generic parameter list exceeds the supported limit.",
+            ));
         }
     }
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
-        return Err(parse_error(tokens, *cursor, "Expected '>' after generic parameters."));
+        return Err(parse_error(
+            tokens,
+            *cursor,
+            "Expected '>' after generic parameters.",
+        ));
     }
     *cursor += 1;
     Ok(parameters)
@@ -315,8 +433,15 @@ fn is_punctuation(token: Option<&V05Token>, expected: V05Punctuation) -> bool {
 
 fn parse_error(tokens: &[V05Token], cursor: usize, message: &str) -> V05ParseError {
     let token = tokens.get(cursor).or_else(|| tokens.last());
-    let (span, line, column) = token.map(|t| (t.span.clone(), t.line, t.column)).unwrap_or((0..0, 1, 1));
-    V05ParseError { message: message.into(), span, line, column }
+    let (span, line, column) = token
+        .map(|t| (t.span.clone(), t.line, t.column))
+        .unwrap_or((0..0, 1, 1));
+    V05ParseError {
+        message: message.into(),
+        span,
+        line,
+        column,
+    }
 }
 
 /// A lexical failure with stable source coordinates.
@@ -335,20 +460,37 @@ mod tests {
     #[test]
     fn recognizes_v05_keywords_and_generic_punctuation() {
         let tokens = lex_v05("struct Box<T> { value: T } enum Result<T, E> { Ok(T) } impl<T> Box<T> {} trait Show {} match value {}").unwrap();
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Struct)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Enum)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Impl)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Trait)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Match)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Punctuation(V05Punctuation::Less)));
-        assert!(tokens.iter().any(|t| t.kind == V05TokenKind::Punctuation(V05Punctuation::Greater)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Struct)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Enum)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Impl)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Trait)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Keyword(V05Keyword::Match)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Punctuation(V05Punctuation::Less)));
+        assert!(tokens
+            .iter()
+            .any(|t| t.kind == V05TokenKind::Punctuation(V05Punctuation::Greater)));
     }
 
     #[test]
     fn preserves_utf8_byte_spans_and_line_columns() {
         let source = "// café\nstruct Cafe {}";
         let tokens = lex_v05(source).unwrap();
-        let cafe = tokens.iter().find(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "Cafe")).unwrap();
+        let cafe = tokens
+            .iter()
+            .find(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "Cafe"))
+            .unwrap();
         assert_eq!(cafe.line, 2);
         assert_eq!(cafe.column, 8);
         assert_eq!(&source[cafe.span.clone()], "Cafe");
@@ -366,7 +508,10 @@ mod tests {
     fn token_spans_are_valid_utf8_boundaries() {
         let source = "struct Point { x: number }";
         for token in lex_v05(source).unwrap() {
-            assert_eq!(&source[token.span.clone()].len(), &(token.span.end - token.span.start));
+            assert_eq!(
+                &source[token.span.clone()].len(),
+                &(token.span.end - token.span.start)
+            );
         }
     }
 }
