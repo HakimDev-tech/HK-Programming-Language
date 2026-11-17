@@ -1,38 +1,30 @@
-//! HK 0.1.x reference interpreter.
-//! Dependency-free tree-walking implementation.
+//! HK language runtime with verified bytecode execution.
+//! The V0.3 tree-walking engine remains available as a test-only semantic reference.
 mod ast;
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub mod bench_support;
+mod bytecode;
+mod compiler;
+
 use ast::S;
 pub mod diagnostics;
+mod environment;
 mod lexer;
 mod module_loader;
 mod parser;
 mod runtime;
+mod runtime_ops;
 mod type_checker;
 mod types;
+mod value;
+mod verifier;
+mod vm;
 pub use diagnostics::HkError;
 pub(crate) type Result<T> = std::result::Result<T, HkError>;
 /// Tokenizes, parses, and executes a complete HK source file.
 pub fn run(source_name: &str, source: &str) -> Result<Vec<String>> {
-    let tokens = lexer::Lexer::new(source_name, source).scan()?;
-    let statements = parser::Parser::new(tokens, source_name, source).parse()?;
-    if let Some(S::Import(_, _, line, column)) = statements
-        .iter()
-        .find(|statement| matches!(statement, S::Import(..)))
-    {
-        return Err(HkError::new(
-            "E4008",
-            "Filesystem imports require hk::run_path() with an entry file.",
-            source_name,
-            *line,
-            *column,
-            source,
-        ));
-    }
-    let typed_mode = has_type_annotations(&statements);
-    if typed_mode {
-        type_checker::TypeChecker::new(source_name, source).check(&statements)?;
-    }
-    runtime::execute(source_name, source, &statements)
+    vm::run_source(source_name, source)
 }
 
 /// Loads, links, type-checks, and executes a filesystem-backed HK program.
@@ -623,5 +615,14 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, "E3000");
         assert!(error.message.contains("Cannot call a value of type Number"));
+    }
+}
+
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub mod fuzzing {
+    /// Runs the bytecode verifier on a bounded program decoded from arbitrary fuzz bytes.
+    pub fn verify_bytecode(input: &[u8]) {
+        crate::verifier::fuzz_verify(input);
     }
 }

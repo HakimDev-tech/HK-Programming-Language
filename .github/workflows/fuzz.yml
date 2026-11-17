@@ -41,3 +41,7 @@ jobs:
         run: cargo fuzz build modules
       - name: Fuzz module specifiers and filesystem resolution
         run: cargo fuzz run modules -- -max_total_time=30 -max_len=2048
+      - name: Build bytecode verifier fuzz target
+        run: cargo fuzz build bytecode_verifier
+      - name: Fuzz malformed bytecode verification
+        run: cargo fuzz run bytecode_verifier -- -max_total_time=30 -max_len=1024

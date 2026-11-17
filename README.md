@@ -1,8 +1,8 @@
 # HK Programming Language
 
-HK is an experimental general-purpose programming language implemented in Rust. HK 0.3.0 provides a tree-walking interpreter with gradual typing and a file-based module system.
+HK is an experimental general-purpose programming language implemented in Rust. HK 0.4.0 provides gradual typing, file-based modules, a verified in-memory bytecode format, and a stack-based virtual machine.
 
-> **Status:** HK 0.3.0 is integrated into `main` by commit `644cee85f839764b146c024ab04972861bd677fe`. Its Git tag and GitHub Release remain unpublished. HK 0.4.0 is currently a design proposal; the shipped engine remains tree-walking.
+> **Status:** HK 0.3.0 is the semantic compatibility baseline. HK 0.4.0 implementation is on PR #16. Exact-head CI and fuzz campaigns passed on the implementation commit; documentation corrections require a final rerun and review before release. The public `run` and `run_path` entry points use the verified bytecode VM; bytecode is in-memory only and has no stable serialized file format.
 
 ## Language capabilities
 
@@ -104,19 +104,22 @@ hk run examples/modules/main.hk
 - [HK-ARCHITECTURE.md](HK-ARCHITECTURE.md) — implementation architecture
 - [HK-IMPLEMENTATION-PLAN.md](HK-IMPLEMENTATION-PLAN.md) — 0.2.0 finalization
 - [HK-0.3-IMPLEMENTATION-PLAN.md](HK-0.3-IMPLEMENTATION-PLAN.md) — 0.3.0 implementation and release gates
-- [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md) — proposed 0.4.0 bytecode and VM specification
-- [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md) — proposed 0.4.0 implementation milestones and release gates
+- [HK-BYTECODE-VM-SPEC.md](HK-BYTECODE-VM-SPEC.md) — V0.4 bytecode and VM specification
+- [HK-0.4-IMPLEMENTATION-PLAN.md](HK-0.4-IMPLEMENTATION-PLAN.md) — V0.4 milestone status and release gates
+- [HK-0.4-BENCHMARKS.md](HK-0.4-BENCHMARKS.md) — V0.4 VM benchmark baseline
+- [HK-0.4-COMPILER-ABI-GAPS.md](HK-0.4-COMPILER-ABI-GAPS.md) — lexical capture and compiler ABI decisions
+- [HK-0.4-SEMANTIC-INVENTORY.md](HK-0.4-SEMANTIC-INVENTORY.md) — V0.3 compatibility inventory
 - [ROADMAP.md](ROADMAP.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [examples/](examples/)
 
 ## Runtime limits
 
-The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. The module loader caps dependency depth at 128, reachable modules at 1,024 per run, each module source at 1 MiB, and the aggregate module graph at 16 MiB. Cyclic array references and cyclic module dependencies are rejected. These are interpreter constraints, not guarantees of an optimizing/native compiler.
+The parser rejects nesting beyond 128 guarded grammar steps. Runtime expression and statement nesting are capped at 128; user-function calls are capped at 64; array display depth is capped at 64. The module loader caps dependency depth at 128, reachable modules at 1,024 per run, each module source at 1 MiB, and the aggregate module graph at 16 MiB. Cyclic array references and cyclic module dependencies are rejected. These bounds are enforced by the retained reference engine and the V0.4 VM; they do not describe native code generation.
 
 ## Scope
 
-HK 0.3.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, bytecode, native compilation, WebAssembly, concurrency, or native FFI. The proposed V0.4 design is not implemented and does not change the current runtime. Imported names are statically treated as `any` in this release; runtime contracts on exported values and functions remain authoritative.
+HK 0.4.0 does not include package management, third-party dependency resolution, cyclic imports, re-exports, default exports, namespace imports, native compilation, WebAssembly, concurrency, native FFI, or a stable serialized bytecode file format. Bytecode is compiled and verified in memory before VM execution. Imported names are statically treated as `any`; runtime contracts on exported values and functions remain authoritative.
 
 ## License
 

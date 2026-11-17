@@ -1,6 +1,6 @@
 # HK 0.4.0 — Versioned Bytecode and Virtual Machine Specification
 
-**Status:** Normative design proposal for HK 0.4.0. No implementation is authorized until this specification and its acceptance matrix are reviewed.
+**Status:** Normative HK 0.4.0 specification. Implemented on `feat/hk-v0.4.0-bytecode-vm`; final release gates are tracked in `HK-0.4-IMPLEMENTATION-PLAN.md`.
 **Baseline:** HK 0.3.0, gradual typing, filesystem modules, `std:math`.
 **Primary objective:** Introduce a verified stack-based bytecode execution engine without changing observable HK language semantics.
 
@@ -40,7 +40,7 @@ The VM must preserve the observable semantics of HK 0.3.0 for every accepted pro
 
 The parser and AST remain the source-language front end. The VM must not re-parse source or infer semantics from source text.
 
-The existing tree-walking engine remains available internally as the reference implementation throughout 0.4.x. Public `run` and `run_path` switch to VM execution only after the complete release gate passes. An internal/test-only reference entry point is retained for differential tests; it is not required to become a permanent public API.
+The existing tree-walking engine remains available internally as the reference implementation throughout 0.4.x. On the V0.4 implementation branch, public `run` and `run_path` execute through the compiler, mandatory verifier, and VM. An internal/test-only reference entry point is retained for differential tests; it is not a permanent public API.
 
 ## 3. Execution pipeline
 
@@ -68,7 +68,7 @@ The VM must never execute unverified bytecode. Verification happens after compil
 The in-memory program contains:
 - `BytecodeHeader`: bytecode format major/minor version, required feature bits, and compiler compatibility metadata;
 - `ConstantPool`: finite numbers, strings, and other immutable literal payloads;
-- `FunctionProto`: function identity/name, parameter metadata and contracts, local-slot count, maximum operand stack, code range, source-map range, and module identity;
+- `FunctionProto`: function identity/name, parameter-to-slot metadata, local-slot descriptors (internal/source name, mutability, optional contract), optional return contract, typed-function provenance, maximum operand stack, instruction vector, and module identity;
 - `InstructionStream`: compact opcode plus typed operands;
 - `ModuleTable`: module identity, initializer function, import links, export binding slots, and source identity;
 - `SourceMap`: instruction-offset to source identity, line, and column mappings;
@@ -163,7 +163,7 @@ The verifier is a mandatory security and correctness boundary, even though 0.4.0
 It must validate:
 1. Header version and required features.
 2. Opcode validity and operand encoding.
-3. Constant, function, module, binding, and source-map indexes.
+3. Constant, function, module, binding, and primary/operand source-map indexes.
 4. Jump targets are within the current function and land on instruction boundaries.
 5. Control-flow stack-height consistency at every merge point.
 6. No stack underflow on any reachable path.
@@ -176,7 +176,7 @@ It must validate:
 
 Verification uses a worklist over the control-flow graph and propagates abstract operand-stack heights plus definite-initialization state for local slots. Jump targets are instruction indexes in the in-memory instruction stream, never arbitrary byte offsets. If future opcodes require richer abstract state, the verifier must extend the abstract domain explicitly.
 
-The verifier must not trust compiler-supplied `max_stack`; it recomputes the maximum and rejects mismatches.
+The verifier must not trust compiler-supplied `max_stack`; it recomputes the maximum and rejects mismatches. It validates every primary and operand source location. Mutability, imported-alias write failures, and duplicate declaration behavior remain runtime semantics; rejecting such writes statically would change behavior for unreachable code.
 
 ## 9. Runtime values and environments
 
@@ -236,43 +236,43 @@ Benchmarks are required for representative workloads: arithmetic loops, recursiv
 - Introduce internal `compile`, `verify`, and `execute_bytecode` boundaries.
 - Do not expose mutable raw bytecode construction as a stable public API in 0.4.0.
 - Keep a test-only/reference path to the tree-walking engine.
-- Switch `run` and `run_path` to the VM only after all compatibility, verifier, fuzz, and cross-platform gates pass.
-- If any semantic mismatch remains, keep the reference engine as the default and do not declare V0.4.0 complete.
+- The V0.4 branch switches `run` and `run_path` to the VM after implementation and compatibility gates; the exact-head CI and fuzz campaign have now passed.
+- If a new semantic mismatch is discovered during final review, block release, preserve the reference engine, and fix the mismatch before declaring V0.4.0 complete.
 
 ## 14. Acceptance criteria
 
 ### Compiler
-- [ ] Every AST construct accepted by 0.3.0 is compiled or rejected with a documented compiler error; none is silently omitted.
-- [ ] Source positions are preserved for all executable instructions and diagnostics.
-- [ ] Lexical slots preserve scope, shadowing, mutability, and declaration errors.
-- [ ] Short-circuit evaluation is lazy and exactly-once.
-- [ ] Function calls preserve left-to-right evaluation and contracts.
+- [x] Every AST construct accepted by 0.3.0 is compiled or rejected with a documented compiler error; none is silently omitted.
+- [x] Source positions are preserved for all executable instructions and diagnostics.
+- [x] Lexical slots preserve scope, shadowing, mutability, and declaration errors.
+- [x] Short-circuit evaluation is lazy and exactly-once.
+- [x] Function calls preserve left-to-right evaluation and contracts.
 
 ### Verifier
-- [ ] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid/uninitialized local access where statically provable, invalid function reference, and invalid module link are rejected.
-- [ ] Malformed bytecode fuzzing cannot panic, hang, or access invalid memory.
-- [ ] Verification runs before any user instruction or module initializer.
+- [x] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid/uninitialized local access where statically provable, invalid function reference, and invalid module link are rejected.
+- [x] Malformed bytecode fuzzing cannot panic, hang, or access invalid memory.
+- [x] Verification runs before any user instruction or module initializer.
 
 ### VM
-- [ ] All 0.3.0 language constructs execute correctly.
-- [ ] Runtime value, array identity, mutation, equality, and numeric behavior match the reference engine.
-- [ ] Runtime contracts and diagnostic provenance match.
-- [ ] Call/operand resource limits fail safely and deterministically.
+- [x] All 0.3.0 language constructs execute correctly.
+- [x] Runtime value, array identity, mutation, equality, and numeric behavior match the reference engine.
+- [x] Runtime contracts and diagnostic provenance match.
+- [x] Call/operand resource limits fail safely and deterministically.
 
 ### Modules
-- [ ] Filesystem modules, standard-library imports, live aliases, module isolation, dependency order, and at-most-once initialization match 0.3.0.
-- [ ] Cycles and link errors are rejected before side effects.
-- [ ] Imported functions preserve their defining module environment and source locations.
+- [x] Filesystem modules, standard-library imports, live aliases, module isolation, dependency order, and at-most-once initialization match 0.3.0.
+- [x] Cycles and link errors are rejected before side effects.
+- [x] Imported functions preserve their defining module environment and source locations.
 
 ### Quality gates
-- [ ] Existing 0.1.x–0.3.0 tests remain intact and pass.
-- [ ] Differential corpus has zero unexplained semantic mismatches.
-- [ ] Compiler and verifier have dedicated unit/integration tests.
+- [x] Existing 0.1.x–0.3.0 tests remain intact and pass.
+- [x] Differential corpus has zero unexplained semantic mismatches.
+- [x] Compiler and verifier have dedicated unit/integration tests.
 - [ ] Fuzz targets cover compiler input, verifier bytecode, VM execution, and module linking.
 - [ ] Linux, Windows, and macOS CI pass formatting, tests, Clippy `-D warnings`, and rustdoc.
-- [ ] Benchmarks are reproducible and make no unsupported performance claim.
+- [x] Benchmarks are reproducible and make no unsupported performance claim.
 - [ ] README, architecture, changelog, roadmap, and implementation plan agree on shipped status.
-- [ ] No blocking review threads remain before merge.
+- [x] No blocking review threads remain before merge.
 
 ## 15. Release policy
 

@@ -1,0 +1,10 @@
+fn outer() {
+    let value = 0;
+    fn middle() {
+        fn inner() { value = value + 1; return value; }
+        return inner();
+    }
+    print(middle());
+    print(value);
+}
+outer();

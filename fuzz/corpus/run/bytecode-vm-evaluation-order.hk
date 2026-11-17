@@ -1,0 +1,6 @@
+let order = 0;
+fn mark(value) { order = order * 10 + value; return value; }
+let values = [0, 0];
+values[mark(1)] = mark(2);
+print(order);
+print(values[1]);

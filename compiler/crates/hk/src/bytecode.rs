@@ -1,0 +1,185 @@
+//! In-memory bytecode representation for HK 0.4.x.
+//!
+//! This is an internal format, not a serialized or stable public ABI.
+use super::ast::TypeName;
+use super::types::Type;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct BytecodeHeader {
+    pub(super) major: u16,
+    pub(super) minor: u16,
+    pub(super) required_features: u64,
+    pub(super) compiler_abi: u32,
+}
+
+impl Default for BytecodeHeader {
+    fn default() -> Self {
+        Self {
+            major: 1,
+            minor: 0,
+            required_features: 0,
+            compiler_abi: 2,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum Constant {
+    Number(f64),
+    String(String),
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct SourceLocation {
+    pub(super) source_id: u32,
+    pub(super) line: u32,
+    pub(super) column: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Opcode {
+    Constant(u32),
+    Null,
+    True,
+    False,
+    Pop,
+    Dup,
+    DefineLocal(u16),
+    DefineFunctionLocal(u16),
+    GetLocal(u16),
+    SetLocal(u16),
+    GetName(u32),
+    SetName(u32),
+    GetUpvalue(u16),
+    SetUpvalue(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
+    DefineModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
+    GetModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
+    SetModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct import bytecode; current linking uses live environment bindings.
+    GetImport(u16),
+    LoadPrint,
+    MakeFunction(u32),
+    EnterScope,
+    ExitScope,
+    Negate,
+    Not,
+    AssertBoolean,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Jump(u32),
+    JumpIfFalse(u32),
+    Call(u16),
+    Return,
+    BuildArray(u16),
+    GetIndex,
+    SetIndex,
+    GetProperty(u32),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Instruction {
+    pub(super) opcode: Opcode,
+    pub(super) source: SourceLocation,
+    /// Additional expression/operand positions used to preserve reference-engine diagnostics.
+    pub(super) operands: Vec<SourceLocation>,
+    /// Whether this instruction executes within a typed expression context.
+    pub(super) typed_context: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SourceFile {
+    pub(super) name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LocalSlot {
+    pub(super) internal_name: String,
+    pub(super) source_name: String,
+    pub(super) mutable: bool,
+    pub(super) contract: Option<Type>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ParameterProto {
+    pub(super) name: String,
+    pub(super) slot: u16,
+    pub(super) annotation: Option<TypeName>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) enum UpvalueSource {
+    EnclosingLocal(u16),
+    EnclosingUpvalue(u16),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct UpvalueDescriptor {
+    pub(super) source: UpvalueSource,
+    pub(super) mutable: bool,
+    pub(super) contract: Option<Type>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct FunctionProto {
+    pub(super) name: String,
+    pub(super) module_id: Option<u32>,
+    pub(super) parameters: Vec<ParameterProto>,
+    pub(super) local_slots: Vec<LocalSlot>,
+    /// Lexical parent prototype; absent only for module initializers and entry functions.
+    pub(super) enclosing_function: Option<u32>,
+    /// Captured lexical bindings, indexed by GetUpvalue/SetUpvalue.
+    pub(super) upvalues: Vec<UpvalueDescriptor>,
+    pub(super) return_contract: Option<Type>,
+    pub(super) typed: bool,
+    /// Must equal the maximum reachable operand-stack height recomputed by the verifier.
+    pub(super) max_stack: u32,
+    pub(super) code: Vec<Instruction>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ImportBinding {
+    pub(super) imported_name: String,
+    pub(super) local_slot: u16,
+    pub(super) target_module: u32,
+    pub(super) target_slot: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ExportBinding {
+    pub(super) name: String,
+    pub(super) slot: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ModuleProto {
+    pub(super) name: String,
+    pub(super) initializer: u32,
+    pub(super) bindings: Vec<LocalSlot>,
+    pub(super) imports: Vec<ImportBinding>,
+    pub(super) exports: Vec<ExportBinding>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct BytecodeProgram {
+    pub(super) header: BytecodeHeader,
+    pub(super) constants: Vec<Constant>,
+    pub(super) source_files: Vec<SourceFile>,
+    pub(super) functions: Vec<FunctionProto>,
+    pub(super) modules: Vec<ModuleProto>,
+    pub(super) entry_function: u32,
+}
