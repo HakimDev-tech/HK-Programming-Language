@@ -1,4 +1,4 @@
-#![allow(dead_code)] // Internal lowering helpers are also exercised by compiler-focused tests.
+#![allow(dead_code)] // Keep compiler internals private; only verified compilation entry points are exposed.
 //! Deterministic AST-to-bytecode lowering for source-only HK programs.
 use super::ast::{TypeName, E, S};
 use super::bytecode::{
