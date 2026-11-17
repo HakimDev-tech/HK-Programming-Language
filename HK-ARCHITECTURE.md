@@ -4,57 +4,45 @@
 
 HK is a Rust modular monolith in one Cargo package. The 0.4 execution pipeline is:
 
-```text
+~~~text
 UTF-8 source -> Lexer -> Parser -> AST -> Gradual Type Checker
   -> AST-to-bytecode Compiler -> Mandatory Bytecode Verifier
   -> Versioned In-Memory Bytecode -> Stack VM -> output
-```
+~~~
 
-The public `hk::run` and `hk::run_path` entry points execute through verified bytecode. The tree-walking runtime is retained as a semantic reference for differential testing. The bytecode is an in-memory, versioned representation; it is not a stable serialized artifact.
+The public hk::run and hk::run_path entry points execute through verified bytecode. The tree-walking runtime remains the semantic reference. Bytecode is versioned in memory, not a stable serialized artifact.
 
 ## Core subsystems
 
 | Subsystem | Responsibility |
 |---|---|
-| Lexer / parser / AST | Source syntax, spans, and structured declarations |
-| Types / type checker | Gradual type contracts and static checks |
-| Compiler | Lower AST into versioned bytecode and source maps |
-| Bytecode verifier | Validate control flow, stack effects, scopes, captures, and references before execution |
-| VM | Bounded stack-based execution, calls, closures, and runtime operations |
-| Runtime core | Tagged values, binding cells, environments, contracts, arrays, native functions |
-| Module loader/linker | Deterministic module discovery, validation, linking, and dependency-first execution |
-| Diagnostics | Stable error categories with source-aware excerpts |
-| Public API / CLI | Source and filesystem execution surfaces |
+| Lexer / parser / AST | Source syntax, spans and declarations |
+| Types / type checker | Gradual contracts and static checks |
+| Compiler | AST-to-bytecode lowering and source maps |
+| Bytecode verifier | Control flow, stack effects, scopes, captures and references |
+| VM | Bounded execution, calls, closures and runtime operations |
+| Runtime core | Tagged values, binding cells, environments, contracts and arrays |
+| Module loader/linker | Deterministic graph discovery, validation, linking and initialization |
+| Diagnostics | Stable source-aware errors |
+| Public API / CLI | Source and filesystem execution |
 
-The crate remains intentionally unified. Splitting into multiple crates is deferred until a real dependency or compilation boundary justifies that cost.
+## Compatibility invariants
 
-## Gradual typing
-
-The source-level primitive types are `number`, `string`, `bool`, `null`, `array`, and `any`. Omitted annotations remain dynamic. The checker distinguishes declared binding contracts, static expression facts, and runtime value tags. Runtime contracts are enforced at typed binding and function boundaries.
-
-## Modules
-
-Each filesystem module has an independent root lexical environment. Imports are named, explicit, and restricted to the module header; exports are explicit. Relative paths resolve from the importer, canonical module identities are cached once per run, cycles are rejected before execution, and dependencies initialize deterministically. Imported aliases are read-only live references. The `std:` namespace uses an explicit registry; `std:math` is supported.
-
-## Runtime and safety invariants
-
-- Values use tagged Rust representations; arrays retain shared identity and interior mutability.
-- Lexical scopes and closure captures preserve the established 0.3 semantics.
-- Parser, runtime, VM stack/call depth, and module graph work are bounded.
-- The bytecode verifier is mandatory for every VM execution path.
-- No unsafe Rust is introduced without a measured requirement and safety review.
+- Primitive types remain number, string, bool, null, array and any.
+- Omitted annotations remain dynamic.
+- Values use safe tagged representations.
+- Arrays and closures preserve established shared identity/capture behavior.
+- Module roots remain isolated; imports are explicit, read-only live aliases.
+- The bytecode verifier is mandatory on every VM path.
 - Source identity and spans survive compilation and module linking.
-- Do not claim serialized bytecode, JIT, native compilation, or performance improvements unless implemented and measured.
+- Existing 0.4 programs retain behavior.
 
-## 0.5 design direction — not implemented
+## HK 0.5.0 architecture target — implementation pending
 
-The 0.5 proposal is documented in [HK-0.5-SPEC.md](HK-0.5-SPEC.md). It evaluates nominal structs/enums, explicit traits, and bounded generics. The proposed additions must extend the front end, type checker, runtime value model, bytecode descriptors, verifier, VM, and module linker as one coherent feature set.
+The normative feature contract is HK-0.5-SPEC.md; milestones and evidence are in HK-0.5-IMPLEMENTATION-PLAN.md.
 
-Key architectural gates:
-- settle struct/enum identity, mutation, receiver, and payload semantics;
-- select a generic implementation strategy only after comparing verifier complexity, code size, runtime cost, and module behavior;
-- resolve trait methods deterministically at compile time; trait objects/dynamic dispatch are not assumed;
-- validate all type/aggregate descriptors before VM execution;
-- preserve 0.4 behavior for existing unannotated programs.
+The 0.5 target extends the front end with nominal declarations, recursive type expressions, generic parameters, trait bounds, impl blocks, enum constructors and exhaustive match patterns. A whole-graph declaration/type phase must precede module initialization. The checker resolves concrete generic applications and monomorphizes functions and nominal type descriptors under strict limits. Trait calls resolve statically; only member lookup through any uses runtime nominal lookup.
 
-No 0.5 implementation claim is made by this architecture document.
+The runtime adds safe reference-counted struct instances and immutable tagged enum instances. Struct fields mutate through shared aliases; nominal equality is identity-based. Methods receive a shared self receiver. The bytecode carries verified nominal descriptors, concrete specializations, field layouts, variant tags, method targets and match dispatch tables. The verifier rejects malformed metadata before VM entry. The reference runtime is extended for differential parity.
+
+No 0.5 feature is considered delivered until parser, checker, runtime, compiler, verifier, VM, module and test paths all support it. No unsafe Rust, unchecked source-derived indices, unbounded generic expansion, or execution before whole-program verification is permitted.
