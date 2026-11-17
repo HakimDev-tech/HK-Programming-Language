@@ -242,37 +242,37 @@ Benchmarks are required for representative workloads: arithmetic loops, recursiv
 ## 14. Acceptance criteria
 
 ### Compiler
-- [ ] Every AST construct accepted by 0.3.0 is compiled or rejected with a documented compiler error; none is silently omitted.
-- [ ] Source positions are preserved for all executable instructions and diagnostics.
-- [ ] Lexical slots preserve scope, shadowing, mutability, and declaration errors.
-- [ ] Short-circuit evaluation is lazy and exactly-once.
-- [ ] Function calls preserve left-to-right evaluation and contracts.
+- [x] Every AST construct accepted by 0.3.0 is compiled or rejected with a documented compiler error; none is silently omitted.
+- [x] Source positions are preserved for all executable instructions and diagnostics.
+- [x] Lexical slots preserve scope, shadowing, mutability, and declaration errors.
+- [x] Short-circuit evaluation is lazy and exactly-once.
+- [x] Function calls preserve left-to-right evaluation and contracts.
 
 ### Verifier
-- [ ] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid/uninitialized local access where statically provable, invalid function reference, and invalid module link are rejected.
-- [ ] Malformed bytecode fuzzing cannot panic, hang, or access invalid memory.
-- [ ] Verification runs before any user instruction or module initializer.
+- [x] Invalid opcode, index, jump, stack underflow, inconsistent stack merge, invalid/uninitialized local access where statically provable, invalid function reference, and invalid module link are rejected.
+- [x] Malformed bytecode fuzzing cannot panic, hang, or access invalid memory.
+- [x] Verification runs before any user instruction or module initializer.
 
 ### VM
-- [ ] All 0.3.0 language constructs execute correctly.
-- [ ] Runtime value, array identity, mutation, equality, and numeric behavior match the reference engine.
-- [ ] Runtime contracts and diagnostic provenance match.
-- [ ] Call/operand resource limits fail safely and deterministically.
+- [x] All 0.3.0 language constructs execute correctly.
+- [x] Runtime value, array identity, mutation, equality, and numeric behavior match the reference engine.
+- [x] Runtime contracts and diagnostic provenance match.
+- [x] Call/operand resource limits fail safely and deterministically.
 
 ### Modules
-- [ ] Filesystem modules, standard-library imports, live aliases, module isolation, dependency order, and at-most-once initialization match 0.3.0.
-- [ ] Cycles and link errors are rejected before side effects.
-- [ ] Imported functions preserve their defining module environment and source locations.
+- [x] Filesystem modules, standard-library imports, live aliases, module isolation, dependency order, and at-most-once initialization match 0.3.0.
+- [x] Cycles and link errors are rejected before side effects.
+- [x] Imported functions preserve their defining module environment and source locations.
 
 ### Quality gates
-- [ ] Existing 0.1.x–0.3.0 tests remain intact and pass.
-- [ ] Differential corpus has zero unexplained semantic mismatches.
-- [ ] Compiler and verifier have dedicated unit/integration tests.
+- [x] Existing 0.1.x–0.3.0 tests remain intact and pass.
+- [x] Differential corpus has zero unexplained semantic mismatches.
+- [x] Compiler and verifier have dedicated unit/integration tests.
 - [ ] Fuzz targets cover compiler input, verifier bytecode, VM execution, and module linking.
 - [ ] Linux, Windows, and macOS CI pass formatting, tests, Clippy `-D warnings`, and rustdoc.
-- [ ] Benchmarks are reproducible and make no unsupported performance claim.
+- [x] Benchmarks are reproducible and make no unsupported performance claim.
 - [ ] README, architecture, changelog, roadmap, and implementation plan agree on shipped status.
-- [ ] No blocking review threads remain before merge.
+- [x] No blocking review threads remain before merge.
 
 ## 15. Release policy
 
