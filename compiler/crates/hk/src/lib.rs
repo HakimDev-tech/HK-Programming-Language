@@ -1,6 +1,9 @@
-//! HK 0.1.x reference interpreter.
-//! Dependency-free tree-walking implementation.
+//! HK language runtime with verified bytecode execution.
+//! The V0.3 tree-walking engine remains available as a test-only semantic reference.
 mod ast;
+#[cfg(feature = "bench-internals")]
+#[doc(hidden)]
+pub mod bench_support;
 mod bytecode;
 mod compiler;
 

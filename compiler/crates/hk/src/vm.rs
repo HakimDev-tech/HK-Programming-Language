@@ -1,5 +1,4 @@
 //! Verified bytecode execution engine. The tree-walking engine remains the reference.
-#![allow(dead_code)] // Public execution routing is gated on differential conformance.
 use super::ast::Param;
 use super::bytecode::{BytecodeProgram, Constant, Instruction, Opcode, UpvalueSource};
 use super::diagnostics::HkError;
@@ -36,15 +35,20 @@ struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    fn new(program: &'a BytecodeProgram, source_name: &str, source_text: &str) -> Self {
+    fn new(
+        program: &'a BytecodeProgram,
+        max_stack: usize,
+        source_name: &str,
+        source_text: &str,
+    ) -> Self {
         let env = Rc::new(RefCell::new(Env::default()));
         Env::ensure_print(&env);
         let source = Rc::new(source_name.to_owned());
         let source_text = Rc::new(source_text.to_owned());
         Self {
             program,
-            stack: Vec::new(),
-            typed_stack: Vec::new(),
+            stack: Vec::with_capacity(max_stack),
+            typed_stack: Vec::with_capacity(max_stack),
             frames: vec![Frame {
                 function: program.entry_function,
                 ip: 0,
@@ -61,11 +65,11 @@ impl<'a> Vm<'a> {
         }
     }
 
-    fn new_empty(program: &'a BytecodeProgram) -> Self {
+    fn new_empty(program: &'a BytecodeProgram, max_stack: usize) -> Self {
         Self {
             program,
-            stack: Vec::new(),
-            typed_stack: Vec::new(),
+            stack: Vec::with_capacity(max_stack),
+            typed_stack: Vec::with_capacity(max_stack),
             frames: Vec::new(),
             output: Vec::new(),
             max_call_depth: 64,
@@ -926,7 +930,18 @@ pub(super) fn execute(
     source_name: &str,
     source_text: &str,
 ) -> Result<Vec<String>> {
-    Vm::new(verified.program(), source_name, source_text).run()
+    execute_ref(&verified, source_name, source_text)
+}
+
+pub(super) fn execute_ref(
+    verified: &VerifiedProgram,
+    source_name: &str,
+    source_text: &str,
+) -> Result<Vec<String>> {
+    let max_stack = verified
+        .max_stack(verified.program().entry_function as usize)
+        .unwrap_or(0) as usize;
+    Vm::new(verified.program(), max_stack, source_name, source_text).run()
 }
 
 pub(super) fn execute_modules(
@@ -945,7 +960,12 @@ pub(super) fn execute_modules(
             "",
         ));
     }
-    let mut vm = Vm::new_empty(program);
+    let max_stack = initializers
+        .iter()
+        .filter_map(|function| verified.max_stack(*function as usize))
+        .max()
+        .unwrap_or(0) as usize;
+    let mut vm = Vm::new_empty(program, max_stack);
     for ((source_name, source_text, environment), function) in modules.iter().zip(initializers) {
         let function_proto = program.functions.get(*function as usize).ok_or_else(|| {
             HkError::new(

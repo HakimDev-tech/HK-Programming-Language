@@ -1,4 +1,3 @@
-#![allow(dead_code)] // The compiler and VM will consume these definitions in subsequent milestones.
 //! In-memory bytecode representation for HK 0.4.x.
 //!
 //! This is an internal format, not a serialized or stable public ABI.
@@ -52,9 +51,17 @@ pub(super) enum Opcode {
     SetName(u32),
     GetUpvalue(u16),
     SetUpvalue(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
     DefineModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
     GetModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct module bytecode; current linking uses module environments.
     SetModule(u16),
+    #[allow(dead_code)]
+    // Reserved for direct import bytecode; current linking uses live environment bindings.
     GetImport(u16),
     LoadPrint,
     MakeFunction(u32),
@@ -175,30 +182,4 @@ pub(super) struct BytecodeProgram {
     pub(super) functions: Vec<FunctionProto>,
     pub(super) modules: Vec<ModuleProto>,
     pub(super) entry_function: u32,
-}
-
-impl BytecodeProgram {
-    pub(super) fn empty_function(name: impl Into<String>, code: Vec<Instruction>) -> Self {
-        Self {
-            header: BytecodeHeader::default(),
-            constants: Vec::new(),
-            source_files: vec![SourceFile {
-                name: "<generated>".to_owned(),
-            }],
-            functions: vec![FunctionProto {
-                name: name.into(),
-                module_id: None,
-                parameters: Vec::new(),
-                local_slots: Vec::new(),
-                enclosing_function: None,
-                upvalues: Vec::new(),
-                return_contract: None,
-                typed: false,
-                max_stack: 0,
-                code,
-            }],
-            modules: Vec::new(),
-            entry_function: 0,
-        }
-    }
 }

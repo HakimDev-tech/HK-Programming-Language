@@ -1,4 +1,3 @@
-#![allow(dead_code)] // Verifier entry points are integrated by the compiler/VM milestone.
 //! Mandatory verifier for compiler-produced in-memory HK bytecode.
 use super::bytecode::{BytecodeProgram, Constant, FunctionProto, Opcode, UpvalueSource};
 use super::types::Type;

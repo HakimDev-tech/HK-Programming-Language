@@ -1,37 +1,55 @@
-# HK 0.4.0 — End-to-end benchmark comparison
+# HK 0.4.0 — Compiler, VM, and end-to-end benchmarks
 
-**Environment:** same 2-vCPU Linux sandbox and Rust toolchain for both revisions  
-**Iterations:** 25 per workload per invocation; median of three release invocations  
+**Environment:** same 2-vCPU Linux sandbox and Rust toolchain for both versions  
+**Iterations:** 25 VM executions per compile; 25 end-to-end runs per workload; median of three invocations  
 **V0.3 reference:** a3ffadb923fef7032fdb6fbc5983b4cf5957886a  
-**V0.4 candidate:** a85ac1408eed7967d6abdc8f076d5e43f2a2e9f8  
-**Command:** cargo bench --bench execution
+**V0.4 candidate:** current bytecode-VM branch  
+**Benchmark-only feature:** bench-internals (not enabled by default)
 
-The identical benchmark harness was copied into a detached V0.3 worktree and run against both public APIs. Each iteration includes parsing, static checks where applicable, and execution. V0.4 additionally includes AST-to-bytecode compilation and mandatory bytecode verification. The linked-module workload also includes module discovery, source loading, graph validation, import linking, and execution.
+## Compiler and VM measured separately
 
-## Results
+The execution benchmark compiles, statically checks, and verifies each source program once, then executes the same verified bytecode 25 times without recompiling or cloning the program. This isolates compile/verification latency from VM execution latency.
+
+| Workload | Compile + verify | VM average per execution |
+|---|---:|---:|
+| Arithmetic and loops | 114.0 µs | 1.893 ms |
+| Recursive calls | 91.1 µs | 674 µs |
+| Function calls | 65.3 µs | 2.569 ms |
+| Nested closure calls | 109.7 µs | 1.515 ms |
+| Array construction/index/mutation | 109.4 µs | 3.415 ms |
+
+These values are medians across three release benchmark invocations. VM average is the elapsed time for 25 executions divided by 25. The compiler column includes parsing, static checks, AST compilation, and mandatory bytecode verification.
+
+## Same-harness end-to-end comparison
+
+The separate execution_e2e benchmark uses the public run and run_path APIs on both the V0.3 reference worktree and V0.4. Each result is the median average of three release invocations, 25 runs per invocation.
 
 | Workload | V0.3 tree-walker | V0.4 VM | V0.4 change |
 |---|---:|---:|---:|
-| Arithmetic and 1,000 loop iterations | 1.692 ms | 2.273 ms | +34.3% slower |
-| 500 nested closure calls | 1.392 ms | 1.863 ms | +33.8% slower |
-| 1,000 array mutations | 2.900 ms | 3.304 ms | +13.9% slower |
-| Linked modules, 100 imported calls | 375 µs | 534 µs | +42.3% slower |
+| Arithmetic and loops | 1.581 ms | 1.919 ms | +21.3% |
+| Recursive calls | 587 µs | 720 µs | +22.6% |
+| Function calls | 1.980 ms | 2.514 ms | +27.0% |
+| Nested closure calls | 1.242 ms | 1.534 ms | +23.6% |
+| Array construction/index/mutation | 2.977 ms | 3.136 ms | +5.3% |
+| Linked modules, 100 imported calls | 336 µs | 434 µs | +29.4% |
 
-These are medians of three consecutive invocations, with 25 iterations per invocation. They show an end-to-end throughput/latency regression for the tested workloads; they do not prove that VM instruction execution alone is slower. V0.4's public path includes compilation and mandatory verification on each run, while V0.3 directly interprets the AST. The contribution of compilation, verification, dispatch, and runtime operations has not yet been isolated with a profiler.
+The end-to-end path includes parsing and static checking in both versions; V0.4 additionally compiles and verifies bytecode before VM execution. The module workload also includes dependency discovery, source loading, graph validation, linking, and execution.
 
-## Interpretation and release decision
+## Interpretation
 
-- Do not market V0.4 as a performance improvement. The current evidence shows the opposite for these end-to-end workloads.
-- The benchmark comparison gate is complete, but the regression must be explicitly accepted for the V0.4 architectural release or addressed through optimization before release approval.
-- If optimizing, profile compile/verify and VM execution separately before changing semantics or weakening mandatory verification.
-- Results are host- and workload-specific. Re-run on the same host/toolchain after any performance change.
+- V0.4 is an architectural bytecode/VM release, not a speed release. The measured end-to-end regressions are documented and accepted as a V0.4 trade-off; no speedup claim is made.
+- The isolated VM numbers show the execution cost once bytecode is compiled and verified. The end-to-end comparison shows the cost of the current public one-shot API, which recompiles and verifies on each run.
+- Profiling and reducing repeated compilation/verification costs are appropriate follow-up work; do not weaken mandatory verification to improve benchmark numbers.
+- Measurements are host- and workload-specific, not production hardware guarantees.
 
 ## Reproduction
 
-Run on V0.4:
+Run compiler/VM-separated measurements:
 
-    cargo bench -p hk --bench execution
+    cargo bench -p hk --features bench-internals --bench execution
 
-For the V0.3 baseline, check out the V0.3 reference commit, copy compiler/crates/hk/benches/execution.rs into its benches directory, add the same [[bench]] target to compiler/crates/hk/Cargo.toml, and run cargo bench --manifest-path compiler/crates/hk/Cargo.toml --bench execution.
+Run public end-to-end measurements:
 
-The harness uses no third-party benchmarking dependency. It reports total elapsed time, iteration count, average iteration time, and output size. Workloads are fixed in compiler/crates/hk/benches/execution.rs.
+    cargo bench -p hk --features bench-internals --bench execution_e2e
+
+For V0.3, check out the reference commit, copy execution_e2e.rs into its benches directory, add the bench-internals feature and same bench target to Cargo.toml, then run the same command. The benchmark sources are in compiler/crates/hk/benches.

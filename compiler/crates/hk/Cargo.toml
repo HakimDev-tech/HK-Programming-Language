@@ -7,6 +7,7 @@ description = "Gradually typed modular programming language with a verified byte
 
 [features]
 fuzzing = []
+bench-internals = []
 
 [lib]
 path = "src/lib.rs"
@@ -18,3 +19,9 @@ path = "src/main.rs"
 [[bench]]
 name = "execution"
 harness = false
+required-features = ["bench-internals"]
+
+[[bench]]
+name = "execution_e2e"
+harness = false
+required-features = ["bench-internals"]
