@@ -1,6 +1,6 @@
 # HK 0.4.0 — Versioned Bytecode and Virtual Machine Specification
 
-**Status:** Normative design proposal for HK 0.4.0. No implementation is authorized until this specification and its acceptance matrix are reviewed.
+**Status:** Normative HK 0.4.0 specification. Implemented on `feat/hk-v0.4.0-bytecode-vm`; final release gates are tracked in `HK-0.4-IMPLEMENTATION-PLAN.md`.
 **Baseline:** HK 0.3.0, gradual typing, filesystem modules, `std:math`.
 **Primary objective:** Introduce a verified stack-based bytecode execution engine without changing observable HK language semantics.
 
@@ -236,8 +236,8 @@ Benchmarks are required for representative workloads: arithmetic loops, recursiv
 - Introduce internal `compile`, `verify`, and `execute_bytecode` boundaries.
 - Do not expose mutable raw bytecode construction as a stable public API in 0.4.0.
 - Keep a test-only/reference path to the tree-walking engine.
-- Switch `run` and `run_path` to the VM only after all compatibility, verifier, fuzz, and cross-platform gates pass.
-- If any semantic mismatch remains, keep the reference engine as the default and do not declare V0.4.0 complete.
+- The V0.4 branch switches `run` and `run_path` to the VM after implementation and compatibility gates; the exact-head CI and fuzz campaign have now passed.
+- If a new semantic mismatch is discovered during final review, block release, preserve the reference engine, and fix the mismatch before declaring V0.4.0 complete.
 
 ## 14. Acceptance criteria
 
