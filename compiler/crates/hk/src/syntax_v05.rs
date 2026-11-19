@@ -459,10 +459,258 @@ pub struct V05LexError {
     pub column: usize,
 }
 
+
+/// Parsed field of a nominal struct declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05Field {
+    pub name: String,
+    pub ty: TypeExpr,
+    pub span: Range<usize>,
+}
+
+/// Struct declaration AST. Semantic resolution (identity, duplicate names across
+/// modules, bounds and field type validity) is deliberately a later compiler phase.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05StructDecl {
+    pub name: String,
+    pub generics: Vec<GenericBound>,
+    pub fields: Vec<V05Field>,
+    pub span: Range<usize>,
+}
+
+/// Enum variant with unit or positional payload.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05EnumVariant {
+    pub name: String,
+    pub payload: Vec<TypeExpr>,
+    pub span: Range<usize>,
+}
+
+/// Enum declaration AST.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05EnumDecl {
+    pub name: String,
+    pub generics: Vec<GenericBound>,
+    pub variants: Vec<V05EnumVariant>,
+    pub span: Range<usize>,
+}
+
+/// The supported declaration subset parsed by this staged parser.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum V05Declaration {
+    Struct(V05StructDecl),
+    Enum(V05EnumDecl),
+}
+
+/// Parse consecutive struct and enum declarations. The parser rejects unsupported
+/// top-level constructs instead of silently skipping tokens. Cursor rollback is
+/// guaranteed on failure.
+pub fn parse_nominal_declarations(tokens: &[V05Token]) -> Result<Vec<V05Declaration>, V05ParseError> {
+    let mut parser = V05NominalParser { tokens, cursor: 0 };
+    let mut declarations = Vec::new();
+    while parser.cursor < tokens.len() {
+        let start = parser.cursor;
+        let declaration = match parser.peek_keyword() {
+            Some(V05Keyword::Struct) => parser.parse_struct().map(V05Declaration::Struct),
+            Some(V05Keyword::Enum) => parser.parse_enum().map(V05Declaration::Enum),
+            _ => Err(parser.error("Expected a struct or enum declaration.")),
+        };
+        match declaration {
+            Ok(value) => declarations.push(value),
+            Err(error) => {
+                parser.cursor = start;
+                return Err(error);
+            }
+        }
+    }
+    Ok(declarations)
+}
+
+struct V05NominalParser<'a> {
+    tokens: &'a [V05Token],
+    cursor: usize,
+}
+
+impl V05NominalParser<'_> {
+    fn peek_keyword(&self) -> Option<V05Keyword> {
+        match self.tokens.get(self.cursor).map(|t| &t.kind) {
+            Some(V05TokenKind::Keyword(keyword)) => Some(*keyword),
+            _ => None,
+        }
+    }
+
+    fn error(&self, message: &str) -> V05ParseError {
+        parse_error(self.tokens, self.cursor, message)
+    }
+
+    fn expect_keyword(&mut self, keyword: V05Keyword, message: &str) -> Result<(), V05ParseError> {
+        if self.peek_keyword() == Some(keyword) {
+            self.cursor += 1;
+            Ok(())
+        } else {
+            Err(self.error(message))
+        }
+    }
+
+    fn expect_punctuation(&mut self, punctuation: V05Punctuation, message: &str) -> Result<(), V05ParseError> {
+        if is_punctuation(self.tokens.get(self.cursor), punctuation) {
+            self.cursor += 1;
+            Ok(())
+        } else {
+            Err(self.error(message))
+        }
+    }
+
+    fn identifier(&mut self, message: &str) -> Result<(String, Range<usize>), V05ParseError> {
+        let token = self.tokens.get(self.cursor).ok_or_else(|| self.error(message))?;
+        if let V05TokenKind::Identifier(name) = &token.kind {
+            let value = name.clone();
+            let span = token.span.clone();
+            self.cursor += 1;
+            Ok((value, span))
+        } else {
+            Err(self.error(message))
+        }
+    }
+
+    fn parse_struct(&mut self) -> Result<V05StructDecl, V05ParseError> {
+        let start = self.tokens[self.cursor].span.start;
+        self.expect_keyword(V05Keyword::Struct, "Expected 'struct'.")?;
+        let (name, name_span) = self.identifier("Expected struct name.")?;
+        let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected '{' before struct fields.")?;
+        let mut fields = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+            if self.cursor >= self.tokens.len() {
+                return Err(self.error("Unterminated struct declaration; expected '}'."));
+            }
+            let (field_name, field_span) = self.identifier("Expected field name.")?;
+            if !names.insert(field_name.clone()) {
+                return Err(V05ParseError {
+                    message: format!("Duplicate struct field '{field_name}'."),
+                    span: field_span.clone(),
+                    line: self.tokens[self.cursor - 1].line,
+                    column: self.tokens[self.cursor - 1].column,
+                });
+            }
+            self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after field name.")?;
+            let ty = parse_type_expr(self.tokens, &mut self.cursor)?;
+            let end = ty_span_end(&ty);
+            fields.push(V05Field { name: field_name, ty, span: field_span.start..end });
+            if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
+                self.cursor += 1;
+            } else if !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+                return Err(self.error("Expected ',' or '}' after field declaration."));
+            }
+        }
+        self.expect_punctuation(V05Punctuation::RightBrace, "Expected '}' after struct fields.")?;
+        let end = self.tokens[self.cursor - 1].span.end;
+        let _ = name_span;
+        Ok(V05StructDecl { name, generics, fields, span: start..end })
+    }
+
+    fn parse_enum(&mut self) -> Result<V05EnumDecl, V05ParseError> {
+        let start = self.tokens[self.cursor].span.start;
+        self.expect_keyword(V05Keyword::Enum, "Expected 'enum'.")?;
+        let (name, _) = self.identifier("Expected enum name.")?;
+        let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected '{' before enum variants.")?;
+        let mut variants = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+            if self.cursor >= self.tokens.len() {
+                return Err(self.error("Unterminated enum declaration; expected '}'."));
+            }
+            let (variant_name, variant_span) = self.identifier("Expected enum variant name.")?;
+            if !names.insert(variant_name.clone()) {
+                return Err(V05ParseError {
+                    message: format!("Duplicate enum variant '{variant_name}'."),
+                    span: variant_span.clone(),
+                    line: self.tokens[self.cursor - 1].line,
+                    column: self.tokens[self.cursor - 1].column,
+                });
+            }
+            let mut payload = Vec::new();
+            if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::LeftParen) {
+                self.cursor += 1;
+                if !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+                    loop {
+                        payload.push(parse_type_expr(self.tokens, &mut self.cursor)?);
+                        if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
+                            self.cursor += 1;
+                            if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after enum payload.")?;
+            }
+            let end = self.tokens[self.cursor.saturating_sub(1)].span.end;
+            variants.push(V05EnumVariant { name: variant_name, payload, span: variant_span.start..end });
+            if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
+                self.cursor += 1;
+            } else if !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+                return Err(self.error("Expected ',' or '}' after enum variant."));
+            }
+        }
+        self.expect_punctuation(V05Punctuation::RightBrace, "Expected '}' after enum variants.")?;
+        let end = self.tokens[self.cursor - 1].span.end;
+        Ok(V05EnumDecl { name, generics, variants, span: start..end })
+    }
+}
+
+fn ty_span_end(ty: &TypeExpr) -> usize {
+    match ty {
+        TypeExpr::Named { span, .. } | TypeExpr::Any { span } => span.end,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn parses_structs_and_enum_unit_and_tuple_variants() {
+        let tokens = lex_v05("struct Box<T: Display> { value: T, } enum Result<T, E> { Ok(T), Err(E), Empty, }").unwrap();
+        let declarations = parse_nominal_declarations(&tokens).unwrap();
+        assert_eq!(declarations.len(), 2);
+        match &declarations[0] {
+            V05Declaration::Struct(decl) => {
+                assert_eq!(decl.name, "Box");
+                assert_eq!(decl.generics[0].traits, vec!["Display"]);
+                assert_eq!(decl.fields[0].name, "value");
+            }
+            _ => panic!("expected struct AST"),
+        }
+        match &declarations[1] {
+            V05Declaration::Enum(decl) => {
+                assert_eq!(decl.name, "Result");
+                assert_eq!(decl.variants.len(), 3);
+                assert_eq!(decl.variants[0].payload.len(), 1);
+                assert_eq!(decl.variants[2].payload.len(), 0);
+            }
+            _ => panic!("expected enum AST"),
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_fields_and_variants() {
+        let duplicate_field = lex_v05("struct S { a: number, a: string }").unwrap();
+        assert!(parse_nominal_declarations(&duplicate_field).unwrap_err().message.contains("Duplicate"));
+        let duplicate_variant = lex_v05("enum E { A, A }").unwrap();
+        assert!(parse_nominal_declarations(&duplicate_variant).unwrap_err().message.contains("Duplicate"));
+    }
+
+    #[test]
+    fn nominal_parser_rejects_trailing_unknown_syntax_and_unclosed_blocks() {
+        assert!(parse_nominal_declarations(&lex_v05("struct S {} fn f() {}").unwrap()).is_err());
+        assert!(parse_nominal_declarations(&lex_v05("enum E { A").unwrap()).is_err());
+    }
     #[test]
     fn recognizes_v05_keywords_and_generic_punctuation() {
         let tokens = lex_v05("struct Box<T> { value: T } enum Result<T, E> { Ok(T) } impl<T> Box<T> {} trait Show {} match value {}").unwrap();
