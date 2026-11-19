@@ -442,12 +442,18 @@ pub fn validate_v05_coherence(
                 if inherent_methods
                     .get(&target_key)
                     .is_some_and(|inherent| inherent.contains(&method.name))
-                    || !names.insert(method.name.clone())
                 {
                     return Err(parse_error_at_span(
                         tokens,
                         method.span.clone(),
-                        "Ambiguous or duplicate trait method for target type.",
+                        "Inherent and trait method name conflict.",
+                    ));
+                }
+                if !names.insert(method.name.clone()) {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        method.span.clone(),
+                        "Duplicate trait method name for target type.",
                     ));
                 }
             }
