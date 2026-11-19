@@ -494,7 +494,8 @@ pub fn validate_v05_coherence(
                 implementation.span.clone(),
             ));
         } else {
-            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target {
+            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target
+            {
                 if type_patterns_overlap(
                     existing_target,
                     existing_generics,
