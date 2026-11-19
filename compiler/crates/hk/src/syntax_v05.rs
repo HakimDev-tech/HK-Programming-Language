@@ -375,8 +375,12 @@ pub fn validate_v05_coherence(
     let mut trait_impls: Vec<(String, TypeExpr, HashSet<String>, Range<usize>)> = Vec::new();
     let mut inherent_methods: Vec<(TypeExpr, HashSet<String>, HashSet<String>, Range<usize>)> =
         Vec::new();
-    let mut trait_methods_by_target: Vec<(TypeExpr, HashSet<String>, HashSet<String>, Range<usize>)> =
-        Vec::new();
+    let mut trait_methods_by_target: Vec<(
+        TypeExpr,
+        HashSet<String>,
+        HashSet<String>,
+        Range<usize>,
+    )> = Vec::new();
 
     for declaration in declarations {
         let V05TopLevelDeclaration::Impl(implementation) = declaration else {
@@ -410,8 +414,9 @@ pub fn validate_v05_coherence(
                     "Trait impl violates the orphan rule: neither trait nor target type is local.",
                 ));
             }
-            if trait_impls.iter().any(
-                |(existing_trait, existing_target, existing_generics, _)| {
+            if trait_impls
+                .iter()
+                .any(|(existing_trait, existing_target, existing_generics, _)| {
                     existing_trait == trait_name
                         && type_patterns_overlap(
                             existing_target,
@@ -419,8 +424,8 @@ pub fn validate_v05_coherence(
                             &implementation.target,
                             &generic_names,
                         )
-                },
-            ) {
+                })
+            {
                 return Err(parse_error_at_span(
                     tokens,
                     implementation.span.clone(),
@@ -458,12 +463,15 @@ pub fn validate_v05_coherence(
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
-                            &format!("Duplicate inherent method '{method}' for overlapping target types."),
+                            &format!(
+                                "Duplicate inherent method '{method}' for overlapping target types."
+                            ),
                         ));
                     }
                 }
             }
-            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target {
+            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target
+            {
                 if type_patterns_overlap(
                     existing_target,
                     existing_generics,
@@ -497,7 +505,9 @@ pub fn validate_v05_coherence(
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
-                            &format!("Duplicate trait method '{method}' for overlapping target types."),
+                            &format!(
+                                "Duplicate trait method '{method}' for overlapping target types."
+                            ),
                         ));
                     }
                 }
