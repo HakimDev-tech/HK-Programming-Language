@@ -84,6 +84,229 @@ impl V05TopLevelDeclaration {
     }
 }
 
+/// Validates module-local trait implementation coherence for a parsed declaration
+/// stream. This is semantic groundwork; imported symbols must be supplied by the
+/// module resolver before the production compiler can invoke this pass.
+pub fn validate_v05_coherence(
+    declarations: &[V05TopLevelDeclaration],
+    tokens: &[V05Token],
+) -> Result<(), V05ParseError> {
+    use std::collections::{HashMap, HashSet};
+
+    let local_types: HashSet<String> = declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            V05TopLevelDeclaration::Struct(value) => Some(value.name.clone()),
+            V05TopLevelDeclaration::Enum(value) => Some(value.name.clone()),
+            _ => None,
+        })
+        .collect();
+    let traits: HashMap<String, &V05TraitDecl> = declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            V05TopLevelDeclaration::Trait(value) => Some((value.name.clone(), value)),
+            _ => None,
+        })
+        .collect();
+
+    let mut trait_impls = HashSet::new();
+    let mut inherent_methods: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut trait_methods_by_target: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for declaration in declarations {
+        let V05TopLevelDeclaration::Impl(implementation) = declaration else {
+            continue;
+        };
+        let target_name = type_root_name(&implementation.target).ok_or_else(|| {
+            parse_error_at_span(tokens, implementation.target_span(), "Invalid impl target type.")
+        })?;
+        let target_key = canonical_type(&implementation.target);
+
+        if implementation.trait_name.is_none() && !local_types.contains(target_name) {
+            return Err(parse_error_at_span(
+                tokens,
+                implementation.span.clone(),
+                "Inherent impl target must be declared in this module.",
+            ));
+        }
+        if let Some(trait_name) = &implementation.trait_name {
+            if !traits.contains_key(trait_name) && !local_types.contains(target_name) {
+                return Err(parse_error_at_span(
+                    tokens,
+                    implementation.span.clone(),
+                    "Trait impl violates the orphan rule: neither trait nor target type is local.",
+                ));
+            }
+            let pair = format!("{trait_name} for {target_key}");
+            if !trait_impls.insert(pair) {
+                return Err(parse_error_at_span(
+                    tokens,
+                    implementation.span.clone(),
+                    "Duplicate trait implementation for the same trait and target type.",
+                ));
+            }
+        }
+
+        let mut current_names = HashSet::new();
+        for method in &implementation.methods {
+            if !current_names.insert(method.name.clone()) {
+                return Err(parse_error_at_span(
+                    tokens,
+                    method.span.clone(),
+                    "Duplicate method in impl block.",
+                ));
+            }
+        }
+
+        if implementation.trait_name.is_none() {
+            let names = inherent_methods.entry(target_key.clone()).or_default();
+            for method in &implementation.methods {
+                if !names.insert(method.name.clone()) {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        method.span.clone(),
+                        "Duplicate inherent method for target type.",
+                    ));
+                }
+            }
+        } else {
+            let names = trait_methods_by_target.entry(target_key.clone()).or_default();
+            for method in &implementation.methods {
+                if inherent_methods
+                    .get(&target_key)
+                    .is_some_and(|inherent| inherent.contains(&method.name))
+                    || !names.insert(method.name.clone())
+                {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        method.span.clone(),
+                        "Ambiguous or duplicate trait method for target type.",
+                    ));
+                }
+            }
+        }
+
+        if let Some(trait_name) = &implementation.trait_name {
+            if let Some(trait_declaration) = traits.get(trait_name) {
+                validate_trait_methods(trait_declaration, implementation, tokens)?;
+            }
+        }
+    }
+
+    // Inherent impls may precede trait impls in the source; check all names
+    // after collection so declaration order cannot affect ambiguity results.
+    for (target, trait_methods) in trait_methods_by_target {
+        if let Some(inherent) = inherent_methods.get(&target) {
+            if let Some(method) = trait_methods.intersection(inherent).next() {
+                return Err(parse_error_at_span(
+                    tokens,
+                    declarations
+                        .iter()
+                        .find_map(|declaration| match declaration {
+                            V05TopLevelDeclaration::Impl(value)
+                                if canonical_type(&value.target) == target =>
+                            {
+                                Some(value.span.clone())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or(0..0),
+                    &format!("Inherent and trait method name '{method}' conflict."),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_trait_methods(
+    trait_declaration: &V05TraitDecl,
+    implementation: &V05ImplDecl,
+    tokens: &[V05Token],
+) -> Result<(), V05ParseError> {
+    use std::collections::HashMap;
+
+    let declared: HashMap<&str, &V05Method> = trait_declaration
+        .methods
+        .iter()
+        .map(|method| (method.name.as_str(), method))
+        .collect();
+    let provided: HashMap<&str, &V05Method> = implementation
+        .methods
+        .iter()
+        .map(|method| (method.name.as_str(), method))
+        .collect();
+
+    for method in &trait_declaration.methods {
+        let actual = provided.get(method.name.as_str()).ok_or_else(|| {
+            parse_error_at_span(
+                tokens,
+                implementation.span.clone(),
+                &format!("Missing trait method '{}'.", method.name),
+            )
+        })?;
+        if !same_method_signature(method, actual) {
+            return Err(parse_error_at_span(
+                tokens,
+                actual.span.clone(),
+                &format!("Method '{}' does not match trait signature.", method.name),
+            ));
+        }
+    }
+    if let Some(extra) = provided.keys().find(|name| !declared.contains_key(**name)) {
+        return Err(parse_error_at_span(
+            tokens,
+            provided[extra].span.clone(),
+            &format!("Method '{}' is not declared by the trait.", extra),
+        ));
+    }
+    Ok(())
+}
+
+fn same_method_signature(left: &V05Method, right: &V05Method) -> bool {
+    left.parameters.len() == right.parameters.len()
+        && left
+            .parameters
+            .iter()
+            .zip(&right.parameters)
+            .all(|(left, right)| left.ty.as_ref().map(canonical_type) == right.ty.as_ref().map(canonical_type))
+        && left.return_type.as_ref().map(canonical_type)
+            == right.return_type.as_ref().map(canonical_type)
+}
+
+fn canonical_type(ty: &TypeExpr) -> String {
+    match ty {
+        TypeExpr::Any { .. } => "any".to_owned(),
+        TypeExpr::Named { name, arguments, .. } => {
+            if arguments.is_empty() {
+                name.clone()
+            } else {
+                format!(
+                    "{}<{}>",
+                    name,
+                    arguments.iter().map(canonical_type).collect::<Vec<_>>().join(",")
+                )
+            }
+        }
+    }
+}
+
+fn type_root_name(ty: &TypeExpr) -> Option<&str> {
+    match ty {
+        TypeExpr::Named { name, .. } => Some(name),
+        TypeExpr::Any { .. } => None,
+    }
+}
+
+fn parse_error_at_span(tokens: &[V05Token], span: Range<usize>, message: &str) -> V05ParseError {
+    let token_index = tokens
+        .iter()
+        .position(|token| token.span.start >= span.start)
+        .unwrap_or(tokens.len());
+    parse_error(tokens, token_index, message)
+}
+
 /// Parses a mixed module declaration stream. Declaration bodies remain source
 /// spans; this pass validates declaration grammar and module-level name
 /// uniqueness without pretending to parse function expressions or type-check.
