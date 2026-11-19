@@ -213,8 +213,8 @@ mod tests {
     }
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
-        let error = run("diagnostic.hk", "const value = 1;
-value = 2;").unwrap_err();
+        let source = "const value = 1;\nvalue = 2;";
+        let error = run("diagnostic.hk", source).unwrap_err();;
         let rendered = error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
@@ -298,13 +298,10 @@ value = 2;").unwrap_err();
     }
     #[test]
     fn strings_support_only_documented_escapes() {
-        assert_eq!(run("test.hk", r#"print("a\
-b");"#).unwrap(), vec!["a\
-b"]);
-        assert_eq!(run("test.hk", r#"print("a
-b");"#).unwrap(), vec!["a
-b"]);
+        assert_eq!(run("test.hk", "print(\"a\\\\nb\");").unwrap(), vec![\"a\\nb\"]);
+        assert_eq!(run("test.hk", "print(\"a\\nb\");").unwrap(), vec![\"a\\nb\"]);
     }
+
     #[test]
     fn executes_annotated_variable_declarations() {
         assert_eq!(
