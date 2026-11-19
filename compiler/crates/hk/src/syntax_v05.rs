@@ -717,7 +717,6 @@ fn ty_span_end(ty: &TypeExpr) -> usize {
 mod tests {
     use super::*;
 
-
     #[test]
     fn parses_structs_and_enum_unit_and_tuple_variants() {
         let tokens = lex_v05(
