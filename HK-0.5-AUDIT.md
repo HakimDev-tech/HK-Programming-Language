@@ -81,3 +81,7 @@ Head `ffd1ea40eabdbf4c6b04abef2abfa2fb6afc9af3` adds a standalone struct-literal
 ## Current exact state — 2026-11-19
 
 Head `4540a15e1e209c5c461e0b63a0e33a6f9efaedad` includes the staged struct literal parser and its fuzz invocation; a missing fuzz-cursor initialization found by run #384 was fixed. CI #878 passed Linux/macOS/Windows (format, workspace tests, Clippy, rustdoc). Fuzz #387 is running: source/interpreter target completed, syntax target build/campaign pending. Parser work remains isolated, expression spans are opaque; M1.1 incomplete, M1.2–M8 outstanding.
+
+## Enum-constructor parser checkpoint — 2026-11-19
+
+Head `77e70223360e66d3d3a710092bb655b0672e4b75` adds parsing of fully-qualified enum constructors, unit variants and tuple payload expression spans, with nested-delimiter/depth handling, empty/unbalanced payload rejection and cursor rollback. CI #890 passed Linux/macOS/Windows (fmt, workspace tests, Clippy, rustdoc). Fuzz run #391 on code/fuzz head `b9c92720c6beb675965f57237d220a9bb59fd5d9` is in progress; #387 completed successfully across all existing fuzz campaigns (including v0.5 syntax, modules, and bytecode verifier). No semantic enum checking or compiler integration; M1.1 incomplete, M1.2–M8 outstanding.
