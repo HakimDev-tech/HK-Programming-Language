@@ -986,6 +986,7 @@ impl V05TraitImplParser<'_> {
                 return Err(self.error("Unterminated trait declaration."));
             }
             let method = self.parse_method(false)?;
+            Self::validate_receiver(&method)?;
             if !names.insert(method.name.clone()) {
                 return Err(self.error("Duplicate trait method."));
             }
@@ -1035,6 +1036,7 @@ impl V05TraitImplParser<'_> {
                 return Err(self.error("Unterminated impl declaration."));
             }
             let method = self.parse_method(true)?;
+            Self::validate_receiver(&method)?;
             if !names.insert(method.name.clone()) {
                 return Err(self.error("Duplicate impl method."));
             }
@@ -1049,6 +1051,18 @@ impl V05TraitImplParser<'_> {
             methods,
             span: start..end,
         })
+    }
+
+    fn validate_receiver(method: &V05Method) -> Result<(), V05ParseError> {
+        if method.parameters.first().is_none_or(|parameter| parameter.name != "self") {
+            return Err(V05ParseError {
+                message: "Instance methods require `self` as their first parameter.".into(),
+                span: method.span.clone(),
+                line: 1,
+                column: 1,
+            });
+        }
+        Ok(())
     }
 
     fn parse_method(&mut self, has_body: bool) -> Result<V05Method, V05ParseError> {
@@ -1252,8 +1266,7 @@ mod v05_trait_impl_parser_tests {
     #[test]
     fn rejects_missing_receiver_and_annotated_receiver() {
         let no_receiver = lex_v05("trait T { fn x(value: number); }").unwrap();
-        // Receiver policy is semantic validation, not parser validation; parse accepts this syntax.
-        assert!(parse_trait_and_impl_declarations(&no_receiver).is_ok());
+        assert!(parse_trait_and_impl_declarations(&no_receiver).is_err());
         let annotated = lex_v05("trait T { fn x(self: T); }").unwrap();
         assert!(parse_trait_and_impl_declarations(&annotated).is_err());
     }
