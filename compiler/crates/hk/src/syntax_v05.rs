@@ -1558,7 +1558,7 @@ mod tests {
         let tokens = lex_v05(duplicate_impl).unwrap();
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
         let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
-        assert!(error.message.contains("Duplicate trait implementation"));
+        assert!(error.message.contains("Overlapping trait implementation"));
 
         let duplicate_inherent = "struct Point { x: number, } impl Point { fn move(self) { } } impl Point { fn move(self) { } }";
         let tokens = lex_v05(duplicate_inherent).unwrap();
