@@ -64,7 +64,7 @@ mod tests {
         let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value; }";
         let tokens = Lexer::new("forward.hk", source).scan().unwrap();
         let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
-        TypeChecker::new("forward.hk", source).check(&statements).unwrap();
+        TypeChecker::new("forward.hk", source)\n            .check(&statements)\n            .unwrap();
     }
 
     #[test]
@@ -72,7 +72,7 @@ mod tests {
         let source = "fn first() -> number { return later(\"wrong\"); } fn later(value: number) -> number { return value; }";
         let tokens = Lexer::new("forward.hk", source).scan().unwrap();
         let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
-        let error = TypeChecker::new("forward.hk", source).check(&statements).unwrap_err();
+        let error = TypeChecker::new("forward.hk", source)\n            .check(&statements)\n            .unwrap_err();
         assert_eq!(error.code, "E3003");
         assert!(error.message.contains("function argument"));
     }
