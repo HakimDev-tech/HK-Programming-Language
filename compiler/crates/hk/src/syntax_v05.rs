@@ -1217,9 +1217,9 @@ mod v05_trait_impl_parser_tests {
                         arguments: vec![super::TypeExpr::Named {
                             name: "T".into(),
                             arguments: vec![],
-                            span: 71..72,
+                            span: 67..68,
                         }],
-                        span: 67..73,
+                        span: 63..69,
                     }
                 );
                 assert_eq!(decl.methods[0].name, "get");
@@ -1241,7 +1241,7 @@ mod v05_trait_impl_parser_tests {
                     super::TypeExpr::Named {
                         name: "Point".into(),
                         arguments: vec![],
-                        span: 65..70,
+                        span: 63..68,
                     }
                 );
             }
