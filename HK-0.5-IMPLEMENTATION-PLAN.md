@@ -79,3 +79,8 @@ Any unresolved normative semantic rule; any unverified descriptor/opcode; panic 
 - [ ] PR reviewed and merged.
 - [ ] Annotated v0.5.0 tag targets the exact merge commit.
 - [ ] GitHub Release published and verified.
+
+
+## Continuation progress — 2026-11-19
+
+New staged parser work adds trait declarations and impl blocks with method signatures, generic impl headers, method body span capture, duplicate checks, and bounded body nesting. The syntax fuzz target exercises trait/impl parsing. Commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is awaiting CI. This does not complete M1.1: bodies remain opaque token spans and no v0.5 feature is integrated into the executable compiler.
