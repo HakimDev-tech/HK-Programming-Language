@@ -1380,10 +1380,7 @@ impl V05FunctionParser<'_> {
                 return Err(self.error("Duplicate function parameter."));
             }
             self.cursor += 1;
-            self.expect_punctuation(
-                V05Punctuation::Colon,
-                "Expected ':' after parameter name.",
-            )?;
+            self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after parameter name.")?;
             let ty = parse_type_expr(self.tokens, &mut self.cursor)?;
             let end = self
                 .tokens
@@ -1404,20 +1401,14 @@ impl V05FunctionParser<'_> {
                 break;
             }
         }
-        self.expect_punctuation(
-            V05Punctuation::RightParen,
-            "Expected ')' after parameters.",
-        )?;
+        self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after parameters.")?;
         let return_type = if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Arrow) {
             self.cursor += 1;
             Some(parse_type_expr(self.tokens, &mut self.cursor)?)
         } else {
             None
         };
-        self.expect_punctuation(
-            V05Punctuation::LeftBrace,
-            "Expected function body.",
-        )?;
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected function body.")?;
         let body_start = self.tokens[self.cursor - 1].span.start;
         let mut depth = 1usize;
         while self.cursor < self.tokens.len() && depth > 0 {
