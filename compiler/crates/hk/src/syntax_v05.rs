@@ -1354,6 +1354,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn declaration_module_analysis_runs_all_frontend_stages_and_indexes_symbols() {
+        let source = "struct Box<T> { value: T, } trait Display { fn display(self) -> string; } impl Display for Box<number> { fn display(self) -> string { return \"box\"; } } fn identity<T>(value: T) -> T { return value; }";
+        let index = analyze_v05_declaration_module(source).unwrap();
+        assert_eq!(
+            index.symbols.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["Box", "Display", "identity"]
+        );
+        assert_eq!(index.symbols["Box"].kind, V05SymbolKind::Struct);
+        assert_eq!(index.symbols["Display"].kind, V05SymbolKind::Trait);
+        assert_eq!(index.symbols["identity"].kind, V05SymbolKind::Function);
+        assert_eq!(index.declarations.len(), 4);
+
+        let invalid = "struct Box<T> { value: T, } fn broken(value: Box) -> number { return 1; }";
+        let error = analyze_v05_declaration_module(invalid).unwrap_err();
+        assert!(error.to_string().contains("generic argument"));
+    }
+
+    #[test]
     fn validates_v05_type_names_and_generic_arity() {
         let valid = "struct Box<T> { value: T, } enum Option<T> { Some(T), None, } trait Display { fn display(self) -> string; } fn identity<T>(value: T) -> T { return value; } fn render<T: Display>(value: T) -> string { return value.display(); }";
         let tokens = lex_v05(valid).unwrap();
