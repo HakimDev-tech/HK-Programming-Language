@@ -36,3 +36,10 @@ All v0.5 syntax additions remain isolated in `syntax_v05.rs`; they are not integ
 5. Continue remaining M1.1 grammar, then M1.2–M8 per authoritative spec.
 6. Keep PR #21 Draft until acceptance; do not merge/release.
 7. Separate outstanding v0.4.0 tag/release issue #18 from v0.5 implementation.
+
+
+## Verification correction — 2026-11-19
+
+- CI run #916 completed successfully on the checkpoint head `d0c7196992e0c6b45e6eed68f226df0ac298099e`, Linux/macOS/Windows.
+- Fuzz run #400 completed successfully on docs head `bfa045c14ac133949b0bd34536811373143f3d36`, all configured fuzz steps including the v0.5 syntax campaign with match parser, module resolver and malformed-bytecode verifier.
+- The syntax campaign and fuzz target build are therefore verified for the match-parser slice. No claim of semantic soundness or integration.
