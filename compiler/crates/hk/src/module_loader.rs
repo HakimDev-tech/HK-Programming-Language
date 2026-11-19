@@ -510,6 +510,19 @@ mod differential_tests {
     }
 
     #[test]
+    fn linked_modules_allow_forward_calls_between_exported_functions() {
+        let fixture = Fixture::new(&[
+            (
+                "library.hk",
+                "export fn first(value) { return later(value) + 1; } export fn later(value) { return value * 2; }",
+            ),
+            ("main.hk", "import { first } from \"./library.hk\"; print(first(4));"),
+        ]);
+        assert_same_outcome(&fixture);
+        assert_eq!(execute_file(&fixture.entry()).unwrap(), vec!["9"]);
+    }
+
+    #[test]
     fn linked_module_vm_matches_reference_for_aliases_live_bindings_and_std_math() {
         let fixture = Fixture::new(&[
             (
