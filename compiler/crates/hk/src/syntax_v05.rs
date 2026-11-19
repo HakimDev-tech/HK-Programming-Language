@@ -1724,7 +1724,14 @@ mod tests {
     fn infers_generic_function_arguments_from_arguments_and_expected_return() {
         let source = "fn identity<T>(value: T) -> T { return value; } fn create<T>() -> T { return null; }";
         let tokens = lex_v05(source).unwrap();
-        let functions = parse_function_declarations(&tokens).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let functions = declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                V05TopLevelDeclaration::Function(function) => Some(function.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
         let number = lex_v05("number").unwrap();
         let mut cursor = 0;
         let number_type = parse_type_expr(&number, &mut cursor).unwrap();
