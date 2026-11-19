@@ -1793,7 +1793,10 @@ fn parse_enum_constructor_at(
         }
         *cursor += 1;
     }
-    let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(variant_token.span.end);
+    let end = tokens
+        .get(cursor.saturating_sub(1))
+        .map(|t| t.span.end)
+        .unwrap_or(variant_token.span.end);
     Ok(V05EnumConstructor {
         enum_type,
         variant,
