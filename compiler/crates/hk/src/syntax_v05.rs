@@ -357,7 +357,6 @@ pub fn parse_generic_parameters(
     let mut parameters = Vec::new();
     let mut parameter_names = std::collections::HashSet::new();
     loop {
-        let start = *cursor;
         let token = tokens
             .get(*cursor)
             .ok_or_else(|| parse_error(tokens, *cursor, "Expected a generic parameter."))?;
@@ -441,7 +440,6 @@ pub fn parse_generic_parameters(
         } else {
             break;
         }
-        let _ = start;
     }
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
         return Err(parse_error(
