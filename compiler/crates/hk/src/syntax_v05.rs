@@ -84,6 +84,172 @@ impl V05TopLevelDeclaration {
     }
 }
 
+/// Performs declaration-level type-name and generic-arity validation over the
+/// staged v0.5 declaration AST. Resolution is module-local at this stage;
+/// imports and executable type checking are handled by later integration work.
+pub fn validate_v05_type_names(
+    declarations: &[V05TopLevelDeclaration],
+    tokens: &[V05Token],
+) -> Result<(), V05ParseError> {
+    use std::collections::{HashMap, HashSet};
+
+    let nominal: HashMap<&str, usize> = declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            V05TopLevelDeclaration::Struct(value) => Some((value.name.as_str(), value.generics.len())),
+            V05TopLevelDeclaration::Enum(value) => Some((value.name.as_str(), value.generics.len())),
+            _ => None,
+        })
+        .collect();
+    let traits: HashSet<&str> = declarations
+        .iter()
+        .filter_map(|declaration| match declaration {
+            V05TopLevelDeclaration::Trait(value) => Some(value.name.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    for declaration in declarations {
+        match declaration {
+            V05TopLevelDeclaration::Struct(value) => {
+                let parameters = generic_parameters(&value.generics, tokens, &traits)?;
+                for field in &value.fields {
+                    validate_type_expr_names(&field.ty, &parameters, &nominal, tokens)?;
+                }
+            }
+            V05TopLevelDeclaration::Enum(value) => {
+                let parameters = generic_parameters(&value.generics, tokens, &traits)?;
+                for variant in &value.variants {
+                    for payload in &variant.payload {
+                        validate_type_expr_names(payload, &parameters, &nominal, tokens)?;
+                    }
+                }
+            }
+            V05TopLevelDeclaration::Trait(value) => {
+                for method in &value.methods {
+                    validate_method_type_names(method, &HashSet::new(), &nominal, tokens)?;
+                }
+            }
+            V05TopLevelDeclaration::Function(value) => {
+                let parameters = generic_parameters(&value.generics, tokens, &traits)?;
+                for parameter in &value.parameters {
+                    validate_type_expr_names(&parameter.ty, &parameters, &nominal, tokens)?;
+                }
+                if let Some(return_type) = &value.return_type {
+                    validate_type_expr_names(return_type, &parameters, &nominal, tokens)?;
+                }
+            }
+            V05TopLevelDeclaration::Impl(value) => {
+                let parameters = generic_parameters(&value.generics, tokens, &traits)?;
+                validate_type_expr_names(&value.target, &parameters, &nominal, tokens)?;
+                if let Some(trait_name) = &value.trait_name {
+                    if !traits.contains(trait_name.as_str()) {
+                        // An imported trait may be resolved by the future module
+                        // resolver; keep unresolved external names as deferred.
+                    }
+                }
+                for method in &value.methods {
+                    validate_method_type_names(method, &parameters, &nominal, tokens)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn generic_parameters(
+    bounds: &[GenericBound],
+    tokens: &[V05Token],
+    traits: &std::collections::HashSet<&str>,
+) -> Result<std::collections::HashSet<String>, V05ParseError> {
+    let mut names = std::collections::HashSet::new();
+    for bound in bounds {
+        if !names.insert(bound.parameter.clone()) {
+            return Err(parse_error_at_span(
+                tokens,
+                bound.span.clone(),
+                "Duplicate generic parameter.",
+            ));
+        }
+        for trait_name in &bound.traits {
+            if !traits.contains(trait_name.as_str()) {
+                return Err(parse_error_at_span(
+                    tokens,
+                    bound.span.clone(),
+                    &format!("Unknown trait bound '{trait_name}'."),
+                ));
+            }
+        }
+    }
+    Ok(names)
+}
+
+fn validate_method_type_names(
+    method: &V05Method,
+    parameters: &std::collections::HashSet<String>,
+    nominal: &std::collections::HashMap<&str, usize>,
+    tokens: &[V05Token],
+) -> Result<(), V05ParseError> {
+    for parameter in &method.parameters {
+        if let Some(ty) = &parameter.ty {
+            validate_type_expr_names(ty, parameters, nominal, tokens)?;
+        }
+    }
+    if let Some(return_type) = &method.return_type {
+        validate_type_expr_names(return_type, parameters, nominal, tokens)?;
+    }
+    Ok(())
+}
+
+fn validate_type_expr_names(
+    ty: &TypeExpr,
+    parameters: &std::collections::HashSet<String>,
+    nominal: &std::collections::HashMap<&str, usize>,
+    tokens: &[V05Token],
+) -> Result<(), V05ParseError> {
+    match ty {
+        TypeExpr::Any { .. } => Ok(()),
+        TypeExpr::Named { name, arguments, span } => {
+            let primitive = matches!(name.as_str(), "number" | "string" | "bool" | "null" | "array" | "any");
+            if parameters.contains(name) {
+                if !arguments.is_empty() {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        span.clone(),
+                        "Generic parameter cannot be applied to type arguments.",
+                    ));
+                }
+            } else if primitive {
+                if !arguments.is_empty() {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        span.clone(),
+                        "Primitive type cannot take generic arguments.",
+                    ));
+                }
+            } else if let Some(expected) = nominal.get(name.as_str()) {
+                if arguments.len() != *expected {
+                    return Err(parse_error_at_span(
+                        tokens,
+                        span.clone(),
+                        &format!("Type '{name}' expects {expected} generic argument(s), found {}.", arguments.len()),
+                    ));
+                }
+            } else {
+                return Err(parse_error_at_span(
+                    tokens,
+                    span.clone(),
+                    &format!("Unknown type name '{name}'."),
+                ));
+            }
+            for argument in arguments {
+                validate_type_expr_names(argument, parameters, nominal, tokens)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 /// Validates module-local trait implementation coherence for a parsed declaration
 /// stream. This is semantic groundwork; imported symbols must be supplied by the
 /// module resolver before the production compiler can invoke this pass.
