@@ -304,7 +304,7 @@ impl<'a> Compiler<'a> {
                     S::Fn(name, parameters, body, line, column) => {
                         let child = self.compile_function(
                             name,
-                            parameters.iter().map(|parameter| (parameter.as_str(), None)).collect(),
+                            parameters\n                                .iter()\n                                .map(|parameter| (parameter.as_str(), None))\n                                .collect(),
                             body,
                             false,
                             None,
