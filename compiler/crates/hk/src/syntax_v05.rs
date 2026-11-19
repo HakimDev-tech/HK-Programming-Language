@@ -388,7 +388,7 @@ pub fn parse_generic_parameters(
                             return Err(parse_error(tokens, *cursor, "Duplicate trait bound."));
                         }
                         traits.push(name.clone());
-                    },
+                    }
                     _ => {
                         return Err(parse_error(
                             tokens,
@@ -791,7 +791,13 @@ mod tests {
             .message
             .contains("Duplicate trait"));
 
-        let many = format!("<{}>", (0..257).map(|i| format!("T{i}")).collect::<Vec<_>>().join(","));
+        let many = format!(
+            "<{}>",
+            (0..257)
+                .map(|i| format!("T{i}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
         let tokens = lex_v05(&many).unwrap();
         let mut cursor = 0;
         assert!(parse_generic_parameters(&tokens, &mut cursor)
@@ -799,6 +805,7 @@ mod tests {
             .message
             .contains("supported limit"));
     }
+
     #[test]
     fn recognizes_v05_keywords_and_generic_punctuation() {
         let tokens = lex_v05("struct Box<T> { value: T } enum Result<T, E> { Ok(T) } impl<T> Box<T> {} trait Show {} match value {}").unwrap();
