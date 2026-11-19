@@ -1559,6 +1559,15 @@ mod tests {
     }
 
     #[test]
+    fn coherence_detects_overlapping_inherent_impl_method_sets() {
+        let source = "struct Box<T> { value: T, } impl<T> Box<T> { fn get(self) -> T { return self.value; } } impl Box<number> { fn get(self) -> number { return self.value; } }";
+        let tokens = lex_v05(source).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("Duplicate inherent method"));
+    }
+
+    #[test]
     fn coherence_detects_overlapping_generic_trait_impls() {
         let overlap = "struct Box<T> { value: T, } trait Display { fn display(self) -> string; } impl<T> Display for Box<T> { fn display(self) -> string { return \"generic\"; } } impl Display for Box<number> { fn display(self) -> string { return \"number\"; } }";
         let tokens = lex_v05(overlap).unwrap();
