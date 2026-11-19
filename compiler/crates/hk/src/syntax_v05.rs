@@ -1280,6 +1280,7 @@ mod v05_trait_impl_parser_tests {
 }
 
  
+
 // ---- Generic function declaration syntax (staged M1.1 slice) --------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1301,7 +1302,9 @@ pub struct V05FunctionDecl {
 
 /// Parses generic and nongeneric function declarations while preserving their
 /// body token ranges. Expression and statement parsing is a separate stage.
-pub fn parse_function_declarations(tokens: &[V05Token]) -> Result<Vec<V05FunctionDecl>, V05ParseError> {
+pub fn parse_function_declarations(
+    tokens: &[V05Token],
+) -> Result<Vec<V05FunctionDecl>, V05ParseError> {
     let mut parser = V05FunctionParser { tokens, cursor: 0 };
     let mut functions = Vec::new();
     let mut names = std::collections::HashSet::new();
@@ -1325,7 +1328,11 @@ impl V05FunctionParser<'_> {
         parse_error(self.tokens, self.cursor, message)
     }
 
-    fn expect_punctuation(&mut self, punctuation: V05Punctuation, message: &str) -> Result<(), V05ParseError> {
+    fn expect_punctuation(
+        &mut self,
+        punctuation: V05Punctuation,
+        message: &str,
+    ) -> Result<(), V05ParseError> {
         if is_punctuation(self.tokens.get(self.cursor), punctuation) {
             self.cursor += 1;
             Ok(())
@@ -1335,24 +1342,36 @@ impl V05FunctionParser<'_> {
     }
 
     fn parse_function(&mut self) -> Result<V05FunctionDecl, V05ParseError> {
-        let start_token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function declaration."))?;
+        let start_token = self
+            .tokens
+            .get(self.cursor)
+            .ok_or_else(|| self.error("Expected function declaration."))?;
         if !matches!(&start_token.kind, V05TokenKind::Identifier(keyword) if keyword == "fn") {
             return Err(self.error("Expected function declaration keyword."));
         }
         let start = start_token.span.start;
         self.cursor += 1;
-        let name_token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function name."))?;
+        let name_token = self
+            .tokens
+            .get(self.cursor)
+            .ok_or_else(|| self.error("Expected function name."))?;
         let name = match &name_token.kind {
             V05TokenKind::Identifier(name) => name.clone(),
             _ => return Err(self.error("Expected function name.")),
         };
         self.cursor += 1;
         let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
-        self.expect_punctuation(V05Punctuation::LeftParen, "Expected '(' after function name/generics.")?;
+        self.expect_punctuation(
+            V05Punctuation::LeftParen,
+            "Expected '(' after function name/generics.",
+        )?;
         let mut parameters = Vec::new();
         let mut names = std::collections::HashSet::new();
         while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
-            let token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function parameter."))?;
+            let token = self
+                .tokens
+                .get(self.cursor)
+                .ok_or_else(|| self.error("Expected function parameter."))?;
             let parameter_name = match &token.kind {
                 V05TokenKind::Identifier(name) => name.clone(),
                 _ => return Err(self.error("Expected parameter name.")),
@@ -1361,10 +1380,21 @@ impl V05FunctionParser<'_> {
                 return Err(self.error("Duplicate function parameter."));
             }
             self.cursor += 1;
-            self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after parameter name.")?;
+            self.expect_punctuation(
+                V05Punctuation::Colon,
+                "Expected ':' after parameter name.",
+            )?;
             let ty = parse_type_expr(self.tokens, &mut self.cursor)?;
-            let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
-            parameters.push(V05FunctionParameter { name: parameter_name, ty, span: token.span.start..end });
+            let end = self
+                .tokens
+                .get(self.cursor.saturating_sub(1))
+                .map(|t| t.span.end)
+                .unwrap_or(token.span.end);
+            parameters.push(V05FunctionParameter {
+                name: parameter_name,
+                ty,
+                span: token.span.start..end,
+            });
             if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
                 self.cursor += 1;
                 if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
@@ -1374,14 +1404,20 @@ impl V05FunctionParser<'_> {
                 break;
             }
         }
-        self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after parameters.")?;
+        self.expect_punctuation(
+            V05Punctuation::RightParen,
+            "Expected ')' after parameters.",
+        )?;
         let return_type = if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Arrow) {
             self.cursor += 1;
             Some(parse_type_expr(self.tokens, &mut self.cursor)?)
         } else {
             None
         };
-        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected function body.")?;
+        self.expect_punctuation(
+            V05Punctuation::LeftBrace,
+            "Expected function body.",
+        )?;
         let body_start = self.tokens[self.cursor - 1].span.start;
         let mut depth = 1usize;
         while self.cursor < self.tokens.len() && depth > 0 {
@@ -1392,7 +1428,9 @@ impl V05FunctionParser<'_> {
             }
             self.cursor += 1;
             if depth > 64 {
-                return Err(self.error("Maximum function-body brace nesting depth (64) exceeded."));
+                return Err(
+                    self.error("Maximum function-body brace nesting depth (64) exceeded.")
+                );
             }
         }
         if depth != 0 {
@@ -1400,7 +1438,14 @@ impl V05FunctionParser<'_> {
         }
         let body_span = body_start..self.tokens[self.cursor - 1].span.end;
         let end = self.tokens[self.cursor - 1].span.end;
-        Ok(V05FunctionDecl { name, generics, parameters, return_type, body_span, span: start..end })
+        Ok(V05FunctionDecl {
+            name,
+            generics,
+            parameters,
+            return_type,
+            body_span,
+            span: start..end,
+        })
     }
 }
 
