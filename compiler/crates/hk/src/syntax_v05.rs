@@ -118,7 +118,7 @@ pub fn validate_v05_coherence(
             continue;
         };
         let target_name = type_root_name(&implementation.target).ok_or_else(|| {
-            parse_error_at_span(tokens, implementation.target_span(), "Invalid impl target type.")
+            parse_error_at_span(tokens, type_span(&implementation.target), "Invalid impl target type.")
         })?;
         let target_key = canonical_type(&implementation.target);
 
@@ -289,6 +289,12 @@ fn canonical_type(ty: &TypeExpr) -> String {
                 )
             }
         }
+    }
+}
+
+fn type_span(ty: &TypeExpr) -> Range<usize> {
+    match ty {
+        TypeExpr::Named { span, .. } | TypeExpr::Any { span } => span.clone(),
     }
 }
 
