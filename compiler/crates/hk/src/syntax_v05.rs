@@ -347,6 +347,13 @@ fn validate_type_expr_names(
     }
 }
 
+#[derive(Clone, Debug)]
+struct V05ImplMethodSet {
+    target: TypeExpr,
+    generic_parameters: HashSet<String>,
+    methods: HashSet<String>,
+}
+
 /// Validates module-local trait implementation coherence for a parsed declaration
 /// stream. This is semantic groundwork; imported symbols must be supplied by the
 /// module resolver before the production compiler can invoke this pass.
@@ -373,14 +380,8 @@ pub fn validate_v05_coherence(
         .collect();
 
     let mut trait_impls: Vec<(String, TypeExpr, HashSet<String>, Range<usize>)> = Vec::new();
-    let mut inherent_methods: Vec<(TypeExpr, HashSet<String>, HashSet<String>, Range<usize>)> =
-        Vec::new();
-    let mut trait_methods_by_target: Vec<(
-        TypeExpr,
-        HashSet<String>,
-        HashSet<String>,
-        Range<usize>,
-    )> = Vec::new();
+    let mut inherent_methods: Vec<V05ImplMethodSet> = Vec::new();
+    let mut trait_methods_by_target: Vec<V05ImplMethodSet> = Vec::new();
 
     for declaration in declarations {
         let V05TopLevelDeclaration::Impl(implementation) = declaration else {
@@ -452,14 +453,14 @@ pub fn validate_v05_coherence(
         }
 
         if implementation.trait_name.is_none() {
-            for (existing_target, existing_generics, existing_names, _) in &inherent_methods {
+            for existing in &inherent_methods {
                 if type_patterns_overlap(
-                    existing_target,
-                    existing_generics,
+                    &existing.target,
+                    &existing.generic_parameters,
                     &implementation.target,
                     &generic_names,
                 ) {
-                    if let Some(method) = current_names.intersection(existing_names).next() {
+                    if let Some(method) = current_names.intersection(&existing.methods).next() {
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
@@ -470,15 +471,14 @@ pub fn validate_v05_coherence(
                     }
                 }
             }
-            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target
-            {
+            for existing in &trait_methods_by_target {
                 if type_patterns_overlap(
-                    existing_target,
-                    existing_generics,
+                    &existing.target,
+                    &existing.generic_parameters,
                     &implementation.target,
                     &generic_names,
                 ) {
-                    if let Some(method) = current_names.intersection(existing_names).next() {
+                    if let Some(method) = current_names.intersection(&existing.methods).next() {
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
@@ -487,22 +487,20 @@ pub fn validate_v05_coherence(
                     }
                 }
             }
-            inherent_methods.push((
-                implementation.target.clone(),
-                generic_names,
-                current_names,
-                implementation.span.clone(),
-            ));
+            inherent_methods.push(V05ImplMethodSet {
+                target: implementation.target.clone(),
+                generic_parameters: generic_names,
+                methods: current_names,
+            });
         } else {
-            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target
-            {
+            for existing in &trait_methods_by_target {
                 if type_patterns_overlap(
-                    existing_target,
-                    existing_generics,
+                    &existing.target,
+                    &existing.generic_parameters,
                     &implementation.target,
                     &generic_names,
                 ) {
-                    if let Some(method) = current_names.intersection(existing_names).next() {
+                    if let Some(method) = current_names.intersection(&existing.methods).next() {
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
@@ -513,14 +511,14 @@ pub fn validate_v05_coherence(
                     }
                 }
             }
-            for (existing_target, existing_generics, existing_names, _) in &inherent_methods {
+            for existing in &inherent_methods {
                 if type_patterns_overlap(
-                    existing_target,
-                    existing_generics,
+                    &existing.target,
+                    &existing.generic_parameters,
                     &implementation.target,
                     &generic_names,
                 ) {
-                    if let Some(method) = current_names.intersection(existing_names).next() {
+                    if let Some(method) = current_names.intersection(&existing.methods).next() {
                         return Err(parse_error_at_span(
                             tokens,
                             implementation.span.clone(),
@@ -529,12 +527,11 @@ pub fn validate_v05_coherence(
                     }
                 }
             }
-            trait_methods_by_target.push((
-                implementation.target.clone(),
-                generic_names,
-                current_names,
-                implementation.span.clone(),
-            ));
+            trait_methods_by_target.push(V05ImplMethodSet {
+                target: implementation.target.clone(),
+                generic_parameters: generic_names,
+                methods: current_names,
+            });
         }
 
         if let Some(trait_name) = &implementation.trait_name {
