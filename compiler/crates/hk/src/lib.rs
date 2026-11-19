@@ -64,7 +64,9 @@ mod tests {
         let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value; }";
         let tokens = Lexer::new("forward.hk", source).scan().unwrap();
         let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
-        TypeChecker::new("forward.hk", source)\n            .check(&statements)\n            .unwrap();
+        TypeChecker::new("forward.hk", source)
+            .check(&statements)
+            .unwrap();
     }
 
     #[test]
@@ -72,7 +74,9 @@ mod tests {
         let source = "fn first() -> number { return later(\"wrong\"); } fn later(value: number) -> number { return value; }";
         let tokens = Lexer::new("forward.hk", source).scan().unwrap();
         let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
-        let error = TypeChecker::new("forward.hk", source)\n            .check(&statements)\n            .unwrap_err();
+        let error = TypeChecker::new("forward.hk", source)
+            .check(&statements)
+            .unwrap_err();
         assert_eq!(error.code, "E3003");
         assert!(error.message.contains("function argument"));
     }
@@ -203,7 +207,8 @@ mod tests {
     }
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
-        let error = run("diagnostic.hk", "const value = 1;\nvalue = 2;").unwrap_err();
+        let error = run("diagnostic.hk", "const value = 1;
+value = 2;").unwrap_err();
         let rendered = error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
@@ -268,7 +273,8 @@ mod tests {
 
     #[test]
     fn generated_source_inputs_never_panic() {
-        let alphabet = b"abcdefghijklmnopqrstuvwxyz0123456789{}[]();,+-*/=!&|. \\n\\t\\\"";
+        let alphabet = b"abcdefghijklmnopqrstuvwxyz0123456789{}[]();,+-*/=!&|. \
+\\t\\\"";
         let mut state = 0x9e3779b97f4a7c15u64;
         for length in 0..96usize {
             let mut source = String::new();
@@ -286,8 +292,12 @@ mod tests {
     }
     #[test]
     fn strings_support_only_documented_escapes() {
-        assert_eq!(run("test.hk", r#"print("a\\nb");"#).unwrap(), vec!["a\\nb"]);
-        assert_eq!(run("test.hk", r#"print("a\nb");"#).unwrap(), vec!["a\nb"]);
+        assert_eq!(run("test.hk", r#"print("a\
+b");"#).unwrap(), vec!["a\
+b"]);
+        assert_eq!(run("test.hk", r#"print("a
+b");"#).unwrap(), vec!["a
+b"]);
     }
     #[test]
     fn executes_annotated_variable_declarations() {
