@@ -763,6 +763,7 @@ pub(super) fn compile_module(
     source_text: &str,
     statements: &[S],
 ) -> Result<VerifiedProgram> {
+    super::declaration_collector::collect(statements, source_name, source_text)?;
     if has_type_annotations(statements) {
         type_checker::TypeChecker::new(source_name, source_text).check(statements)?;
     }
@@ -865,6 +866,7 @@ pub(super) fn compile_source(source_name: &str, source_text: &str) -> Result<Ver
             source_text,
         ));
     }
+    super::declaration_collector::collect(&statements, source_name, source_text)?;
     if has_type_annotations(&statements) {
         type_checker::TypeChecker::new(source_name, source_text).check(&statements)?;
     }
