@@ -163,7 +163,11 @@ mod tests {
         );
         let symbols = collect(&statements, "collect.hk", "").unwrap();
         assert_eq!(
-            symbols\n                .symbols\n                .keys()\n                .map(String::as_str)\n                .collect::<Vec<_>>(),
+            symbols
+                .symbols
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
             vec!["alias", "local", "main", "print"]
         );
         assert_eq!(symbols.exported_names().collect::<Vec<_>>(), vec!["main"]);
@@ -181,6 +185,9 @@ mod tests {
     #[test]
     fn rejects_reserved_print_binding() {
         let statements = parse("let print = 1;");
-        assert_eq!(\n            collect(&statements, "collect.hk", "").unwrap_err().code,\n            "E4001"\n        );
+        assert_eq!(
+            collect(&statements, "collect.hk", "").unwrap_err().code,
+            "E4001"
+        );
     }
 }
