@@ -26,6 +26,14 @@ enum Flow {
     Next,
     Return(V, usize, usize),
 }
+fn is_module_function(statement: &S) -> bool {
+    match statement {
+        S::Export(inner) => matches!(inner.as_ref(), S::Fn(..) | S::TypedFn(..)),
+        S::Fn(..) | S::TypedFn(..) => true,
+        _ => false,
+    }
+}
+
 struct Engine {
     env: Rc<RefCell<Env>>,
     output: Vec<String>,
@@ -90,8 +98,21 @@ impl Engine {
         HkError::new(code, msg, &self.source, line, col, &self.source_text)
     }
     fn run(&mut self, ss: &[S]) -> Result<()> {
-        for s in ss {
-            if let Flow::Return(_, line, col) = self.exec(s)? {
+        // Mirror the VM's module-entry function hoisting. Closures are installed
+        // before initializers so forward and mutually recursive calls behave
+        // identically in the reference engine.
+        for statement in ss {
+            if is_module_function(statement) {
+                if let Flow::Return(_, line, col) = self.exec(statement)? {
+                    return Err(self.error("'return' is only valid inside a function.", line, col));
+                }
+            }
+        }
+        for statement in ss {
+            if is_module_function(statement) {
+                continue;
+            }
+            if let Flow::Return(_, line, col) = self.exec(statement)? {
                 return Err(self.error("'return' is only valid inside a function.", line, col));
             }
         }
@@ -884,5 +905,31 @@ mod contract_tests {
             Env::get(&child, "value"),
             Some(V::Str(value)) if value == "updated"
         ));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{lexer::Lexer, parser::Parser};
+
+    #[test]
+    fn reference_engine_supports_mutual_recursion_after_hoisting() {
+        let source = "print(even(10)); fn even(value) { if (value == 0) { return true; } else { return odd(value - 1); } } fn odd(value) { if (value == 0) { return false; } else { return even(value - 1); } }";
+        let tokens = Lexer::new("mutual.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "mutual.hk", source).parse().unwrap();
+        let mut engine = Engine::new("mutual.hk", source);
+        engine.run(&statements).unwrap();
+        assert_eq!(engine.output, vec!["true"]);
+    }
+
+    #[test]
+    fn reference_engine_hoists_forward_function_declarations() {
+        let source = "print(first(4)); fn first(value) { return later(value) + 1; } fn later(value) { return value * 2; }";
+        let tokens = Lexer::new("forward.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
+        let mut engine = Engine::new("forward.hk", source);
+        engine.run(&statements).unwrap();
+        assert_eq!(engine.output, vec!["9"]);
     }
 }

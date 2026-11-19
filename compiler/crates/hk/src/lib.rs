@@ -6,6 +6,7 @@ mod ast;
 pub mod bench_support;
 mod bytecode;
 mod compiler;
+mod declaration_collector;
 
 use ast::S;
 pub mod diagnostics;
@@ -15,6 +16,7 @@ mod module_loader;
 mod parser;
 mod runtime;
 mod runtime_ops;
+pub mod syntax_v05;
 mod type_checker;
 mod types;
 mod value;
@@ -56,6 +58,53 @@ fn has_type_annotations(statements: &[S]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::run;
+    use super::{lexer::Lexer, parser::Parser, type_checker::TypeChecker};
+    #[test]
+    fn type_checker_resolves_typed_functions_declared_later() {
+        let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value; }";
+        let tokens = Lexer::new("forward.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
+        TypeChecker::new("forward.hk", source)
+            .check(&statements)
+            .unwrap();
+    }
+
+    #[test]
+    fn type_checker_validates_calls_to_later_function_signatures() {
+        let source = "fn first() -> number { return later(\"wrong\"); } fn later(value: number) -> number { return value; }";
+        let tokens = Lexer::new("forward.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
+        let error = TypeChecker::new("forward.hk", source)
+            .check(&statements)
+            .unwrap_err();
+        assert_eq!(error.code, "E3003");
+        assert!(error.message.contains("function argument"));
+    }
+
+    #[test]
+    fn module_functions_are_hoisted_for_forward_calls() {
+        let source = "print(first(4)); fn first(value) { return later(value) + 1; } fn later(value) { return value * 2; }";
+        assert_eq!(run("forward.hk", source).unwrap(), vec!["9"]);
+    }
+
+    #[test]
+    fn typed_forward_function_calls_are_checked_and_executable() {
+        let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value * 2; } print(first(5));";
+        assert_eq!(run("forward-typed.hk", source).unwrap(), vec!["10"]);
+    }
+
+    #[test]
+    fn module_functions_support_mutual_recursion() {
+        let source = "print(even(10)); fn even(value) { if (value == 0) { return true; } else { return odd(value - 1); } } fn odd(value) { if (value == 0) { return false; } else { return even(value - 1); } }";
+        assert_eq!(run("mutual.hk", source).unwrap(), vec!["true"]);
+    }
+
+    #[test]
+    fn typed_module_functions_support_mutual_recursion() {
+        let source = "fn even(value: number) -> bool { if (value == 0) { return true; } else { return odd(value - 1); } } fn odd(value: number) -> bool { if (value == 0) { return false; } else { return even(value - 1); } } print(even(8));";
+        assert_eq!(run("typed-mutual.hk", source).unwrap(), vec!["true"]);
+    }
+
     #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
@@ -178,11 +227,13 @@ mod tests {
     #[test]
     fn duplicate_declarations_in_one_scope_are_rejected() {
         let error = run("test.hk", "let value=1;let value=2;").unwrap_err();
-        assert!(error.message.contains("already declared"));
+        assert_eq!(error.code, "E4001");
+        assert!(error.message.contains("Duplicate module binding"));
     }
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
-        let error = run("diagnostic.hk", "const value = 1;\nvalue = 2;").unwrap_err();
+        let source = "const value = 1;\nvalue = 2;";
+        let error = run("diagnostic.hk", source).unwrap_err();
         let rendered = error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
@@ -247,7 +298,8 @@ mod tests {
 
     #[test]
     fn generated_source_inputs_never_panic() {
-        let alphabet = b"abcdefghijklmnopqrstuvwxyz0123456789{}[]();,+-*/=!&|. \\n\\t\\\"";
+        let alphabet = b"abcdefghijklmnopqrstuvwxyz0123456789{}[]();,+-*/=!&|. \
+\\t\\\"";
         let mut state = 0x9e3779b97f4a7c15u64;
         for length in 0..96usize {
             let mut source = String::new();
@@ -265,9 +317,13 @@ mod tests {
     }
     #[test]
     fn strings_support_only_documented_escapes() {
-        assert_eq!(run("test.hk", r#"print("a\\nb");"#).unwrap(), vec!["a\\nb"]);
-        assert_eq!(run("test.hk", r#"print("a\nb");"#).unwrap(), vec!["a\nb"]);
+        assert_eq!(run("test.hk", "print(\"a\\nb\");").unwrap(), vec!["a\nb"]);
+        assert_eq!(
+            run("test.hk", concat!("print(\"a", "\n", "b\");")).unwrap(),
+            vec!["a\nb"]
+        );
     }
+
     #[test]
     fn executes_annotated_variable_declarations() {
         assert_eq!(

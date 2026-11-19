@@ -44,10 +44,70 @@ impl<'a> TypeChecker<'a> {
     }
 
     pub(crate) fn check(&mut self, statements: &[S]) -> Result<()> {
+        // Root-level function signatures are visible throughout the module,
+        // independent of declaration order. Bodies are still checked in source
+        // order after this declaration-only pass.
+        if self.scopes.len() == 1 {
+            self.collect_function_signatures(statements);
+        }
         for statement in statements {
             self.check_statement(statement)?;
         }
         Ok(())
+    }
+
+    fn collect_function_signatures(&mut self, statements: &[S]) {
+        for statement in statements {
+            let declaration = match statement {
+                S::Export(inner) => inner.as_ref(),
+                other => other,
+            };
+            match declaration {
+                S::Fn(name, parameters, _, _, _) => {
+                    self.define_function(
+                        name,
+                        FunctionSignature {
+                            parameters: vec![Type::Any; parameters.len()],
+                            return_type: None,
+                            typed: false,
+                        },
+                    );
+                    self.define_binding(
+                        name,
+                        Binding {
+                            ty: Type::Any,
+                            contract: None,
+                            mutable: false,
+                            imported: false,
+                        },
+                    );
+                }
+                S::TypedFn(name, parameters, return_type, _, _, _) => {
+                    let parameter_types = parameters
+                        .iter()
+                        .map(|parameter| parameter.annotation.map(Type::from).unwrap_or(Type::Any))
+                        .collect::<Vec<_>>();
+                    self.define_function(
+                        name,
+                        FunctionSignature {
+                            parameters: parameter_types,
+                            return_type: return_type.map(Type::from),
+                            typed: true,
+                        },
+                    );
+                    self.define_binding(
+                        name,
+                        Binding {
+                            ty: Type::Any,
+                            contract: None,
+                            mutable: false,
+                            imported: false,
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
     }
 
     fn error(

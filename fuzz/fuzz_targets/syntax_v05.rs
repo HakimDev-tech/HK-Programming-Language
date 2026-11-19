@@ -1,0 +1,51 @@
+#![no_main]
+
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|input: &[u8]| {
+    if let Ok(source) = std::str::from_utf8(input) {
+        if let Ok(index) = hk::syntax_v05::analyze_v05_declaration_module(source) {
+            for declaration in &index.declarations {
+                if let hk::syntax_v05::V05TopLevelDeclaration::Function(function) = declaration {
+                    let argument_types = function
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.ty.clone())
+                        .collect::<Vec<_>>();
+                    let _ = hk::syntax_v05::infer_v05_generic_function_type_arguments(
+                        function,
+                        &argument_types,
+                        function.return_type.as_ref(),
+                        None,
+                        &index.declarations,
+                    );
+                }
+            }
+        }
+    }
+    if let Ok(source) = std::str::from_utf8(input) {
+        match hk::syntax_v05::lex_v05(source) {
+            Ok(tokens) => {
+                let _ = hk::syntax_v05::parse_nominal_declarations(&tokens);
+                let _ = hk::syntax_v05::parse_trait_and_impl_declarations(&tokens);
+                let _ = hk::syntax_v05::parse_function_declarations(&tokens);
+                if let Ok(declarations) =
+                    hk::syntax_v05::parse_v05_top_level_declarations(&tokens)
+                {
+                    let _ = hk::syntax_v05::validate_v05_coherence(&declarations, &tokens);
+                    let _ = hk::syntax_v05::validate_v05_type_names(&declarations, &tokens);
+                }
+                let mut cursor = 0;
+                let _ = hk::syntax_v05::parse_struct_literal(&tokens, &mut cursor);
+                cursor = 0;
+                let _ = hk::syntax_v05::parse_enum_constructor(&tokens, &mut cursor);
+                cursor = 0;
+                let _ = hk::syntax_v05::parse_match_statement(&tokens, &mut cursor);
+                let _ = hk::syntax_v05::parse_type_expr(&tokens, &mut cursor);
+                cursor = 0;
+                let _ = hk::syntax_v05::parse_generic_parameters(&tokens, &mut cursor);
+            }
+            Err(_) => {}
+        }
+    }
+});

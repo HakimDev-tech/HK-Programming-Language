@@ -31,3 +31,10 @@ path = "fuzz_targets/bytecode_verifier.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "syntax_v05"
+path = "fuzz_targets/syntax_v05.rs"
+test = false
+doc = false
+bench = false

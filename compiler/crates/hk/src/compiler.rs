@@ -271,7 +271,83 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_statements(&mut self, statements: &[S]) -> Result<()> {
+        // Module-entry functions are hoisted: allocate all slots and compile
+        // closures before ordinary initializers, making forward calls executable.
+        let is_module_entry = self
+            .builders
+            .last()
+            .is_some_and(|builder| builder.index == 0 && builder.scope_depth == 0);
+        if is_module_entry {
+            // Allocate every binding before compiling any closure, so each
+            // function can resolve all forward and mutually recursive peers.
+            let mut declarations = Vec::new();
+            for statement in statements {
+                let declaration = match statement {
+                    S::Export(inner) => inner.as_ref(),
+                    other => other,
+                };
+                match declaration {
+                    S::Fn(name, ..) | S::TypedFn(name, ..) => {
+                        let slot = self.define_local(name, false, None);
+                        declarations.push((statement, slot));
+                    }
+                    _ => {}
+                }
+            }
+
+            for (statement, slot) in declarations {
+                let declaration = match statement {
+                    S::Export(inner) => inner.as_ref(),
+                    other => other,
+                };
+                match declaration {
+                    S::Fn(name, parameters, body, line, column) => {
+                        let child = self.compile_function(
+                            name,
+                            parameters
+                                .iter()
+                                .map(|parameter| (parameter.as_str(), None))
+                                .collect(),
+                            body,
+                            false,
+                            None,
+                        )?;
+                        self.emit(Opcode::MakeFunction(child), (*line, *column), &[]);
+                        self.emit(Opcode::DefineFunctionLocal(slot), (*line, *column), &[]);
+                    }
+                    S::TypedFn(name, parameters, return_type, body, line, column) => {
+                        self.mark_typed_function(name);
+                        let params = parameters
+                            .iter()
+                            .map(|parameter| (parameter.name.as_str(), parameter.annotation))
+                            .collect();
+                        let child = self.compile_function(
+                            name,
+                            params,
+                            body,
+                            true,
+                            return_type.map(Type::from),
+                        )?;
+                        self.emit(Opcode::MakeFunction(child), (*line, *column), &[]);
+                        self.emit(Opcode::DefineFunctionLocal(slot), (*line, *column), &[]);
+                    }
+                    _ => continue,
+                }
+            }
+        }
+
         for statement in statements {
+            if is_module_entry
+                && matches!(
+                    match statement {
+                        S::Export(inner) => inner.as_ref(),
+                        other => other,
+                    },
+                    S::Fn(..) | S::TypedFn(..)
+                )
+            {
+                continue;
+            }
             self.compile_statement(statement)?;
         }
         Ok(())
@@ -763,6 +839,7 @@ pub(super) fn compile_module(
     source_text: &str,
     statements: &[S],
 ) -> Result<VerifiedProgram> {
+    super::declaration_collector::collect(statements, source_name, source_text)?;
     if has_type_annotations(statements) {
         type_checker::TypeChecker::new(source_name, source_text).check(statements)?;
     }
@@ -865,6 +942,7 @@ pub(super) fn compile_source(source_name: &str, source_text: &str) -> Result<Ver
             source_text,
         ));
     }
+    super::declaration_collector::collect(&statements, source_name, source_text)?;
     if has_type_annotations(&statements) {
         type_checker::TypeChecker::new(source_name, source_text).check(&statements)?;
     }

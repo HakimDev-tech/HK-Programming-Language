@@ -278,51 +278,17 @@ fn execute_file_impl(entry: &Path, use_vm: bool) -> Result<Vec<String>> {
         &mut total_source_bytes,
     )?;
 
-    // Validate the complete top-level module namespace before execution.
+    // Collect the full namespace for every module before import linking or
+    // initializer execution. The sorted collector is the canonical namespace
+    // pass; this also catches collisions between imports and declarations.
     for path in &order {
-        let module = modules.get(path).expect("loaded module must exist");
-        let mut local_names = HashSet::new();
-        local_names.insert("print".to_owned());
-        for statement in &module.statements {
-            if let S::Import(_, names, _, _) = statement {
-                for name in names {
-                    if !local_names.insert(name.local.clone()) {
-                        return Err(module_error(
-                            "E4001",
-                            format!("Duplicate module binding '{}'.", name.local),
-                            &module.path.display().to_string(),
-                            name.line,
-                            name.column,
-                            &module.source,
-                        ));
-                    }
-                }
-            } else {
-                let declaration = match statement {
-                    S::Export(inner) => inner.as_ref(),
-                    other => other,
-                };
-                let declared = match declaration {
-                    S::Var(name, ..)
-                    | S::TypedVar(name, ..)
-                    | S::Fn(name, ..)
-                    | S::TypedFn(name, ..) => Some((name.as_str(), declaration.source_position())),
-                    _ => None,
-                };
-                if let Some((name, (line, column))) = declared {
-                    if !local_names.insert(name.to_owned()) {
-                        return Err(module_error(
-                            "E4001",
-                            format!("Duplicate module binding '{name}'."),
-                            &module.path.display().to_string(),
-                            line,
-                            column,
-                            &module.source,
-                        ));
-                    }
-                }
-            }
-        }
+        let module = modules.get_mut(path).expect("loaded module must exist");
+        let symbols = crate::declaration_collector::collect(
+            &module.statements,
+            &module.path.display().to_string(),
+            &module.source,
+        )?;
+        module.exports = symbols.exported_names().map(str::to_owned).collect();
     }
 
     // Validate every import link before any module body executes.
@@ -541,6 +507,19 @@ mod differential_tests {
                 panic!("module VM/reference outcome mismatch: VM={vm:?}, reference={reference:?}")
             }
         }
+    }
+
+    #[test]
+    fn linked_modules_allow_forward_calls_between_exported_functions() {
+        let fixture = Fixture::new(&[
+            (
+                "library.hk",
+                "export fn first(value) { return later(value) + 1; } export fn later(value) { return value * 2; }",
+            ),
+            ("main.hk", "import { first } from \"./library.hk\"; print(first(4));"),
+        ]);
+        assert_same_outcome(&fixture);
+        assert_eq!(execute_file(&fixture.entry()).unwrap(), vec!["9"]);
     }
 
     #[test]
