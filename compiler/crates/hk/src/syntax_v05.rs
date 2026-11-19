@@ -1278,3 +1278,163 @@ mod v05_trait_impl_parser_tests {
         assert!(parse_trait_and_impl_declarations(&excessive).is_err());
     }
 }
+
+ 
+// ---- Generic function declaration syntax (staged M1.1 slice) --------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05FunctionParameter {
+    pub name: String,
+    pub ty: TypeExpr,
+    pub span: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05FunctionDecl {
+    pub name: String,
+    pub generics: Vec<GenericBound>,
+    pub parameters: Vec<V05FunctionParameter>,
+    pub return_type: Option<TypeExpr>,
+    pub body_span: Range<usize>,
+    pub span: Range<usize>,
+}
+
+/// Parses generic and nongeneric function declarations while preserving their
+/// body token ranges. Expression and statement parsing is a separate stage.
+pub fn parse_function_declarations(tokens: &[V05Token]) -> Result<Vec<V05FunctionDecl>, V05ParseError> {
+    let mut parser = V05FunctionParser { tokens, cursor: 0 };
+    let mut functions = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    while parser.cursor < tokens.len() {
+        let function = parser.parse_function()?;
+        if !names.insert(function.name.clone()) {
+            return Err(parser.error("Duplicate function declaration."));
+        }
+        functions.push(function);
+    }
+    Ok(functions)
+}
+
+struct V05FunctionParser<'a> {
+    tokens: &'a [V05Token],
+    cursor: usize,
+}
+
+impl V05FunctionParser<'_> {
+    fn error(&self, message: &str) -> V05ParseError {
+        parse_error(self.tokens, self.cursor, message)
+    }
+
+    fn expect_punctuation(&mut self, punctuation: V05Punctuation, message: &str) -> Result<(), V05ParseError> {
+        if is_punctuation(self.tokens.get(self.cursor), punctuation) {
+            self.cursor += 1;
+            Ok(())
+        } else {
+            Err(self.error(message))
+        }
+    }
+
+    fn parse_function(&mut self) -> Result<V05FunctionDecl, V05ParseError> {
+        let start_token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function declaration."))?;
+        if !matches!(&start_token.kind, V05TokenKind::Identifier(keyword) if keyword == "fn") {
+            return Err(self.error("Expected function declaration keyword."));
+        }
+        let start = start_token.span.start;
+        self.cursor += 1;
+        let name_token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function name."))?;
+        let name = match &name_token.kind {
+            V05TokenKind::Identifier(name) => name.clone(),
+            _ => return Err(self.error("Expected function name.")),
+        };
+        self.cursor += 1;
+        let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
+        self.expect_punctuation(V05Punctuation::LeftParen, "Expected '(' after function name/generics.")?;
+        let mut parameters = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+            let token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected function parameter."))?;
+            let parameter_name = match &token.kind {
+                V05TokenKind::Identifier(name) => name.clone(),
+                _ => return Err(self.error("Expected parameter name.")),
+            };
+            if !names.insert(parameter_name.clone()) {
+                return Err(self.error("Duplicate function parameter."));
+            }
+            self.cursor += 1;
+            self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after parameter name.")?;
+            let ty = parse_type_expr(self.tokens, &mut self.cursor)?;
+            let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
+            parameters.push(V05FunctionParameter { name: parameter_name, ty, span: token.span.start..end });
+            if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
+                self.cursor += 1;
+                if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after parameters.")?;
+        let return_type = if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Arrow) {
+            self.cursor += 1;
+            Some(parse_type_expr(self.tokens, &mut self.cursor)?)
+        } else {
+            None
+        };
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected function body.")?;
+        let body_start = self.tokens[self.cursor - 1].span.start;
+        let mut depth = 1usize;
+        while self.cursor < self.tokens.len() && depth > 0 {
+            match self.tokens[self.cursor].kind {
+                V05TokenKind::Punctuation(V05Punctuation::LeftBrace) => depth += 1,
+                V05TokenKind::Punctuation(V05Punctuation::RightBrace) => depth -= 1,
+                _ => {}
+            }
+            self.cursor += 1;
+            if depth > 64 {
+                return Err(self.error("Maximum function-body brace nesting depth (64) exceeded."));
+            }
+        }
+        if depth != 0 {
+            return Err(self.error("Unterminated function body."));
+        }
+        let body_span = body_start..self.tokens[self.cursor - 1].span.end;
+        let end = self.tokens[self.cursor - 1].span.end;
+        Ok(V05FunctionDecl { name, generics, parameters, return_type, body_span, span: start..end })
+    }
+}
+
+#[cfg(test)]
+mod v05_function_parser_tests {
+    use super::{lex_v05, parse_function_declarations};
+
+    #[test]
+    fn parses_generic_function_signature_and_captures_body() {
+        let tokens = lex_v05("fn identity<T>(value: T) -> T { return value; } fn sum(a: number, b: number) { return a + b; }").unwrap();
+        let functions = parse_function_declarations(&tokens).unwrap();
+        assert_eq!(functions.len(), 2);
+        assert_eq!(functions[0].name, "identity");
+        assert_eq!(functions[0].generics[0].parameter, "T");
+        assert_eq!(functions[0].parameters[0].name, "value");
+        assert!(functions[0].return_type.is_some());
+        assert_eq!(functions[1].name, "sum");
+        assert_eq!(functions[1].parameters.len(), 2);
+        assert!(functions[1].return_type.is_none());
+    }
+
+    #[test]
+    fn rejects_duplicate_function_and_parameter_names() {
+        let duplicate_functions = lex_v05("fn f() {} fn f() {}").unwrap();
+        assert!(parse_function_declarations(&duplicate_functions).is_err());
+        let duplicate_parameters = lex_v05("fn f(a: number, a: string) {}").unwrap();
+        assert!(parse_function_declarations(&duplicate_parameters).is_err());
+    }
+
+    #[test]
+    fn rejects_unterminated_and_deep_function_bodies() {
+        let unterminated = lex_v05("fn f() { if (true) { }").unwrap();
+        assert!(parse_function_declarations(&unterminated).is_err());
+        let deep = lex_v05(&format!("fn f() {{ {} }}", "{".repeat(70))).unwrap();
+        assert!(parse_function_declarations(&deep).is_err());
+    }
+}
