@@ -97,3 +97,8 @@ Fuzz run #398 completed successfully: source/interpreter fuzz, v0.5 syntax targe
 ## Integrated M1.2 namespace collector checkpoint — 2026-11-19
 
 Commit `c608a45fe194961e544958da036dcd92ec07a088` introduces `declaration_collector.rs` and wires it into filesystem module loading. It collects imports, module variables/functions, and exports into a deterministic BTreeMap, rejects duplicate bindings and collisions with builtin `print`, and sets module exports from the collected export symbols before import-link validation and before any initializer runs. Three unit tests cover deterministic symbol ordering/export classification, import-vs-declaration collisions, and reserved `print`. CI #924 is pending. This advances M1.2 but is not whole-graph nominal/type/trait collection and does not implement forward references. v0.5 execution features remain absent.
+
+
+## Forward function-signature collection checkpoint — 2026-11-19
+
+The type checker now precollects root/module-level function signatures before checking declaration bodies. This enables a typed function to reference a typed function declared later and ensures argument contracts are validated against the later signature. Tests added for successful forward resolution and wrong-argument diagnostics. The module declaration collector remains integrated. Commits `f7af3ba5847decbf2144426d1bf521a6c715e30c` and `88b055bca2f0429aa85cc1968dff05bfca703c2f`. Formatting-only CI failures on earlier commits were corrected in `ca76d5242e4d4581515c0d493fb1d88d3504acdc`; checks for the newest code/test commits are pending. Runtime forward-call execution is not yet implemented.
