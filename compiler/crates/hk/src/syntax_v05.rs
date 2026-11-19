@@ -1018,7 +1018,7 @@ impl V05TraitImplParser<'_> {
                     name, arguments, ..
                 } if arguments.is_empty() => name,
                 _ => {
-                    return Err(self.error("Trait name in impl must be a non-generic identifier here."))
+                    return Err(self.error("Trait name must be a plain identifier."));
                 }
             };
             (Some(trait_name), target)
@@ -1054,7 +1054,7 @@ impl V05TraitImplParser<'_> {
     }
 
     fn validate_receiver(&self, method: &V05Method) -> Result<(), V05ParseError> {
-        if method.parameters.first().is_none_or(|parameter| parameter.name != "self") {
+        if method\n            .parameters\n            .first()\n            .is_none_or(|parameter| parameter.name != "self")\n        {
             return Err(self.error("Instance methods require `self` as their first parameter."));
         }
         Ok(())
