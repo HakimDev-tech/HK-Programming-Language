@@ -502,15 +502,13 @@ pub enum V05Declaration {
 }
 
 /// Parse consecutive struct and enum declarations. The parser rejects unsupported
-/// top-level constructs instead of silently skipping tokens. Cursor rollback is
-/// guaranteed on failure.
+/// top-level constructs instead of silently skipping tokens.
 pub fn parse_nominal_declarations(
     tokens: &[V05Token],
 ) -> Result<Vec<V05Declaration>, V05ParseError> {
     let mut parser = V05NominalParser { tokens, cursor: 0 };
     let mut declarations = Vec::new();
     while parser.cursor < tokens.len() {
-        let start = parser.cursor;
         let declaration = match parser.peek_keyword() {
             Some(V05Keyword::Struct) => parser.parse_struct().map(V05Declaration::Struct),
             Some(V05Keyword::Enum) => parser.parse_enum().map(V05Declaration::Enum),
@@ -518,10 +516,7 @@ pub fn parse_nominal_declarations(
         };
         match declaration {
             Ok(value) => declarations.push(value),
-            Err(error) => {
-                parser.cursor = start;
-                return Err(error);
-            }
+            Err(error) => return Err(error),
         }
     }
     Ok(declarations)
