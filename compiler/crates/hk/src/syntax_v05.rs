@@ -120,15 +120,31 @@ pub fn parse_v05_top_level_declarations(
             Some(V05TokenKind::Identifier(name)) if name == "fn" => {
                 match parse_function_declarations(slice)?.into_iter().next() {
                     Some(value) => V05TopLevelDeclaration::Function(value),
-                    None => return Err(parse_error(tokens, cursor, "Expected function declaration.")),
+                    None => {
+                        return Err(parse_error(
+                            tokens,
+                            cursor,
+                            "Expected function declaration.",
+                        ))
+                    },
                 }
             }
-            _ => return Err(parse_error(tokens, cursor, "Expected a top-level HK 0.5 declaration.")),
+            _ => {
+                return Err(parse_error(
+                    tokens,
+                    cursor,
+                    "Expected a top-level HK 0.5 declaration.",
+                ))
+            },
         };
 
         if let Some(name) = declaration.name() {
             if !names.insert(name.to_owned()) {
-                return Err(parse_error(tokens, cursor, "Duplicate module-level declaration name."));
+                return Err(parse_error(
+                    tokens,
+                    cursor,
+                    "Duplicate module-level declaration name.",
+                ));
             }
         }
         declarations.push(declaration);
