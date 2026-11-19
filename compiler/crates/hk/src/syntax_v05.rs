@@ -1123,7 +1123,18 @@ mod v05_trait_impl_parser_tests {
         match &declarations[1] {
             V05TraitOrImpl::Impl(decl) => {
                 assert_eq!(decl.generics[0].parameter, "T");
-                assert_eq!(decl.target, super::TypeExpr::Named { name: "Box".into(), arguments: vec![super::TypeExpr::Named { name: "T".into(), arguments: vec![], span: 71..72 }], span: 67..73 });
+                assert_eq!(
+                    decl.target,
+                    super::TypeExpr::Named {
+                        name: "Box".into(),
+                        arguments: vec![super::TypeExpr::Named {
+                            name: "T".into(),
+                            arguments: vec![],
+                            span: 71..72,
+                        }],
+                        span: 67..73,
+                    }
+                );
                 assert_eq!(decl.methods[0].name, "get");
                 assert!(decl.methods[0].body_span.is_some());
             }
@@ -1138,7 +1149,14 @@ mod v05_trait_impl_parser_tests {
         match &declarations[1] {
             V05TraitOrImpl::Impl(decl) => {
                 assert_eq!(decl.trait_name.as_deref(), Some("Display"));
-                assert_eq!(decl.target, super::TypeExpr::Named { name: "Point".into(), arguments: vec![], span: 65..70 });
+                assert_eq!(
+                    decl.target,
+                    super::TypeExpr::Named {
+                        name: "Point".into(),
+                        arguments: vec![],
+                        span: 65..70,
+                    }
+                );
             }
             _ => panic!("expected trait impl"),
         }
@@ -1148,7 +1166,8 @@ mod v05_trait_impl_parser_tests {
     fn rejects_duplicate_method_names_and_parameter_names() {
         let duplicate_method = lex_v05("trait T { fn x(self); fn x(self); }").unwrap();
         assert!(parse_trait_and_impl_declarations(&duplicate_method).is_err());
-        let duplicate_parameter = lex_v05("impl T { fn x(self, value: number, value: string) {} }").unwrap();
+        let duplicate_parameter =
+            lex_v05("impl T { fn x(self, value: number, value: string) {} }").unwrap();
         assert!(parse_trait_and_impl_declarations(&duplicate_parameter).is_err());
     }
 
@@ -1165,7 +1184,8 @@ mod v05_trait_impl_parser_tests {
     fn body_capture_is_bounded_and_requires_closing_brace() {
         let unterminated = lex_v05("impl T { fn x(self) { if (true) { }").unwrap();
         assert!(parse_trait_and_impl_declarations(&unterminated).is_err());
-        let excessive = lex_v05(&format!("impl T {{ fn x(self) {{ {} }} }}", "{".repeat(70))).unwrap();
+        let excessive =
+            lex_v05(&format!("impl T {{ fn x(self) {{ {} }} }}", "{".repeat(70))).unwrap();
         assert!(parse_trait_and_impl_declarations(&excessive).is_err());
     }
 }
