@@ -1292,7 +1292,8 @@ mod tests {
             .message
             .contains("Unknown type name"));
 
-        let wrong_arity = "struct Box<T> { value: T, } fn use_box(value: Box) -> number { return 1; }";
+        let wrong_arity =
+            "struct Box<T> { value: T, } fn use_box(value: Box) -> number { return 1; }";
         let tokens = lex_v05(wrong_arity).unwrap();
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
         assert!(validate_v05_type_names(&declarations, &tokens)
