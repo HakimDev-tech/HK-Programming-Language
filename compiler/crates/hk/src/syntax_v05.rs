@@ -1580,8 +1580,7 @@ mod tests {
         let error = lex_v05(&oversized_source).unwrap_err();
         assert!(error.message.contains("source size"));
 
-        let many_tokens = std::iter::repeat("x")
-            .take(MAX_V05_TOKENS + 1)
+        let many_tokens = std::iter::repeat_n("x", MAX_V05_TOKENS + 1)
             .collect::<Vec<_>>()
             .join(" ");
         let error = lex_v05(&many_tokens).unwrap_err();
