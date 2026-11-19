@@ -839,6 +839,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_mixed_top_level_v05_declarations_and_tracks_spans() {
+        let source = "struct Point { x: number, y: number, } enum Direction { North, South, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"point\"; } } fn identity<T>(value: T) -> T { return value; }";
+        let tokens = lex_v05(source).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        assert_eq!(declarations.len(), 5);
+        assert_eq!(
+            declarations.iter().filter_map(V05TopLevelDeclaration::name).collect::<Vec<_>>(),
+            vec!["Point", "Direction", "Display", "identity"]
+        );
+        assert!(declarations.iter().all(|declaration| {
+            let span = declaration.span();
+            span.start < span.end && source.get(span.clone()).is_some()
+        }));
+        assert!(matches!(declarations[3], V05TopLevelDeclaration::Impl(_)));
+        assert!(matches!(declarations[4], V05TopLevelDeclaration::Function(_)));
+    }
+
+    #[test]
+    fn mixed_top_level_parser_rejects_duplicate_names_across_kinds() {
+        let tokens = lex_v05("struct Value { field: number, } fn Value() { }").unwrap();
+        let error = parse_v05_top_level_declarations(&tokens).unwrap_err();
+        assert!(error.message.contains("Duplicate module-level"));
+    }
+
+    #[test]
+    fn mixed_top_level_parser_rejects_unterminated_declarations() {
+        let tokens = lex_v05("struct Broken { field: number,").unwrap();
+        let error = parse_v05_top_level_declarations(&tokens).unwrap_err();
+        assert!(error.message.contains("Unterminated"));
+    }
+
+    #[test]
     fn parses_structs_and_enum_unit_and_tuple_variants() {
         let tokens = lex_v05(
             "struct Box<T: Display> { value: T, } enum Result<T, E> { Ok(T), Err(E), Empty, }",
