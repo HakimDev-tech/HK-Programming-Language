@@ -43,3 +43,13 @@ All v0.5 syntax additions remain isolated in `syntax_v05.rs`; they are not integ
 - CI run #916 completed successfully on the checkpoint head `d0c7196992e0c6b45e6eed68f226df0ac298099e`, Linux/macOS/Windows.
 - Fuzz run #400 completed successfully on docs head `bfa045c14ac133949b0bd34536811373143f3d36`, all configured fuzz steps including the v0.5 syntax campaign with match parser, module resolver and malformed-bytecode verifier.
 - The syntax campaign and fuzz target build are therefore verified for the match-parser slice. No claim of semantic soundness or integration.
+
+
+## Work performed in this continuation
+
+- Added deterministic module namespace collector in `declaration_collector.rs`, integrated into module loader before import validation/initializers; exports derive from collected symbols.
+- Added collector unit tests for sorted symbols/export status, import/declaration collision, and reserved `print`.
+- Added type-checker root function-signature prepass and tests for later-declared typed function resolution and argument mismatch.
+- Commits: `bd3cf71d18c4481dd2afbbbc32da764cd06598f3`, `107612ae8a035549656d3522be757049995c08a`, `c608a45fe194961e544958da036dcd92ec07a088`, `ca76d5242e4d4581515c0d493fb1d88d3504acdc`, `f7af3ba5847decbf2144426d1bf521a6c715e30c`, `88b055bca2f0429aa85cc1968dff05bfca703c2f`.
+- CI: initial attempts failed only `cargo fmt --check`; formatter corrections committed. CI results on current head still pending.
+- Limitations: function forward signatures are type-checker-visible, but runtime forward calls remain non-hoisted. Nominal declarations, generic/trait collection, global type resolution, and all v0.5 execution integration remain outstanding.
