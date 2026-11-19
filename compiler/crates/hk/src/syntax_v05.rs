@@ -55,6 +55,246 @@ pub enum V05TokenKind {
     ExistingSyntax(String),
 }
 
+/// A generic-call inference diagnostic with the source span that introduced
+/// the failed constraint.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05InferenceError {
+    pub message: String,
+    pub span: Range<usize>,
+}
+
+/// Infers a generic function's concrete type arguments from typed argument
+/// expressions and an optional expected return type. Explicit type arguments
+/// constrain the same solver. This API is staged and is not yet called by HK's
+/// executable parser/compiler.
+pub fn infer_v05_function_type_arguments(
+    function: &V05FunctionDecl,
+    argument_types: &[TypeExpr],
+    expected_return: Option<&TypeExpr>,
+    explicit_type_arguments: Option<&[TypeExpr]>,
+    declarations: &[V05TopLevelDeclaration],
+) -> Result<Vec<TypeExpr>, V05InferenceError> {
+    let generic_names: HashSet<String> = function
+        .generics
+        .iter()
+        .map(|bound| bound.parameter.clone())
+        .collect();
+    if argument_types.len() != function.parameters.len() {
+        return Err(V05InferenceError {
+            message: format!(
+                "Function '{}' expects {} argument(s), found {}.",
+                function.name,
+                function.parameters.len(),
+                argument_types.len()
+            ),
+            span: function.span.clone(),
+        });
+    }
+    if let Some(explicit) = explicit_type_arguments {
+        if explicit.len() != function.generics.len() {
+            return Err(V05InferenceError {
+                message: format!(
+                    "Function '{}' expects {} explicit type argument(s), found {}.",
+                    function.name,
+                    function.generics.len(),
+                    explicit.len()
+                ),
+                span: function.span.clone(),
+            });
+        }
+    }
+
+    let mut substitutions = std::collections::HashMap::<String, TypeExpr>::new();
+    if let Some(explicit) = explicit_type_arguments {
+        for (parameter, argument) in function.generics.iter().zip(explicit) {
+            substitutions.insert(parameter.parameter.clone(), argument.clone());
+        }
+    }
+
+    for (parameter, argument) in function.parameters.iter().zip(argument_types) {
+        infer_v05_constraint(
+            &parameter.ty,
+            argument,
+            &generic_names,
+            &mut substitutions,
+        )?;
+    }
+    if let (Some(return_pattern), Some(expected)) =
+        (&function.return_type, expected_return)
+    {
+        infer_v05_constraint(
+            return_pattern,
+            expected,
+            &generic_names,
+            &mut substitutions,
+        )?;
+    }
+
+    let mut inferred = Vec::with_capacity(function.generics.len());
+    for generic in &function.generics {
+        let Some(argument) = substitutions.get(&generic.parameter).cloned() else {
+            return Err(V05InferenceError {
+                message: format!(
+                    "Cannot infer generic parameter '{}'; provide explicit type arguments or an expected return type.",
+                    generic.parameter
+                ),
+                span: generic.span.clone(),
+            });
+        };
+        for trait_name in &generic.traits {
+            if !v05_type_satisfies_trait(&argument, trait_name, declarations) {
+                return Err(V05InferenceError {
+                    message: format!(
+                        "Inferred type '{}' does not satisfy trait bound '{}'.",
+                        canonical_type(&argument),
+                        trait_name
+                    ),
+                    span: generic.span.clone(),
+                });
+            }
+        }
+        inferred.push(argument);
+    }
+    Ok(inferred)
+}
+
+fn infer_v05_constraint(
+    pattern: &TypeExpr,
+    actual: &TypeExpr,
+    generic_parameters: &HashSet<String>,
+    substitutions: &mut std::collections::HashMap<String, TypeExpr>,
+) -> Result<(), V05InferenceError> {
+    match pattern {
+        TypeExpr::Any { .. } => Ok(()),
+        TypeExpr::Named {
+            name,
+            arguments,
+            span,
+        } if generic_parameters.contains(name) && arguments.is_empty() => {
+            if matches!(actual, TypeExpr::Any { .. } | TypeExpr::Named { name, arguments, .. } if name == "any" && arguments.is_empty()) {
+                return Ok(());
+            }
+            if let Some(existing) = substitutions.get(name) {
+                if same_type_expr(existing, actual) {
+                    Ok(())
+                } else {
+                    Err(V05InferenceError {
+                        message: format!(
+                            "Conflicting constraints for generic parameter '{name}': '{}' and '{}'.",
+                            canonical_type(existing),
+                            canonical_type(actual)
+                        ),
+                        span: span.clone(),
+                    })
+                }
+            } else {
+                substitutions.insert(name.clone(), actual.clone());
+                Ok(())
+            }
+        }
+        TypeExpr::Named {
+            name: pattern_name,
+            arguments: pattern_arguments,
+            span,
+        } => match actual {
+            TypeExpr::Any { .. } => Ok(()),
+            TypeExpr::Named {
+                name: actual_name,
+                arguments: actual_arguments,
+                ..
+            } if pattern_name == actual_name && pattern_arguments.len() == actual_arguments.len() => {
+                for (pattern_argument, actual_argument) in
+                    pattern_arguments.iter().zip(actual_arguments)
+                {
+                    infer_v05_constraint(
+                        pattern_argument,
+                        actual_argument,
+                        generic_parameters,
+                        substitutions,
+                    )?;
+                }
+                Ok(())
+            }
+            _ => Err(V05InferenceError {
+                message: format!(
+                    "Type constraint mismatch: expected '{}', found '{}'.",
+                    canonical_type(pattern),
+                    canonical_type(actual)
+                ),
+                span: span.clone(),
+            }),
+        },
+    }
+}
+
+fn same_type_expr(left: &TypeExpr, right: &TypeExpr) -> bool {
+    canonical_type(left) == canonical_type(right)
+}
+
+fn v05_type_satisfies_trait(
+    argument: &TypeExpr,
+    trait_name: &str,
+    declarations: &[V05TopLevelDeclaration],
+) -> bool {
+    if matches!(argument, TypeExpr::Any { .. })
+        || matches!(argument, TypeExpr::Named { name, arguments, .. } if name == "any" && arguments.is_empty())
+    {
+        return false;
+    }
+    declarations.iter().any(|declaration| {
+        let V05TopLevelDeclaration::Impl(implementation) = declaration else {
+            return false;
+        };
+        if implementation.trait_name.as_deref() != Some(trait_name) {
+            return false;
+        }
+        let generic_names: HashSet<String> = implementation
+            .generics
+            .iter()
+            .map(|bound| bound.parameter.clone())
+            .collect();
+        type_pattern_matches(
+            &implementation.target,
+            &generic_names,
+            argument,
+        )
+    })
+}
+
+fn type_pattern_matches(
+    pattern: &TypeExpr,
+    generic_parameters: &HashSet<String>,
+    actual: &TypeExpr,
+) -> bool {
+    match pattern {
+        TypeExpr::Any { .. } => false,
+        TypeExpr::Named {
+            name,
+            arguments,
+            ..
+        } if generic_parameters.contains(name) && arguments.is_empty() => true,
+        TypeExpr::Named {
+            name: pattern_name,
+            arguments: pattern_arguments,
+            ..
+        } => match actual {
+            TypeExpr::Named {
+                name: actual_name,
+                arguments: actual_arguments,
+                ..
+            } if pattern_name == actual_name && pattern_arguments.len() == actual_arguments.len() => {
+                pattern_arguments
+                    .iter()
+                    .zip(actual_arguments)
+                    .all(|(pattern, actual)| {
+                        type_pattern_matches(pattern, generic_parameters, actual)
+                    })
+            }
+            _ => false,
+        },
+    }
+}
+
 /// Module declaration symbol category.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum V05SymbolKind {
