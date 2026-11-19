@@ -1054,7 +1054,11 @@ impl V05TraitImplParser<'_> {
     }
 
     fn validate_receiver(&self, method: &V05Method) -> Result<(), V05ParseError> {
-        if method\n            .parameters\n            .first()\n            .is_none_or(|parameter| parameter.name != "self")\n        {
+        if method
+            .parameters
+            .first()
+            .is_none_or(|parameter| parameter.name != "self")
+        {
             return Err(self.error("Instance methods require `self` as their first parameter."));
         }
         Ok(())
