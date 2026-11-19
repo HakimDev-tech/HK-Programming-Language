@@ -13,6 +13,7 @@ fuzz_target!(|input: &[u8]| {
                     hk::syntax_v05::parse_v05_top_level_declarations(&tokens)
                 {
                     let _ = hk::syntax_v05::validate_v05_coherence(&declarations, &tokens);
+                    let _ = hk::syntax_v05::validate_v05_type_names(&declarations, &tokens);
                 }
                 let mut cursor = 0;
                 let _ = hk::syntax_v05::parse_struct_literal(&tokens, &mut cursor);
