@@ -865,7 +865,6 @@ mod tests {
     }
 }
 
-
 // ---- Trait and impl declaration parsing (staged M1.1 slice) ----------------
 
 /// A named, typed instance-method parameter. The receiver is represented as the
