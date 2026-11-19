@@ -29,7 +29,7 @@ Integrated into main at c47a06cec1120edd33114cce1857c40f10b7f333 (PR #16). Post-
 
 ## 0.5.0
 
-The normative specification and implementation plan are maintained in PR #19 and carried into the implementation branch. D0 semantic decisions are closed in HK-0.5-SPEC.md. M1.1 has an isolated front-end slice in PR #21: token vocabulary, spans, recursive type-expression/bound models, initial type/bound parsers, and struct/enum declaration AST/parser (fields, generic bounds, unit/tuple variants, duplicate diagnostics). Exact code head e388941ab1851f8c4109064f5ac2ca250b4e193e passes CI on Linux/macOS/Windows; fuzz run #343 is pending. This is not the complete grammar and is not integrated into executable compilation. M1.1 remains in progress; M1.2–M8 have not been implemented. No 0.5 feature is shipped.
+The normative specification and implementation plan are maintained in PR #19 and carried into the implementation branch. D0 semantic decisions are closed in HK-0.5-SPEC.md. M1.1 has an isolated front-end slice in PR #21: token vocabulary, spans, recursive type-expression/bound models, initial type/bound parsers, and struct/enum declaration AST/parser (fields, generic bounds, unit/tuple variants, duplicate diagnostics). The parser now bounds generic parameter/bound lists (256) and rejects duplicate generic parameters and trait bounds; a dedicated `syntax_v05` fuzz target was added. Code head 6db4fd9b04ca211226bc16f578eab9af65438479 passes CI on Linux/macOS/Windows; fuzz run #351 is pending. This is not the complete grammar and is not integrated into executable compilation. M1.1 remains in progress; M1.2–M8 have not been implemented. No 0.5 feature is shipped.
 
 ## Deferred
 
