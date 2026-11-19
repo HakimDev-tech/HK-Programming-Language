@@ -96,8 +96,12 @@ pub fn validate_v05_type_names(
     let nominal: HashMap<&str, usize> = declarations
         .iter()
         .filter_map(|declaration| match declaration {
-            V05TopLevelDeclaration::Struct(value) => Some((value.name.as_str(), value.generics.len())),
-            V05TopLevelDeclaration::Enum(value) => Some((value.name.as_str(), value.generics.len())),
+            V05TopLevelDeclaration::Struct(value) => {
+                Some((value.name.as_str(), value.generics.len()))
+            }
+            V05TopLevelDeclaration::Enum(value) => {
+                Some((value.name.as_str(), value.generics.len()))
+            }
             _ => None,
         })
         .collect();
@@ -209,8 +213,15 @@ fn validate_type_expr_names(
 ) -> Result<(), V05ParseError> {
     match ty {
         TypeExpr::Any { .. } => Ok(()),
-        TypeExpr::Named { name, arguments, span } => {
-            let primitive = matches!(name.as_str(), "number" | "string" | "bool" | "null" | "array" | "any");
+        TypeExpr::Named {
+            name,
+            arguments,
+            span,
+        } => {
+            let primitive = matches!(
+                name.as_str(),
+                "number" | "string" | "bool" | "null" | "array" | "any"
+            );
             if parameters.contains(name) {
                 if !arguments.is_empty() {
                     return Err(parse_error_at_span(
@@ -232,7 +243,10 @@ fn validate_type_expr_names(
                     return Err(parse_error_at_span(
                         tokens,
                         span.clone(),
-                        &format!("Type '{name}' expects {expected} generic argument(s), found {}.", arguments.len()),
+                        &format!(
+                            "Type '{name}' expects {expected} generic argument(s), found {}.",
+                            arguments.len()
+                        ),
                     ));
                 }
             } else {
@@ -284,7 +298,11 @@ pub fn validate_v05_coherence(
             continue;
         };
         let target_name = type_root_name(&implementation.target).ok_or_else(|| {
-            parse_error_at_span(tokens, type_span(&implementation.target), "Invalid impl target type.")
+            parse_error_at_span(
+                tokens,
+                type_span(&implementation.target),
+                "Invalid impl target type.",
+            )
         })?;
         let target_key = canonical_type(&implementation.target);
 
@@ -336,7 +354,9 @@ pub fn validate_v05_coherence(
                 }
             }
         } else {
-            let names = trait_methods_by_target.entry(target_key.clone()).or_default();
+            let names = trait_methods_by_target
+                .entry(target_key.clone())
+                .or_default();
             for method in &implementation.methods {
                 if inherent_methods
                     .get(&target_key)
@@ -436,7 +456,9 @@ fn same_method_signature(left: &V05Method, right: &V05Method) -> bool {
             .parameters
             .iter()
             .zip(&right.parameters)
-            .all(|(left, right)| left.ty.as_ref().map(canonical_type) == right.ty.as_ref().map(canonical_type))
+            .all(|(left, right)| {
+                left.ty.as_ref().map(canonical_type) == right.ty.as_ref().map(canonical_type)
+            })
         && left.return_type.as_ref().map(canonical_type)
             == right.return_type.as_ref().map(canonical_type)
 }
@@ -444,14 +466,20 @@ fn same_method_signature(left: &V05Method, right: &V05Method) -> bool {
 fn canonical_type(ty: &TypeExpr) -> String {
     match ty {
         TypeExpr::Any { .. } => "any".to_owned(),
-        TypeExpr::Named { name, arguments, .. } => {
+        TypeExpr::Named {
+            name, arguments, ..
+        } => {
             if arguments.is_empty() {
                 name.clone()
             } else {
                 format!(
                     "{}<{}>",
                     name,
-                    arguments.iter().map(canonical_type).collect::<Vec<_>>().join(",")
+                    arguments
+                        .iter()
+                        .map(canonical_type)
+                        .collect::<Vec<_>>()
+                        .join(",")
                 )
             }
         }
