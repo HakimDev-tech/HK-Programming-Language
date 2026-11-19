@@ -1471,7 +1471,6 @@ mod v05_function_parser_tests {
     }
 }
 
- 
 // ---- Struct literal field syntax (staged M1.1 slice) ----------------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1490,7 +1489,10 @@ pub struct V05StructLiteral {
 
 /// Parses a standalone nominal struct literal. Field expressions are retained
 /// as source spans and will be parsed by the expression parser in integration.
-pub fn parse_struct_literal(tokens: &[V05Token], cursor: &mut usize) -> Result<V05StructLiteral, V05ParseError> {
+pub fn parse_struct_literal(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+) -> Result<V05StructLiteral, V05ParseError> {
     let original = *cursor;
     match parse_struct_literal_at(tokens, cursor) {
         Ok(literal) => Ok(literal),
@@ -1501,11 +1503,18 @@ pub fn parse_struct_literal(tokens: &[V05Token], cursor: &mut usize) -> Result<V
     }
 }
 
-fn parse_struct_literal_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V05StructLiteral, V05ParseError> {
+fn parse_struct_literal_at(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+) -> Result<V05StructLiteral, V05ParseError> {
     let ty = parse_type_expr(tokens, cursor)?;
     let start = ty_span_start(&ty);
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::LeftBrace) {
-        return Err(parse_error(tokens, *cursor, "Expected '{' after struct literal type."));
+        return Err(parse_error(
+            tokens,
+            *cursor,
+            "Expected '{' after struct literal type.",
+        ));
     }
     *cursor += 1;
     let mut fields = Vec::new();
@@ -1514,29 +1523,59 @@ fn parse_struct_literal_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V0
         if *cursor >= tokens.len() {
             return Err(parse_error(tokens, *cursor, "Unterminated struct literal."));
         }
-        let field_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected field name."))?;
+        let field_token = tokens
+            .get(*cursor)
+            .ok_or_else(|| parse_error(tokens, *cursor, "Expected field name."))?;
         let field_name = match &field_token.kind {
             V05TokenKind::Identifier(name) => name.clone(),
-            _ => return Err(parse_error(tokens, *cursor, "Expected struct literal field name.")),
+            _ => {
+                return Err(parse_error(
+                    tokens,
+                    *cursor,
+                    "Expected struct literal field name.",
+                ))
+            }
         };
         if !names.insert(field_name.clone()) {
-            return Err(parse_error(tokens, *cursor, "Duplicate struct literal field."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Duplicate struct literal field.",
+            ));
         }
         *cursor += 1;
         if !is_punctuation(tokens.get(*cursor), V05Punctuation::Colon) {
-            return Err(parse_error(tokens, *cursor, "Expected ':' after field name."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Expected ':' after field name.",
+            ));
         }
         *cursor += 1;
-        let value_start_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected field expression."))?;
+        let value_start_token = tokens
+            .get(*cursor)
+            .ok_or_else(|| parse_error(tokens, *cursor, "Expected field expression."))?;
         let value_start = value_start_token.span.start;
         let mut nested = 0usize;
         let mut value_end = value_start;
         while *cursor < tokens.len() {
             let token = &tokens[*cursor];
             match token.kind {
-                V05TokenKind::Punctuation(V05Punctuation::LeftParen | V05Punctuation::LeftBracket | V05Punctuation::LeftBrace) => nested += 1,
-                V05TokenKind::Punctuation(V05Punctuation::RightParen | V05Punctuation::RightBracket) => {
-                    if nested == 0 { return Err(parse_error(tokens, *cursor, "Unbalanced field expression delimiter.")); }
+                V05TokenKind::Punctuation(
+                    V05Punctuation::LeftParen
+                    | V05Punctuation::LeftBracket
+                    | V05Punctuation::LeftBrace,
+                ) => nested += 1,
+                V05TokenKind::Punctuation(
+                    V05Punctuation::RightParen | V05Punctuation::RightBracket,
+                ) => {
+                    if nested == 0 {
+                        return Err(parse_error(
+                            tokens,
+                            *cursor,
+                            "Unbalanced field expression delimiter.",
+                        ));
+                    }
                     nested -= 1;
                 }
                 V05TokenKind::Punctuation(V05Punctuation::RightBrace) if nested == 0 => break,
@@ -1547,13 +1586,21 @@ fn parse_struct_literal_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V0
             value_end = token.span.end;
             *cursor += 1;
             if nested > 64 {
-                return Err(parse_error(tokens, *cursor, "Maximum struct-literal expression nesting (64) exceeded."));
+                return Err(parse_error(
+                    tokens,
+                    *cursor,
+                    "Maximum struct-literal expression nesting (64) exceeded.",
+                ));
             }
         }
         if value_end == value_start {
             return Err(parse_error(tokens, *cursor, "Field expression cannot be empty."));
         }
-        fields.push(V05StructLiteralField { name: field_name, value_span: value_start..value_end, span: field_token.span.start..value_end });
+        fields.push(V05StructLiteralField {
+            name: field_name,
+            value_span: value_start..value_end,
+            span: field_token.span.start..value_end,
+        });
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
             *cursor += 1;
             if is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) { break; }
@@ -1566,7 +1613,11 @@ fn parse_struct_literal_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V0
     }
     *cursor += 1;
     let end = tokens[*cursor - 1].span.end;
-    Ok(V05StructLiteral { ty, fields, span: start..end })
+    Ok(V05StructLiteral {
+        ty,
+        fields,
+        span: start..end,
+    })
 }
 
 fn ty_span_start(ty: &TypeExpr) -> usize {
