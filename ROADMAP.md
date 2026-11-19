@@ -34,3 +34,6 @@ The normative specification and implementation plan are maintained in PR #19 and
 ## Deferred
 
 Native compilation, WASM, FFI, concurrency, package management, LSP, formatter and debugger remain future roadmap items.
+
+
+**Continuation update (2026-11-19):** a staged parser slice now models/parses trait signatures and impl declarations, generic impl headers, typed method parameters/returns and bounded body token spans. Duplicate methods/parameters are rejected and the dedicated syntax fuzz target now includes this parser. Commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is pending CI. Still isolated, not executable; M1.1 remains incomplete and M1.2–M8 remain unimplemented.
