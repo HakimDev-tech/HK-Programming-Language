@@ -106,3 +106,11 @@ New staged parser work adds trait declarations and impl blocks with method signa
 
 
 **Latest integrated declaration/forward-call work (2026-11-19):** deterministic module namespace collection is integrated before import validation/initializers and in source/module compilation; root function signatures are precollected by the type checker; module-entry functions are hoisted by the compiler after allocating all function slots, enabling forward calls; reference interpreter hoisting and a parity test were added. CI #967 passed all three OSes on `a37bf96e514c192c8ec7934252739bbf50186338`. Head `fc8761efa188b491bc835ab00275e282260c2cf3` adds the reference-engine parity test and has CI #969/fuzz #428 pending. Formatting and test failures found in earlier attempts were fixed; only #967 is currently verified green for this integration slice. Nominal v0.5 declaration collection and all type/runtime/bytecode/VM/module feature integration remain outstanding.
+
+
+## Verification checkpoint — 2026-11-19
+
+- Latest code commit `02bfd9d78ab5fea8ab678a37cb7e68be00f93cb3` includes end-to-end typed forward-call test.
+- CI #975 and #976: Linux/macOS/Windows green (format, tests, Clippy, rustdoc).
+- Fuzz #431 green; preceding Fuzz #430 also green on checkpoint `fbdda2c0260c776fd243af05bd4f401c7d6c516c`.
+- PR #21 is still Draft and unmerged. These checks validate existing integrated slices only, not the full v0.5 contract.
