@@ -65,3 +65,7 @@ Only mark a requirement complete when the code is integrated, tests exist and ar
 ## Continuation update — 2026-11-19
 
 Verified prior head `a2cac3f3ec09e3b98e6a60311da3063f85a84220`: PR #21 remains Draft; CI #807/#806 and fuzz #354/#353/#352/#351 are successful. Added an isolated trait/impl declaration parser slice in `syntax_v05.rs`: trait signatures, impl generic headers, inherent/trait impl targets, method parameter and return types, body-span capture, duplicate method/parameter rejection and bounded brace-depth. Fuzz target now exercises this parser. New commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is pending CI after a formatting-only correction. This parser is not compiler-integrated; method bodies are captured, not parsed/compiled. M1.1 remains incomplete and M1.2–M8 remain outstanding.
+
+## Corrected latest-state record — 2026-11-19
+
+The preceding status text is historical and stale. Latest implementation head: `d9270d6c9d6be68439aa1ddee5295325897dcec3`. The trait/impl syntax parser is added but still isolated: it parses signatures, captures method body spans, checks duplicate names and requires `self` as first parameter. CI run #842 is successful on Linux/macOS/Windows (workspace tests, format, Clippy, rustdoc). Fuzz run #371 is still running. Several intermediate CI/fuzz runs failed due formatting mistakes and a missing parser receiver argument; these were corrected, and the current successful CI evidence supersedes those failed attempts. This does not prove complete v0.5 semantics or integration. M1.1 incomplete; M1.2–M8 outstanding.
