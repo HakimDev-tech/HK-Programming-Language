@@ -328,7 +328,7 @@ impl<'a> Compiler<'a> {
                         self.emit(Opcode::MakeFunction(child), (*line, *column), &[]);
                         self.emit(Opcode::DefineFunctionLocal(slot), (*line, *column), &[]);
                     }
-                    _ => unreachable!("precollected function declaration changed kind"),
+                    _ => continue,
                 }
             }
         }
