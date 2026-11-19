@@ -1017,9 +1017,7 @@ impl V05TraitImplParser<'_> {
                     name, arguments, ..
                 } if arguments.is_empty() => name,
                 _ => {
-                    return Err(self.error(
-                        "Trait name in impl must be a non-generic identifier here."
-                    ))
+                    return Err(self.error("Trait name in impl must be a non-generic identifier here."))
                 }
             };
             (Some(trait_name), target)
