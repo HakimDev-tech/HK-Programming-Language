@@ -1,6 +1,6 @@
 # HK 0.5.0 — Implementation Plan
 
-**Current phase:** M1.1 — front-end model and grammar (in progress; isolated lexical/type-expression foundation exists in PR #21, but the full declaration AST and parser are outstanding).
+**Current phase:** M1.1 — front-end model and grammar (in progress; isolated lexer/type-expression model plus initial struct/enum AST/parser slice in PR #21; full grammar and executable integration outstanding).
 **Normative contract:** HK-0.5-SPEC.md.
 **Base:** HK 0.4.0 merge commit c47a06cec1120edd33114cce1857c40f10b7f333.
 **Release status:** not implemented; not released.
@@ -27,7 +27,7 @@ Implement in dependency order. Each milestone is a focused reviewable change and
 
 ## M1.1 checklist
 
-**Progress note (2026-11-17):** PR #21 adds an isolated lexer/type-expression foundation. Its exact head `9c1edf6a1e0d1592b6df1dfe099952c33aa863df` passes the repository CI matrix on Linux, macOS and Windows and the configured fuzz workflow. These checks validate the current code slice only; they do not close M1.1 or establish feature-level parser/runtime correctness.
+**Progress note (2026-11-19):** PR #21 adds the isolated lexer/type-expression foundation and an initial struct/enum declaration AST/parser (generic params/bounds, typed fields, unit/tuple enum variants, duplicate field/variant diagnostics, spans). Exact code head `e388941ab1851f8c4109064f5ac2ca250b4e193e` passes CI on Linux/macOS/Windows (format, workspace tests, Clippy with warnings denied, rustdoc). Fuzz run #343 is pending. These checks validate this code slice only; M1.1 remains incomplete and there is no executable v0.5 feature integration.
 
 - Add keywords and punctuation without changing existing tokenization.
 - Represent recursive type expressions: primitive, nominal path, generic application and type parameter.
