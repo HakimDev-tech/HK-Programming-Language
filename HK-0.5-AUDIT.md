@@ -49,8 +49,8 @@ Existing source files: `ast.rs`, `lexer.rs`, `parser.rs`, `type_checker.rs`, `ty
 - PR #21 is open and Draft; current head is `b79cb8f8ceb5364181c1aca8e20e9b0a6e7f3f3f`.
 - The current head CI run #773 succeeded on Ubuntu, macOS, and Windows; fuzz run #337 succeeded.
 - These runs validate the repository's current existing test/workflow scope, not v0.5 feature semantics.
-- The current v0.5 syntax module is explicitly isolated and not connected to compiler execution.
-- No v0.5 runtime/compiler/verifier/VM/module feature is delivered.
+- The current v0.5 syntax module is explicitly isolated and not connected to compiler execution. It now contains an initial struct/enum AST/parser slice and generic-list duplicate/limit checks; it still lacks the full grammar and semantic integration.
+- No v0.5 runtime/compiler/verifier/VM/module feature is delivered. Current exact head `6db4fd9b04ca211226bc16f578eab9af65438479` passes the CI matrix; a dedicated `syntax_v05` fuzz target/campaign was added and is pending.
 - No v0.5 release tag or release exists.
 
 ## Execution constraints encountered in this session
