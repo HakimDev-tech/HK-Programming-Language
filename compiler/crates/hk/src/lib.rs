@@ -58,6 +58,25 @@ fn has_type_annotations(statements: &[S]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::run;
+    use super::{lexer::Lexer, parser::Parser, type_checker::TypeChecker};
+    #[test]
+    fn type_checker_resolves_typed_functions_declared_later() {
+        let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value; }";
+        let tokens = Lexer::new("forward.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
+        TypeChecker::new("forward.hk", source).check(&statements).unwrap();
+    }
+
+    #[test]
+    fn type_checker_validates_calls_to_later_function_signatures() {
+        let source = "fn first() -> number { return later(\"wrong\"); } fn later(value: number) -> number { return value; }";
+        let tokens = Lexer::new("forward.hk", source).scan().unwrap();
+        let statements = Parser::new(tokens, "forward.hk", source).parse().unwrap();
+        let error = TypeChecker::new("forward.hk", source).check(&statements).unwrap_err();
+        assert_eq!(error.code, "E3003");
+        assert!(error.message.contains("function argument"));
+    }
+
     #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
