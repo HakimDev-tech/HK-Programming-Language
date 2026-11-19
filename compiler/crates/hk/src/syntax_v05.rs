@@ -1504,6 +1504,21 @@ mod tests {
     }
 
     #[test]
+    fn v05_lexer_enforces_source_and_token_limits() {
+        let oversized_source = "x".repeat(MAX_V05_SOURCE_BYTES + 1);
+        let error = lex_v05(&oversized_source).unwrap_err();
+        assert!(error.message.contains("source size"));
+
+        let many_tokens = std::iter::repeat("x")
+            .take(MAX_V05_TOKENS + 1)
+            .collect::<Vec<_>>()
+            .join(" ");
+        let error = lex_v05(&many_tokens).unwrap_err();
+        assert!(error.message.contains("token count"));
+        assert_eq!(error.span.start, MAX_V05_TOKENS * 2);
+    }
+
+    #[test]
     fn parses_mixed_top_level_v05_declarations_and_tracks_spans() {
         let source = "struct Point { x: number, y: number, } enum Direction { North, South, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"point\"; } } fn identity<T>(value: T) -> T { return value; }";
         let tokens = lex_v05(source).unwrap();
