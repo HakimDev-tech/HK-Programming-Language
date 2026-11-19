@@ -89,3 +89,7 @@ Head `77e70223360e66d3d3a710092bb655b0672e4b75` adds parsing of fully-qualified 
 ## Match-parser checkpoint — 2026-11-19
 
 Head `d628663067e785cc53ce7658ee0cdccc57f311fa` adds statement-level match syntax: scrutinee token span, fully-qualified enum variant patterns, tuple binding names, wildcard, block arm spans, duplicate variant/binder/wildcard checks, wildcard-last rule and bounded nesting/cursor rollback. CI #904 passed Linux/macOS/Windows (fmt, workspace tests, Clippy, rustdoc). Fuzz #398 is in progress and has built the syntax target; its v0.5 syntax campaign is running. Semantic exhaustiveness, expression parsing and integration remain absent. M1.1 incomplete; M1.2–M8 outstanding.
+
+## Match syntax fuzz completion — 2026-11-19
+
+Fuzz run #398 completed successfully: source/interpreter fuzz, v0.5 syntax target build and 30-second syntax campaign, module resolver campaign, bytecode verifier build and malformed-bytecode campaign all passed. It ran against code head `d628663067e785cc53ce7658ee0cdccc57f311fa` (match parser code); syntax target included match parsing. CI #904 also passed all platforms. New match parser remains isolated and does not perform exhaustiveness or expression parsing. M1.1 incomplete, M1.2–M8 outstanding.
