@@ -133,3 +133,10 @@ This is staged frontend groundwork only: bodies are opaque and no production com
 ## Coherence diagnostic correction — 2026-11-19
 
 A CI assertion exposed an overly broad trait-method conflict diagnostic. The implementation now distinguishes inherent/trait name conflict from duplicate trait method names. CI #1045 is green on `d27da2199033fd09c3e9f46522435cdc6891393b` across Linux/macOS/Windows. Fuzz #459 completed successfully on the declaration analyzer checkpoint; campaign #465 on the updated validator remains running. Forward nominal-reference test commit `c015a78a82c6dba6aa245668cabed5763a2b8619` is awaiting validation.
+
+
+## Generic coherence and lexer limits checkpoint — 2026-11-19
+
+Implemented overlap-aware trait impl coherence (`Box<T>` vs concrete instantiations), overlap-aware inherent/trait method-set conflict detection, and 1 MiB source / 100,000-token v0.5 lexer bounds. Tests cover overlapping and disjoint generic impl patterns, generic inherent method collisions, and resource-limit diagnostics. CI #1078/#1079 green Linux/macOS/Windows on `f51fcaddc1bcec1614185af94258f92b2accb3ac`. Fuzz #481 is still running.
+
+Staged semantics remain not integrated into executable compilation. M1.1 partial; M2 groundwork only; M3–M6 absent; M7 partial; M8 unreleased.
