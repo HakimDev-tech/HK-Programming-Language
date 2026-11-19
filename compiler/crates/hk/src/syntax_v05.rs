@@ -2048,10 +2048,10 @@ fn parse_match_statement_at(
                 }
                 if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
                     return Err(parse_error(
-                    tokens,
-                    *cursor,
-                    "Expected ')' after pattern bindings.",
-                ));
+                        tokens,
+                        *cursor,
+                        "Expected ')' after pattern bindings.",
+                    ));
                 }
                 *cursor += 1;
             }
@@ -2117,14 +2117,18 @@ fn parse_match_statement_at(
         }
         if body_depth != 0 {
             return Err(parse_error(
-            tokens,
-            *cursor,
-            "Unterminated match arm block.",
-        ));
+                tokens,
+                *cursor,
+                "Unterminated match arm block.",
+            ));
         }
         let body_end = tokens[*cursor - 1].span.end;
         let arm_end = body_end;
-        arms.push(V05MatchArm { pattern, body_span: body_start..body_end, span: arm_start..arm_end });
+        arms.push(V05MatchArm {
+            pattern,
+            body_span: body_start..body_end,
+            span: arm_start..arm_end,
+        });
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
             *cursor += 1;
         }
@@ -2162,8 +2166,13 @@ mod v05_match_parser_tests {
         let mut cursor = 0;
         let statement = parse_match_statement(&tokens, &mut cursor).unwrap();
         assert_eq!(statement.arms.len(), 3);
-        assert!(matches!(statement.arms[0].pattern, V05MatchPattern::Variant { ref bindings, .. } if bindings == &["x"]));
-        assert!(matches!(statement.arms[2].pattern, V05MatchPattern::Wildcard { .. }));
+        assert!(
+            matches!(statement.arms[0].pattern, V05MatchPattern::Variant { ref bindings, .. } if bindings == &["x"])
+        );
+        assert!(matches!(
+            statement.arms[2].pattern,
+            V05MatchPattern::Wildcard { .. }
+        ));
         assert_eq!(cursor, tokens.len());
     }
 
