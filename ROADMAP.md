@@ -37,3 +37,5 @@ Native compilation, WASM, FFI, concurrency, package management, LSP, formatter a
 
 
 **Continuation update (2026-11-19):** a staged parser slice now models/parses trait signatures and impl declarations, generic impl headers, typed method parameters/returns and bounded body token spans. Duplicate methods/parameters are rejected and the dedicated syntax fuzz target now includes this parser. Commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is pending CI. Still isolated, not executable; M1.1 remains incomplete and M1.2–M8 remain unimplemented.
+
+**Latest verified continuation:** head `d9270d6c9d6be68439aa1ddee5295325897dcec3` passed CI #842 across Linux/macOS/Windows (format, tests, Clippy, rustdoc). Added trait/impl signature parser with generic impl declarations, typed parameters/returns, opaque body spans, duplicate checks, first-self enforcement and bounded nesting. Fuzz #371 remains running. Intermediate CI failures were corrected; the parser remains isolated and is not executable compiler functionality.
