@@ -1400,6 +1400,14 @@ mod tests {
             .message
             .contains("expects 1 generic argument"));
 
+        let unknown_trait_impl = "struct Point { x: number, } impl MissingTrait for Point { fn display(self) -> string { return \"p\"; } }";
+        let tokens = lex_v05(unknown_trait_impl).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        assert!(validate_v05_type_names(&declarations, &tokens)
+            .unwrap_err()
+            .message
+            .contains("Unknown trait name"));
+
         let unknown_bound = "fn render<T: MissingTrait>(value: T) -> string { return \"\"; }";
         let tokens = lex_v05(unknown_bound).unwrap();
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
