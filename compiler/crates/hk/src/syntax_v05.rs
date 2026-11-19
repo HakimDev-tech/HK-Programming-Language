@@ -1721,6 +1721,81 @@ mod tests {
     use super::*;
 
     #[test]
+    fn infers_generic_function_arguments_from_arguments_and_expected_return() {
+        let source = "fn identity<T>(value: T) -> T { return value; } fn create<T>() -> T { return null; }";
+        let tokens = lex_v05(source).unwrap();
+        let functions = parse_function_declarations(&tokens).unwrap();
+        let number = lex_v05("number").unwrap();
+        let mut cursor = 0;
+        let number_type = parse_type_expr(&number, &mut cursor).unwrap();
+        let inferred = infer_v05_generic_function_type_arguments(
+            &functions[0],
+            &[number_type.clone()],
+            None,
+            None,
+            &[],
+        )
+        .unwrap();
+        assert_eq!(canonical_type(&inferred[0]), "number");
+
+        let string = lex_v05("string").unwrap();
+        cursor = 0;
+        let string_type = parse_type_expr(&string, &mut cursor).unwrap();
+        let inferred = infer_v05_generic_function_type_arguments(
+            &functions[1],
+            &[],
+            Some(&string_type),
+            None,
+            &[],
+        )
+        .unwrap();
+        assert_eq!(canonical_type(&inferred[0]), "string");
+    }
+
+    #[test]
+    fn generic_inference_rejects_conflicts_ambiguity_and_unsatisfied_bounds() {
+        let source = "fn pair<T>(left: T, right: T) -> T { return left; } fn create<T>() -> T { return null; } trait Display { fn display(self) -> string; } fn render<T: Display>(value: T) -> string { return value.display(); }";
+        let tokens = lex_v05(source).unwrap();
+        let functions = parse_function_declarations(&tokens).unwrap();
+        let number = lex_v05("number").unwrap();
+        let string = lex_v05("string").unwrap();
+        let mut cursor = 0;
+        let number_type = parse_type_expr(&number, &mut cursor).unwrap();
+        cursor = 0;
+        let string_type = parse_type_expr(&string, &mut cursor).unwrap();
+
+        let conflict = infer_v05_generic_function_type_arguments(
+            &functions[0],
+            &[number_type.clone(), string_type.clone()],
+            None,
+            None,
+            &[],
+        )
+        .unwrap_err();
+        assert!(conflict.message.contains("Conflicting constraints"));
+
+        let ambiguous = infer_v05_generic_function_type_arguments(
+            &functions[1],
+            &[],
+            None,
+            None,
+            &[],
+        )
+        .unwrap_err();
+        assert!(ambiguous.message.contains("Cannot infer generic parameter"));
+
+        let bound = infer_v05_generic_function_type_arguments(
+            &functions[2],
+            &[number_type],
+            None,
+            None,
+            &[],
+        )
+        .unwrap_err();
+        assert!(bound.message.contains("does not satisfy trait bound"));
+    }
+
+    #[test]
     fn declaration_module_analysis_runs_all_frontend_stages_and_indexes_symbols() {
         let source = "struct Box<T> { value: T, } trait Display { fn display(self) -> string; } impl Display for Box<number> { fn display(self) -> string { return \"box\"; } } fn identity<T>(value: T) -> T { return value; }";
         let index = analyze_v05_declaration_module(source).unwrap();
