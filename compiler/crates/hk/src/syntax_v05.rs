@@ -1419,9 +1419,7 @@ impl V05FunctionParser<'_> {
             }
             self.cursor += 1;
             if depth > 64 {
-                return Err(
-                    self.error("Maximum function-body brace nesting depth (64) exceeded.")
-                );
+                return Err(self.error("Maximum function-body brace nesting depth (64) exceeded."));
             }
         }
         if depth != 0 {
