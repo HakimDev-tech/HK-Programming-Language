@@ -64,3 +64,10 @@ All v0.5 syntax additions remain isolated in `syntax_v05.rs`; they are not integ
 - CI #975 and #976: Linux/macOS/Windows green (format, tests, Clippy, rustdoc).
 - Fuzz #431 green; preceding Fuzz #430 also green on checkpoint `fbdda2c0260c776fd243af05bd4f401c7d6c516c`.
 - PR #21 is still Draft and unmerged. These checks validate existing integrated slices only, not the full v0.5 contract.
+
+
+## Mixed top-level parser checkpoint — 2026-11-19
+
+Implemented `parse_v05_top_level_declarations`: dispatches mixed struct/enum/trait/impl/function declaration streams to their specialized syntax parsers, retains source spans and rejects duplicate module-level names across kinds and unterminated declaration bodies. Unit tests cover mixed grammar/spans/duplicate names/malformed bodies. CI #998/#999 green on code commit `2ef96aa76db26c126d592496834bd7a816a30a83`. Fuzz target calls the mixed parser from commit `3affb2eaf4ea9414b270a542fe6895d3e5e0d5e9`; campaign #442 pending.
+
+Limitations remain explicit: body grammar is opaque, module parser isn't wired into the production compiler, semantic resolution and runtime integration absent. M1.1 partial, not completed.
