@@ -9,7 +9,11 @@ fuzz_target!(|input: &[u8]| {
                 let _ = hk::syntax_v05::parse_nominal_declarations(&tokens);
                 let _ = hk::syntax_v05::parse_trait_and_impl_declarations(&tokens);
                 let _ = hk::syntax_v05::parse_function_declarations(&tokens);
-                let _ = hk::syntax_v05::parse_v05_top_level_declarations(&tokens);
+                if let Ok(declarations) =
+                    hk::syntax_v05::parse_v05_top_level_declarations(&tokens)
+                {
+                    let _ = hk::syntax_v05::validate_v05_coherence(&declarations, &tokens);
+                }
                 let mut cursor = 0;
                 let _ = hk::syntax_v05::parse_struct_literal(&tokens, &mut cursor);
                 cursor = 0;
