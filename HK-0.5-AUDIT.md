@@ -60,3 +60,8 @@ Repository edits can be made through the GitHub contents API and CI results can 
 ## Acceptance policy
 
 Only mark a requirement complete when the code is integrated, tests exist and are meaningful, and validation evidence is available for the relevant exact commit. This audit is a tracking artifact, not implementation credit.
+
+
+## Continuation update — 2026-11-19
+
+Verified prior head `a2cac3f3ec09e3b98e6a60311da3063f85a84220`: PR #21 remains Draft; CI #807/#806 and fuzz #354/#353/#352/#351 are successful. Added an isolated trait/impl declaration parser slice in `syntax_v05.rs`: trait signatures, impl generic headers, inherent/trait impl targets, method parameter and return types, body-span capture, duplicate method/parameter rejection and bounded brace-depth. Fuzz target now exercises this parser. New commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is pending CI after a formatting-only correction. This parser is not compiler-integrated; method bodies are captured, not parsed/compiled. M1.1 remains incomplete and M1.2–M8 remain outstanding.
