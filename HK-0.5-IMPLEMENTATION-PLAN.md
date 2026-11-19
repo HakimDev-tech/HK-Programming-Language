@@ -27,7 +27,7 @@ Implement in dependency order. Each milestone is a focused reviewable change and
 
 ## M1.1 checklist
 
-**Progress note (2026-11-19):** PR #21 adds the isolated lexer/type-expression foundation and an initial struct/enum declaration AST/parser (generic params/bounds, typed fields, unit/tuple enum variants, duplicate field/variant diagnostics, spans). Exact code head `e388941ab1851f8c4109064f5ac2ca250b4e193e` passes CI on Linux/macOS/Windows (format, workspace tests, Clippy with warnings denied, rustdoc). Fuzz run #343 is pending. These checks validate this code slice only; M1.1 remains incomplete and there is no executable v0.5 feature integration.
+**Progress note (2026-11-19):** PR #21 contains the isolated lexer/type-expression foundation and initial struct/enum declaration AST/parser (generic params/bounds, typed fields, unit/tuple variants, duplicate diagnostics and source spans). Generic lists now reject duplicate parameters/bounds and are bounded at 256 each. Dedicated fuzz target `syntax_v05` exercises lexer/type-expression/nominal parser inputs. Code head `6db4fd9b04ca211226bc16f578eab9af65438479` passes CI on Linux/macOS/Windows (format, workspace tests, Clippy with warnings denied, rustdoc); fuzz campaign #351 is pending. These validate this isolated slice only; M1.1 remains incomplete and no v0.5 feature is integrated into executable source compilation.
 
 - Add keywords and punctuation without changing existing tokenization.
 - Represent recursive type expressions: primitive, nominal path, generic application and type parameter.
