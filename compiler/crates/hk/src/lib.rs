@@ -100,6 +100,12 @@ mod tests {
     }
 
     #[test]
+    fn typed_module_functions_support_mutual_recursion() {
+        let source = "fn even(value: number) -> bool { if (value == 0) { return true; } else { return odd(value - 1); } } fn odd(value: number) -> bool { if (value == 0) { return false; } else { return even(value - 1); } } print(even(8));";
+        assert_eq!(run("typed-mutual.hk", source).unwrap(), vec!["true"]);
+    }
+
+    #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
     }
