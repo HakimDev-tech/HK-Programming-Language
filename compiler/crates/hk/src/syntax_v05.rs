@@ -52,6 +52,82 @@ pub enum V05TokenKind {
     ExistingSyntax(String),
 }
 
+/// Module declaration symbol category.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum V05SymbolKind {
+    Struct,
+    Enum,
+    Trait,
+    Function,
+}
+
+/// A declaration's name and source span in the staged module index.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05Symbol {
+    pub kind: V05SymbolKind,
+    pub span: Range<usize>,
+}
+
+/// Result of the staged declaration-front-end pipeline. This deliberately does
+/// not represent executable AST or claim that expressions/method bodies have
+/// been parsed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05ModuleIndex {
+    pub declarations: Vec<V05TopLevelDeclaration>,
+    pub symbols: std::collections::BTreeMap<String, V05Symbol>,
+}
+
+/// Error propagated by the declaration analysis entry point.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum V05ModuleError {
+    Lex(V05LexError),
+    Parse(V05ParseError),
+}
+
+impl std::fmt::Display for V05ModuleError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Lex(error) => write!(formatter, "{}", error.message),
+            Self::Parse(error) => write!(formatter, "{}", error.message),
+        }
+    }
+}
+
+impl std::error::Error for V05ModuleError {}
+
+/// Runs the staged v0.5 declaration frontend as a single ordered pipeline:
+/// lexical analysis, mixed declaration parsing, type-name/generic-arity
+/// validation, trait coherence, and deterministic symbol indexing.
+pub fn analyze_v05_declaration_module(source: &str) -> Result<V05ModuleIndex, V05ModuleError> {
+    let tokens = lex_v05(source).map_err(V05ModuleError::Lex)?;
+    let declarations =
+        parse_v05_top_level_declarations(&tokens).map_err(V05ModuleError::Parse)?;
+    validate_v05_type_names(&declarations, &tokens).map_err(V05ModuleError::Parse)?;
+    validate_v05_coherence(&declarations, &tokens).map_err(V05ModuleError::Parse)?;
+
+    let mut symbols = std::collections::BTreeMap::new();
+    for declaration in &declarations {
+        let Some(name) = declaration.name() else {
+            continue;
+        };
+        let kind = match declaration {
+            V05TopLevelDeclaration::Struct(_) => V05SymbolKind::Struct,
+            V05TopLevelDeclaration::Enum(_) => V05SymbolKind::Enum,
+            V05TopLevelDeclaration::Trait(_) => V05SymbolKind::Trait,
+            V05TopLevelDeclaration::Function(_) => V05SymbolKind::Function,
+            V05TopLevelDeclaration::Impl(_) => unreachable!("impl blocks are not named symbols"),
+        };
+        symbols.insert(name.to_owned(), V05Symbol {
+            kind,
+            span: declaration.span(),
+        });
+    }
+    Ok(V05ModuleIndex {
+        declarations,
+        symbols,
+    })
+}
+
 /// Unified top-level declaration model for mixed HK 0.5 source files.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum V05TopLevelDeclaration {
