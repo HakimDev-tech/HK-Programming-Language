@@ -1594,7 +1594,11 @@ fn parse_struct_literal_at(
             }
         }
         if value_end == value_start {
-            return Err(parse_error(tokens, *cursor, "Field expression cannot be empty."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Field expression cannot be empty.",
+            ));
         }
         fields.push(V05StructLiteralField {
             name: field_name,
@@ -1603,13 +1607,19 @@ fn parse_struct_literal_at(
         });
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
             *cursor += 1;
-            if is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) { break; }
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) {
+                break;
+            }
         } else {
             break;
         }
     }
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) {
-        return Err(parse_error(tokens, *cursor, "Expected '}' to close struct literal."));
+        return Err(parse_error(
+            tokens,
+            *cursor,
+            "Expected '}' to close struct literal.",
+        ));
     }
     *cursor += 1;
     let end = tokens[*cursor - 1].span.end;
