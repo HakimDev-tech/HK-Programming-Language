@@ -1084,6 +1084,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn validates_trait_impl_conformance_and_orphan_rule() {
+        let source = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"point\"; } }";
+        let tokens = lex_v05(source).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        validate_v05_coherence(&declarations, &tokens).unwrap();
+
+        let missing = "struct Point { x: number, } trait Display { fn display(self) -> string; fn size(self) -> number; } impl Display for Point { fn display(self) -> string { return \"point\"; } }";
+        let tokens = lex_v05(missing).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("Missing trait method"));
+
+        let orphan = "impl Display for Foreign { fn display(self) -> string { return \"x\"; } }";
+        let tokens = lex_v05(orphan).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("orphan rule"));
+    }
+
+    #[test]
+    fn rejects_duplicate_trait_impl_pairs_and_inherent_methods() {
+        let duplicate_impl = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"a\"; } } impl Display for Point { fn display(self) -> string { return \"b\"; } }";
+        let tokens = lex_v05(duplicate_impl).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("Duplicate trait implementation"));
+
+        let duplicate_inherent = "struct Point { x: number, } impl Point { fn move(self) { } } impl Point { fn move(self) { } }";
+        let tokens = lex_v05(duplicate_inherent).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("Duplicate inherent method"));
+    }
+
+    #[test]
+    fn rejects_trait_impl_signature_mismatch() {
+        let source = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> number { return 1; } }";
+        let tokens = lex_v05(source).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("does not match trait signature"));
+    }
+
+    #[test]
     fn parses_mixed_top_level_v05_declarations_and_tracks_spans() {
         let source = "struct Point { x: number, y: number, } enum Direction { North, South, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"point\"; } } fn identity<T>(value: T) -> T { return value; }";
         let tokens = lex_v05(source).unwrap();
