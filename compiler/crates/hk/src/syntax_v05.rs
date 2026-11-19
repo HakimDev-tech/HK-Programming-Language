@@ -1035,7 +1035,7 @@ impl V05TraitImplParser<'_> {
                 return Err(self.error("Unterminated impl declaration."));
             }
             let method = self.parse_method(true)?;
-            Self::validate_receiver(&method)?;
+            self.validate_receiver(&method)?;
             if !names.insert(method.name.clone()) {
                 return Err(self.error("Duplicate impl method."));
             }
