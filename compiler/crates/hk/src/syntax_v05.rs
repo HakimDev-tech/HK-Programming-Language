@@ -514,10 +514,7 @@ pub fn parse_nominal_declarations(
             Some(V05Keyword::Enum) => parser.parse_enum().map(V05Declaration::Enum),
             _ => Err(parser.error("Expected a struct or enum declaration.")),
         };
-        match declaration {
-            Ok(value) => declarations.push(value),
-            Err(error) => return Err(error),
-        }
+        declarations.push(declaration?);
     }
     Ok(declarations)
 }
