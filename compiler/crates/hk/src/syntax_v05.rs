@@ -226,8 +226,11 @@ pub fn validate_v05_type_names(
                 validate_type_expr_names(&value.target, &parameters, &nominal, tokens)?;
                 if let Some(trait_name) = &value.trait_name {
                     if !traits.contains(trait_name.as_str()) {
-                        // An imported trait may be resolved by the future module
-                        // resolver; keep unresolved external names as deferred.
+                        return Err(parse_error_at_span(
+                            tokens,
+                            value.span.clone(),
+                            &format!("Unknown trait name '{trait_name}'."),
+                        ));
                     }
                 }
                 for method in &value.methods {
