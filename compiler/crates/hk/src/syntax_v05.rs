@@ -1250,6 +1250,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn validates_v05_type_names_and_generic_arity() {
+        let valid = "struct Box<T> { value: T, } enum Option<T> { Some(T), None, } trait Display { fn display(self) -> string; } fn identity<T>(value: T) -> T { return value; } fn render<T: Display>(value: T) -> string { return value.display(); }";
+        let tokens = lex_v05(valid).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        validate_v05_type_names(&declarations, &tokens).unwrap();
+
+        let unknown = "struct Point { value: Missing, }";
+        let tokens = lex_v05(unknown).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        assert!(validate_v05_type_names(&declarations, &tokens)
+            .unwrap_err()
+            .message
+            .contains("Unknown type name"));
+
+        let wrong_arity = "struct Box<T> { value: T, } fn use_box(value: Box) -> number { return 1; }";
+        let tokens = lex_v05(wrong_arity).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        assert!(validate_v05_type_names(&declarations, &tokens)
+            .unwrap_err()
+            .message
+            .contains("expects 1 generic argument"));
+
+        let unknown_bound = "fn render<T: MissingTrait>(value: T) -> string { return \"\"; }";
+        let tokens = lex_v05(unknown_bound).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        assert!(validate_v05_type_names(&declarations, &tokens)
+            .unwrap_err()
+            .message
+            .contains("Unknown trait bound"));
+    }
+
+    #[test]
     fn validates_trait_impl_conformance_and_orphan_rule() {
         let source = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"point\"; } }";
         let tokens = lex_v05(source).unwrap();
