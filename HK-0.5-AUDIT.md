@@ -120,3 +120,10 @@ The type checker now precollects root/module-level function signatures before ch
 Implemented `parse_v05_top_level_declarations`: dispatches mixed struct/enum/trait/impl/function declaration streams to their specialized syntax parsers, retains source spans and rejects duplicate module-level names across kinds and unterminated declaration bodies. Unit tests cover mixed grammar/spans/duplicate names/malformed bodies. CI #998/#999 green on code commit `2ef96aa76db26c126d592496834bd7a816a30a83`. Fuzz target calls the mixed parser from commit `3affb2eaf4ea9414b270a542fe6895d3e5e0d5e9`; campaign #442 pending.
 
 Limitations remain explicit: body grammar is opaque, module parser isn't wired into the production compiler, semantic resolution and runtime integration absent. M1.1 partial, not completed.
+
+
+## Staged declaration analysis checkpoint — 2026-11-19
+
+Added module-local nominal type-name resolution and generic arity validation (field, payload, function/method signatures, impl targets), generic parameter and trait-bound validation, plus coherence checks (orphan rule, inherent ownership, duplicate impls/methods, trait signature conformance/missing/extra methods, inherent/trait name conflicts). Added `analyze_v05_declaration_module` orchestration pipeline lex→mixed parser→type-name validation→coherence→sorted symbol index. Fuzz target exercises these APIs. CI #1032/#1033 green on `29bfbeda95b11acd8b2157d49d99b9d88a82fbd7`; fuzz #459 pending. Test commit `cb079b682de21ac7f410d08f5d65fc3a3844621b` pending.
+
+This is staged frontend groundwork only: bodies are opaque and no production compiler integration, runtime, bytecode, verifier or VM nominal feature support is claimed.
