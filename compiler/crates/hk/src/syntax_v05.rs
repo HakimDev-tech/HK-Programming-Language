@@ -52,6 +52,116 @@ pub enum V05TokenKind {
     ExistingSyntax(String),
 }
 
+/// Unified top-level declaration model for mixed HK 0.5 source files.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum V05TopLevelDeclaration {
+    Struct(V05StructDecl),
+    Enum(V05EnumDecl),
+    Trait(V05TraitDecl),
+    Impl(V05ImplDecl),
+    Function(V05FunctionDecl),
+}
+
+impl V05TopLevelDeclaration {
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::Struct(declaration) => Some(&declaration.name),
+            Self::Enum(declaration) => Some(&declaration.name),
+            Self::Trait(declaration) => Some(&declaration.name),
+            Self::Function(declaration) => Some(&declaration.name),
+            Self::Impl(_) => None,
+        }
+    }
+
+    pub fn span(&self) -> Range<usize> {
+        match self {
+            Self::Struct(declaration) => declaration.span.clone(),
+            Self::Enum(declaration) => declaration.span.clone(),
+            Self::Trait(declaration) => declaration.span.clone(),
+            Self::Impl(declaration) => declaration.span.clone(),
+            Self::Function(declaration) => declaration.span.clone(),
+        }
+    }
+}
+
+/// Parses a mixed module declaration stream. Declaration bodies remain source
+/// spans; this pass validates declaration grammar and module-level name
+/// uniqueness without pretending to parse function expressions or type-check.
+pub fn parse_v05_top_level_declarations(
+    tokens: &[V05Token],
+) -> Result<Vec<V05TopLevelDeclaration>, V05ParseError> {
+    let mut declarations = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    let mut cursor = 0usize;
+
+    while cursor < tokens.len() {
+        let end = declaration_end(tokens, cursor)?;
+        let slice = &tokens[cursor..end];
+        let declaration = match tokens.get(cursor).map(|token| &token.kind) {
+            Some(V05TokenKind::Keyword(V05Keyword::Struct | V05Keyword::Enum)) => {
+                match parse_nominal_declarations(slice)?.into_iter().next() {
+                    Some(V05Declaration::Struct(value)) => V05TopLevelDeclaration::Struct(value),
+                    Some(V05Declaration::Enum(value)) => V05TopLevelDeclaration::Enum(value),
+                    None => return Err(parse_error(tokens, cursor, "Empty nominal declaration.")),
+                }
+            }
+            Some(V05TokenKind::Keyword(V05Keyword::Trait)) => {
+                match parse_trait_and_impl_declarations(slice)?.into_iter().next() {
+                    Some(V05TraitOrImpl::Trait(value)) => V05TopLevelDeclaration::Trait(value),
+                    _ => return Err(parse_error(tokens, cursor, "Expected trait declaration.")),
+                }
+            }
+            Some(V05TokenKind::Keyword(V05Keyword::Impl)) => {
+                match parse_trait_and_impl_declarations(slice)?.into_iter().next() {
+                    Some(V05TraitOrImpl::Impl(value)) => V05TopLevelDeclaration::Impl(value),
+                    _ => return Err(parse_error(tokens, cursor, "Expected impl declaration.")),
+                }
+            }
+            Some(V05TokenKind::Identifier(name)) if name == "fn" => {
+                match parse_function_declarations(slice)?.into_iter().next() {
+                    Some(value) => V05TopLevelDeclaration::Function(value),
+                    None => return Err(parse_error(tokens, cursor, "Expected function declaration.")),
+                }
+            }
+            _ => return Err(parse_error(tokens, cursor, "Expected a top-level HK 0.5 declaration.")),
+        };
+
+        if let Some(name) = declaration.name() {
+            if !names.insert(name.to_owned()) {
+                return Err(parse_error(tokens, cursor, "Duplicate module-level declaration name."));
+            }
+        }
+        declarations.push(declaration);
+        cursor = end;
+    }
+
+    Ok(declarations)
+}
+
+fn declaration_end(tokens: &[V05Token], start: usize) -> Result<usize, V05ParseError> {
+    let mut brace_depth = 0usize;
+    let mut saw_body = false;
+    for (index, token) in tokens.iter().enumerate().skip(start) {
+        if is_punctuation(Some(token), V05Punctuation::LeftBrace) {
+            saw_body = true;
+            brace_depth += 1;
+        } else if is_punctuation(Some(token), V05Punctuation::RightBrace) {
+            if brace_depth == 0 {
+                return Err(parse_error(tokens, index, "Unexpected closing brace."));
+            }
+            brace_depth -= 1;
+            if saw_body && brace_depth == 0 {
+                return Ok(index + 1);
+            }
+        }
+    }
+    Err(parse_error(
+        tokens,
+        tokens.len(),
+        "Unterminated top-level declaration body.",
+    ))
+}
+
 /// A source-spanned token. Ranges are half-open UTF-8 byte offsets.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct V05Token {
