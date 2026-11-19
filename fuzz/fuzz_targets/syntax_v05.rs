@@ -4,7 +4,24 @@ use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|input: &[u8]| {
     if let Ok(source) = std::str::from_utf8(input) {
-        let _ = hk::syntax_v05::analyze_v05_declaration_module(source);
+        if let Ok(index) = hk::syntax_v05::analyze_v05_declaration_module(source) {
+            for declaration in &index.declarations {
+                if let hk::syntax_v05::V05TopLevelDeclaration::Function(function) = declaration {
+                    let argument_types = function
+                        .parameters
+                        .iter()
+                        .map(|parameter| parameter.ty.clone())
+                        .collect::<Vec<_>>();
+                    let _ = hk::syntax_v05::infer_v05_generic_function_type_arguments(
+                        function,
+                        &argument_types,
+                        function.return_type.as_ref(),
+                        None,
+                        &index.declarations,
+                    );
+                }
+            }
+        }
     }
     if let Ok(source) = std::str::from_utf8(input) {
         match hk::syntax_v05::lex_v05(source) {
