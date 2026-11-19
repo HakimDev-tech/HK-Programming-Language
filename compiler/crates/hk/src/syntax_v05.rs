@@ -126,7 +126,7 @@ pub fn parse_v05_top_level_declarations(
                             cursor,
                             "Expected function declaration.",
                         ))
-                    },
+                    }
                 }
             }
             _ => {
@@ -135,7 +135,7 @@ pub fn parse_v05_top_level_declarations(
                     cursor,
                     "Expected a top-level HK 0.5 declaration.",
                 ))
-            },
+            }
         };
 
         if let Some(name) = declaration.name() {
