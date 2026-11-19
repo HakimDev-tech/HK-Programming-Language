@@ -93,3 +93,7 @@ Head `d628663067e785cc53ce7658ee0cdccc57f311fa` adds statement-level match synta
 ## Match syntax fuzz completion — 2026-11-19
 
 Fuzz run #398 completed successfully: source/interpreter fuzz, v0.5 syntax target build and 30-second syntax campaign, module resolver campaign, bytecode verifier build and malformed-bytecode campaign all passed. It ran against code head `d628663067e785cc53ce7658ee0cdccc57f311fa` (match parser code); syntax target included match parsing. CI #904 also passed all platforms. New match parser remains isolated and does not perform exhaustiveness or expression parsing. M1.1 incomplete, M1.2–M8 outstanding.
+
+## Integrated M1.2 namespace collector checkpoint — 2026-11-19
+
+Commit `c608a45fe194961e544958da036dcd92ec07a088` introduces `declaration_collector.rs` and wires it into filesystem module loading. It collects imports, module variables/functions, and exports into a deterministic BTreeMap, rejects duplicate bindings and collisions with builtin `print`, and sets module exports from the collected export symbols before import-link validation and before any initializer runs. Three unit tests cover deterministic symbol ordering/export classification, import-vs-declaration collisions, and reserved `print`. CI #924 is pending. This advances M1.2 but is not whole-graph nominal/type/trait collection and does not implement forward references. v0.5 execution features remain absent.
