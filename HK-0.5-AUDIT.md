@@ -77,3 +77,7 @@ Latest code/fuzz-target commit `bb547f7127499002c634dd30be8938c33af49eb9`. It in
 ## Latest checkpoint — 2026-11-19
 
 Head `ffd1ea40eabdbf4c6b04abef2abfa2fb6afc9af3` adds a standalone struct-literal parser that records field value spans, detects duplicate/empty fields, supports nested delimiters and rolls back the cursor on failure. Dedicated syntax fuzz target now invokes this parser. CI #871 passed Linux/macOS/Windows (fmt, workspace tests, Clippy, rustdoc). Fuzz #384 is in progress and has not yet reached its v0.5 syntax campaign. All new parsers remain isolated; captured expressions/function/method bodies are not parsed or executed. M1.1 incomplete; M1.2–M8 outstanding.
+
+## Current exact state — 2026-11-19
+
+Head `4540a15e1e209c5c461e0b63a0e33a6f9efaedad` includes the staged struct literal parser and its fuzz invocation; a missing fuzz-cursor initialization found by run #384 was fixed. CI #878 passed Linux/macOS/Windows (format, workspace tests, Clippy, rustdoc). Fuzz #387 is running: source/interpreter target completed, syntax target build/campaign pending. Parser work remains isolated, expression spans are opaque; M1.1 incomplete, M1.2–M8 outstanding.
