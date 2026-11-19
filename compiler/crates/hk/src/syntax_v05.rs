@@ -1384,7 +1384,7 @@ mod tests {
 
     #[test]
     fn validates_v05_type_names_and_generic_arity() {
-        let valid = "struct Box<T> { value: T, } enum Option<T> { Some(T), None, } trait Display { fn display(self) -> string; } fn identity<T>(value: T) -> T { return value; } fn render<T: Display>(value: T) -> string { return value.display(); }";
+        let valid = "struct Box<T> { value: T, } struct Wrapper { item: Box<number>, } enum Option<T> { Some(T), None, } trait Display { fn display(self) -> string; } fn identity<T>(value: T) -> T { return value; } fn render<T: Display>(value: T) -> string { return value.display(); } fn use_box(value: Box<number>) -> number { return 1; }";
         let tokens = lex_v05(valid).unwrap();
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
         validate_v05_type_names(&declarations, &tokens).unwrap();
