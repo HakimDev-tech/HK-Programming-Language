@@ -409,15 +409,18 @@ pub fn validate_v05_coherence(
                 .iter()
                 .map(|bound| bound.parameter.clone())
                 .collect();
-            if trait_impls.iter().any(|(existing_trait, existing_target, existing_generics, _)| {
-                existing_trait == trait_name
-                    && type_patterns_overlap(
-                        existing_target,
-                        existing_generics,
-                        &implementation.target,
-                        &generic_names,
-                    )
-            }) {
+            if trait_impls
+                .iter()
+                .any(|(existing_trait, existing_target, existing_generics, _)| {
+                    existing_trait == trait_name
+                        && type_patterns_overlap(
+                            existing_target,
+                            existing_generics,
+                            &implementation.target,
+                            &generic_names,
+                        )
+                })
+            {
                 return Err(parse_error_at_span(
                     tokens,
                     implementation.span.clone(),
@@ -614,20 +617,19 @@ fn type_patterns_overlap(
             },
         ) => {
             let left_variable = left_parameters.contains(left_name) && left_arguments.is_empty();
-            let right_variable = right_parameters.contains(right_name) && right_arguments.is_empty();
+            let right_variable =
+                right_parameters.contains(right_name) && right_arguments.is_empty();
             if left_variable || right_variable {
                 return true;
             }
             left_name == right_name
                 && left_arguments.len() == right_arguments.len()
-                && left_arguments.iter().zip(right_arguments).all(|(left, right)| {
-                    type_patterns_overlap(
-                        left,
-                        left_parameters,
-                        right,
-                        right_parameters,
-                    )
-                })
+                && left_arguments
+                    .iter()
+                    .zip(right_arguments)
+                    .all(|(left, right)| {
+                        type_patterns_overlap(left, left_parameters, right, right_parameters)
+                    })
         }
     }
 }
