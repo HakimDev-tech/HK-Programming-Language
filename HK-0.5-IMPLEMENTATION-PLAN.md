@@ -84,3 +84,5 @@ Any unresolved normative semantic rule; any unverified descriptor/opcode; panic 
 ## Continuation progress — 2026-11-19
 
 New staged parser work adds trait declarations and impl blocks with method signatures, generic impl headers, method body span capture, duplicate checks, and bounded body nesting. The syntax fuzz target exercises trait/impl parsing. Commit `eefd7dc479375a861cd799d0bf9ec25fbb6d2e44` is awaiting CI. This does not complete M1.1: bodies remain opaque token spans and no v0.5 feature is integrated into the executable compiler.
+
+**Latest verified update (2026-11-19):** implementation head `d9270d6c9d6be68439aa1ddee5295325897dcec3`; CI #842 passed Linux/macOS/Windows with workspace tests, formatting, Clippy and rustdoc. The trait/impl parser slice now enforces a first `self` receiver and captures bodies opaquely. Fuzz #371 is in progress. Earlier CI failures were fixed; do not treat those attempts as passing. No compiler integration yet; M1.1 incomplete, M1.2–M8 remain.
