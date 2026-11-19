@@ -13,6 +13,8 @@ fuzz_target!(|input: &[u8]| {
                 let _ = hk::syntax_v05::parse_struct_literal(&tokens, &mut cursor);
                 cursor = 0;
                 let _ = hk::syntax_v05::parse_enum_constructor(&tokens, &mut cursor);
+                cursor = 0;
+                let _ = hk::syntax_v05::parse_match_statement(&tokens, &mut cursor);
                 let _ = hk::syntax_v05::parse_type_expr(&tokens, &mut cursor);
                 cursor = 0;
                 let _ = hk::syntax_v05::parse_generic_parameters(&tokens, &mut cursor);
