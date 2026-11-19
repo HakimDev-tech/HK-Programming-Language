@@ -1672,3 +1672,129 @@ mod v05_struct_literal_parser_tests {
         assert_eq!(cursor, 0);
     }
 }
+
+ 
+// ---- Enum constructor syntax (staged M1.1 slice) --------------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05EnumConstructor {
+    pub enum_type: TypeExpr,
+    pub variant: String,
+    pub payload_spans: Vec<Range<usize>>,
+    pub span: Range<usize>,
+}
+
+/// Parses a fully-qualified enum constructor and retains payload expression
+/// spans; payload expressions and expected-arity/type checks remain later phases.
+pub fn parse_enum_constructor(tokens: &[V05Token], cursor: &mut usize) -> Result<V05EnumConstructor, V05ParseError> {
+    let original = *cursor;
+    match parse_enum_constructor_at(tokens, cursor) {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            *cursor = original;
+            Err(error)
+        }
+    }
+}
+
+fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V05EnumConstructor, V05ParseError> {
+    let enum_type = parse_type_expr(tokens, cursor)?;
+    let start = ty_span_start(&enum_type);
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::DoubleColon) {
+        return Err(parse_error(tokens, *cursor, "Expected '::' before enum variant."));
+    }
+    *cursor += 1;
+    let variant_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected enum variant name."))?;
+    let variant = match &variant_token.kind {
+        V05TokenKind::Identifier(name) => name.clone(),
+        _ => return Err(parse_error(tokens, *cursor, "Expected enum variant name.")),
+    };
+    *cursor += 1;
+    let mut payload_spans = Vec::new();
+    if is_punctuation(tokens.get(*cursor), V05Punctuation::LeftParen) {
+        *cursor += 1;
+        while !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
+            let value_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Unterminated enum constructor payload."))?;
+            let value_start = value_token.span.start;
+            let mut depth = 0usize;
+            let mut value_end = value_start;
+            while *cursor < tokens.len() {
+                let token = &tokens[*cursor];
+                match token.kind {
+                    V05TokenKind::Punctuation(
+                        V05Punctuation::LeftParen | V05Punctuation::LeftBracket | V05Punctuation::LeftBrace,
+                    ) => depth += 1,
+                    V05TokenKind::Punctuation(V05Punctuation::RightParen) if depth == 0 => break,
+                    V05TokenKind::Punctuation(V05Punctuation::RightParen | V05Punctuation::RightBracket | V05Punctuation::RightBrace) => {
+                        if depth == 0 {
+                            return Err(parse_error(tokens, *cursor, "Unbalanced enum payload delimiter."));
+                        }
+                        depth -= 1;
+                    }
+                    V05TokenKind::Punctuation(V05Punctuation::Comma) if depth == 0 => break,
+                    _ => {}
+                }
+                value_end = token.span.end;
+                *cursor += 1;
+                if depth > 64 {
+                    return Err(parse_error(tokens, *cursor, "Maximum enum payload nesting (64) exceeded."));
+                }
+            }
+            if value_end == value_start {
+                return Err(parse_error(tokens, *cursor, "Enum payload expression cannot be empty."));
+            }
+            payload_spans.push(value_start..value_end);
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+                *cursor += 1;
+                if is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
+            return Err(parse_error(tokens, *cursor, "Expected ')' to close enum constructor."));
+        }
+        *cursor += 1;
+    }
+    let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(variant_token.span.end);
+    Ok(V05EnumConstructor { enum_type, variant, payload_spans, span: start..end })
+}
+
+#[cfg(test)]
+mod v05_enum_constructor_parser_tests {
+    use super::{lex_v05, parse_enum_constructor};
+
+    #[test]
+    fn parses_unit_and_tuple_enum_constructors() {
+        let tokens = lex_v05("Direction::North").unwrap();
+        let mut cursor = 0;
+        let value = parse_enum_constructor(&tokens, &mut cursor).unwrap();
+        assert_eq!(value.variant, "North");
+        assert!(value.payload_spans.is_empty());
+
+        let tokens = lex_v05("Result<number, string>::Ok(1, [2, 3],)").unwrap();
+        let mut cursor = 0;
+        let value = parse_enum_constructor(&tokens, &mut cursor).unwrap();
+        assert_eq!(value.variant, "Ok");
+        assert_eq!(value.payload_spans.len(), 2);
+        assert_eq!(cursor, tokens.len());
+    }
+
+    #[test]
+    fn rejects_empty_and_unterminated_enum_payloads() {
+        let empty = lex_v05("Result::Ok(,)").unwrap();
+        assert!(parse_enum_constructor(&empty, &mut 0).is_err());
+        let missing_close = lex_v05("Result::Ok(1").unwrap();
+        assert!(parse_enum_constructor(&missing_close, &mut 0).is_err());
+    }
+
+    #[test]
+    fn enum_constructor_parse_failure_rolls_back_cursor() {
+        let tokens = lex_v05("Result::Ok(, 1)").unwrap();
+        let mut cursor = 0;
+        assert!(parse_enum_constructor(&tokens, &mut cursor).is_err());
+        assert_eq!(cursor, 0);
+    }
+}
