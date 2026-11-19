@@ -1427,6 +1427,21 @@ mod tests {
     }
 
     #[test]
+    fn rejects_extra_trait_methods_and_inherent_trait_name_conflicts() {
+        let extra = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"p\"; } fn extra(self) { } }";
+        let tokens = lex_v05(extra).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("not declared by the trait"));
+
+        let conflict = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Point { fn display(self) -> string { return \"p\"; } } impl Display for Point { fn display(self) -> string { return \"p\"; } }";
+        let tokens = lex_v05(conflict).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("conflict"));
+    }
+
+    #[test]
     fn rejects_duplicate_trait_impl_pairs_and_inherent_methods() {
         let duplicate_impl = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"a\"; } } impl Display for Point { fn display(self) -> string { return \"b\"; } }";
         let tokens = lex_v05(duplicate_impl).unwrap();
