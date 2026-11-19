@@ -1673,7 +1673,6 @@ mod v05_struct_literal_parser_tests {
     }
 }
 
- 
 // ---- Enum constructor syntax (staged M1.1 slice) --------------------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1686,7 +1685,10 @@ pub struct V05EnumConstructor {
 
 /// Parses a fully-qualified enum constructor and retains payload expression
 /// spans; payload expressions and expected-arity/type checks remain later phases.
-pub fn parse_enum_constructor(tokens: &[V05Token], cursor: &mut usize) -> Result<V05EnumConstructor, V05ParseError> {
+pub fn parse_enum_constructor(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+) -> Result<V05EnumConstructor, V05ParseError> {
     let original = *cursor;
     match parse_enum_constructor_at(tokens, cursor) {
         Ok(value) => Ok(value),
@@ -1697,14 +1699,23 @@ pub fn parse_enum_constructor(tokens: &[V05Token], cursor: &mut usize) -> Result
     }
 }
 
-fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V05EnumConstructor, V05ParseError> {
+fn parse_enum_constructor_at(
+    tokens: &[V05Token],
+    cursor: &mut usize,
+) -> Result<V05EnumConstructor, V05ParseError> {
     let enum_type = parse_type_expr(tokens, cursor)?;
     let start = ty_span_start(&enum_type);
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::DoubleColon) {
-        return Err(parse_error(tokens, *cursor, "Expected '::' before enum variant."));
+        return Err(parse_error(
+            tokens,
+            *cursor,
+            "Expected '::' before enum variant.",
+        ));
     }
     *cursor += 1;
-    let variant_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected enum variant name."))?;
+    let variant_token = tokens
+        .get(*cursor)
+        .ok_or_else(|| parse_error(tokens, *cursor, "Expected enum variant name."))?;
     let variant = match &variant_token.kind {
         V05TokenKind::Identifier(name) => name.clone(),
         _ => return Err(parse_error(tokens, *cursor, "Expected enum variant name.")),
@@ -1714,7 +1725,9 @@ fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<
     if is_punctuation(tokens.get(*cursor), V05Punctuation::LeftParen) {
         *cursor += 1;
         while !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
-            let value_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Unterminated enum constructor payload."))?;
+            let value_token = tokens.get(*cursor).ok_or_else(|| {
+                parse_error(tokens, *cursor, "Unterminated enum constructor payload.")
+            })?;
             let value_start = value_token.span.start;
             let mut depth = 0usize;
             let mut value_end = value_start;
@@ -1722,12 +1735,22 @@ fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<
                 let token = &tokens[*cursor];
                 match token.kind {
                     V05TokenKind::Punctuation(
-                        V05Punctuation::LeftParen | V05Punctuation::LeftBracket | V05Punctuation::LeftBrace,
+                        V05Punctuation::LeftParen
+                        | V05Punctuation::LeftBracket
+                        | V05Punctuation::LeftBrace,
                     ) => depth += 1,
                     V05TokenKind::Punctuation(V05Punctuation::RightParen) if depth == 0 => break,
-                    V05TokenKind::Punctuation(V05Punctuation::RightParen | V05Punctuation::RightBracket | V05Punctuation::RightBrace) => {
+                    V05TokenKind::Punctuation(
+                        V05Punctuation::RightParen
+                        | V05Punctuation::RightBracket
+                        | V05Punctuation::RightBrace,
+                    ) => {
                         if depth == 0 {
-                            return Err(parse_error(tokens, *cursor, "Unbalanced enum payload delimiter."));
+                            return Err(parse_error(
+                                tokens,
+                                *cursor,
+                                "Unbalanced enum payload delimiter.",
+                            ));
                         }
                         depth -= 1;
                     }
@@ -1737,11 +1760,19 @@ fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<
                 value_end = token.span.end;
                 *cursor += 1;
                 if depth > 64 {
-                    return Err(parse_error(tokens, *cursor, "Maximum enum payload nesting (64) exceeded."));
+                    return Err(parse_error(
+                        tokens,
+                        *cursor,
+                        "Maximum enum payload nesting (64) exceeded.",
+                    ));
                 }
             }
             if value_end == value_start {
-                return Err(parse_error(tokens, *cursor, "Enum payload expression cannot be empty."));
+                return Err(parse_error(
+                    tokens,
+                    *cursor,
+                    "Enum payload expression cannot be empty.",
+                ));
             }
             payload_spans.push(value_start..value_end);
             if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
@@ -1754,12 +1785,21 @@ fn parse_enum_constructor_at(tokens: &[V05Token], cursor: &mut usize) -> Result<
             }
         }
         if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
-            return Err(parse_error(tokens, *cursor, "Expected ')' to close enum constructor."));
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Expected ')' to close enum constructor.",
+            ));
         }
         *cursor += 1;
     }
     let end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(variant_token.span.end);
-    Ok(V05EnumConstructor { enum_type, variant, payload_spans, span: start..end })
+    Ok(V05EnumConstructor {
+        enum_type,
+        variant,
+        payload_spans,
+        span: start..end,
+    })
 }
 
 #[cfg(test)]
