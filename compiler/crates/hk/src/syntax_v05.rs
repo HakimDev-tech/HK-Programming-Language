@@ -372,7 +372,7 @@ pub fn validate_v05_coherence(
         })
         .collect();
 
-    let mut trait_impls = HashSet::new();
+    let mut trait_impls: Vec<(String, TypeExpr, HashSet<String>, Range<usize>)> = Vec::new();
     let mut inherent_methods: HashMap<String, HashSet<String>> = HashMap::new();
     let mut trait_methods_by_target: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -404,14 +404,32 @@ pub fn validate_v05_coherence(
                     "Trait impl violates the orphan rule: neither trait nor target type is local.",
                 ));
             }
-            let pair = format!("{trait_name} for {target_key}");
-            if !trait_impls.insert(pair) {
+            let generic_names: HashSet<String> = implementation
+                .generics
+                .iter()
+                .map(|bound| bound.parameter.clone())
+                .collect();
+            if trait_impls.iter().any(|(existing_trait, existing_target, existing_generics, _)| {
+                existing_trait == trait_name
+                    && type_patterns_overlap(
+                        existing_target,
+                        existing_generics,
+                        &implementation.target,
+                        &generic_names,
+                    )
+            }) {
                 return Err(parse_error_at_span(
                     tokens,
                     implementation.span.clone(),
-                    "Duplicate trait implementation for the same trait and target type.",
+                    "Overlapping trait implementation for the same trait and target type.",
                 ));
             }
+            trait_impls.push((
+                trait_name.clone(),
+                implementation.target.clone(),
+                generic_names,
+                implementation.span.clone(),
+            ));
         }
 
         let mut current_names = HashSet::new();
@@ -571,6 +589,45 @@ fn canonical_type(ty: &TypeExpr) -> String {
                         .join(",")
                 )
             }
+        }
+    }
+}
+
+fn type_patterns_overlap(
+    left: &TypeExpr,
+    left_parameters: &std::collections::HashSet<String>,
+    right: &TypeExpr,
+    right_parameters: &std::collections::HashSet<String>,
+) -> bool {
+    match (left, right) {
+        (TypeExpr::Any { .. }, _) | (_, TypeExpr::Any { .. }) => true,
+        (
+            TypeExpr::Named {
+                name: left_name,
+                arguments: left_arguments,
+                ..
+            },
+            TypeExpr::Named {
+                name: right_name,
+                arguments: right_arguments,
+                ..
+            },
+        ) => {
+            let left_variable = left_parameters.contains(left_name) && left_arguments.is_empty();
+            let right_variable = right_parameters.contains(right_name) && right_arguments.is_empty();
+            if left_variable || right_variable {
+                return true;
+            }
+            left_name == right_name
+                && left_arguments.len() == right_arguments.len()
+                && left_arguments.iter().zip(right_arguments).all(|(left, right)| {
+                    type_patterns_overlap(
+                        left,
+                        left_parameters,
+                        right,
+                        right_parameters,
+                    )
+                })
         }
     }
 }
