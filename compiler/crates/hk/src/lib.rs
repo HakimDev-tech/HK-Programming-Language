@@ -94,6 +94,12 @@ mod tests {
     }
 
     #[test]
+    fn module_functions_support_mutual_recursion() {
+        let source = "print(even(10)); fn even(value) { if (value == 0) { return true; } else { return odd(value - 1); } } fn odd(value) { if (value == 0) { return false; } else { return even(value - 1); } }";
+        assert_eq!(run("mutual.hk", source).unwrap(), vec!["true"]);
+    }
+
+    #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
     }
