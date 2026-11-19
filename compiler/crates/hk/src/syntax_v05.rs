@@ -112,22 +112,10 @@ pub fn infer_v05_function_type_arguments(
     }
 
     for (parameter, argument) in function.parameters.iter().zip(argument_types) {
-        infer_v05_constraint(
-            &parameter.ty,
-            argument,
-            &generic_names,
-            &mut substitutions,
-        )?;
+        infer_v05_constraint(&parameter.ty, argument, &generic_names, &mut substitutions)?;
     }
-    if let (Some(return_pattern), Some(expected)) =
-        (&function.return_type, expected_return)
-    {
-        infer_v05_constraint(
-            return_pattern,
-            expected,
-            &generic_names,
-            &mut substitutions,
-        )?;
+    if let (Some(return_pattern), Some(expected)) = (&function.return_type, expected_return) {
+        infer_v05_constraint(return_pattern, expected, &generic_names, &mut substitutions)?;
     }
 
     let mut inferred = Vec::with_capacity(function.generics.len());
@@ -202,7 +190,9 @@ fn infer_v05_constraint(
                 name: actual_name,
                 arguments: actual_arguments,
                 ..
-            } if pattern_name == actual_name && pattern_arguments.len() == actual_arguments.len() => {
+            } if pattern_name == actual_name
+                && pattern_arguments.len() == actual_arguments.len() =>
+            {
                 for (pattern_argument, actual_argument) in
                     pattern_arguments.iter().zip(actual_arguments)
                 {
@@ -230,7 +220,9 @@ fn infer_v05_constraint(
 fn is_v05_any_type(ty: &TypeExpr) -> bool {
     match ty {
         TypeExpr::Any { .. } => true,
-        TypeExpr::Named { name, arguments, .. } => name == "any" && arguments.is_empty(),
+        TypeExpr::Named {
+            name, arguments, ..
+        } => name == "any" && arguments.is_empty(),
     }
 }
 
@@ -260,11 +252,7 @@ fn v05_type_satisfies_trait(
             .iter()
             .map(|bound| bound.parameter.clone())
             .collect();
-        type_pattern_matches(
-            &implementation.target,
-            &generic_names,
-            argument,
-        )
+        type_pattern_matches(&implementation.target, &generic_names, argument)
     })
 }
 
@@ -276,9 +264,7 @@ fn type_pattern_matches(
     match pattern {
         TypeExpr::Any { .. } => false,
         TypeExpr::Named {
-            name,
-            arguments,
-            ..
+            name, arguments, ..
         } if generic_parameters.contains(name) && arguments.is_empty() => true,
         TypeExpr::Named {
             name: pattern_name,
@@ -289,7 +275,9 @@ fn type_pattern_matches(
                 name: actual_name,
                 arguments: actual_arguments,
                 ..
-            } if pattern_name == actual_name && pattern_arguments.len() == actual_arguments.len() => {
+            } if pattern_name == actual_name
+                && pattern_arguments.len() == actual_arguments.len() =>
+            {
                 pattern_arguments
                     .iter()
                     .zip(actual_arguments)
@@ -1722,7 +1710,8 @@ mod tests {
 
     #[test]
     fn infers_generic_function_arguments_from_arguments_and_expected_return() {
-        let source = "fn identity<T>(value: T) -> T { return value; } fn create<T>() -> T { return null; }";
+        let source =
+            "fn identity<T>(value: T) -> T { return value; } fn create<T>() -> T { return null; }";
         let tokens = lex_v05(source).unwrap();
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
         let functions = declarations
@@ -1788,14 +1777,9 @@ mod tests {
         .unwrap_err();
         assert!(conflict.message.contains("Conflicting constraints"));
 
-        let ambiguous = infer_v05_generic_function_type_arguments(
-            &functions[1],
-            &[],
-            None,
-            None,
-            &[],
-        )
-        .unwrap_err();
+        let ambiguous =
+            infer_v05_generic_function_type_arguments(&functions[1], &[], None, None, &[])
+                .unwrap_err();
         assert!(ambiguous.message.contains("Cannot infer generic parameter"));
 
         let bound = infer_v05_generic_function_type_arguments(
