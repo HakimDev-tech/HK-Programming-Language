@@ -1279,8 +1279,6 @@ mod v05_trait_impl_parser_tests {
     }
 }
 
- 
-
 // ---- Generic function declaration syntax (staged M1.1 slice) --------------
 
 #[derive(Clone, Debug, PartialEq, Eq)]
