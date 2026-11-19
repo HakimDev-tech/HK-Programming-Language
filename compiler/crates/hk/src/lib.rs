@@ -88,6 +88,12 @@ mod tests {
     }
 
     #[test]
+    fn typed_forward_function_calls_are_checked_and_executable() {
+        let source = "fn first(value: number) -> number { return later(value); } fn later(value: number) -> number { return value * 2; } print(first(5));";
+        assert_eq!(run("forward-typed.hk", source).unwrap(), vec!["10"]);
+    }
+
+    #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
     }
