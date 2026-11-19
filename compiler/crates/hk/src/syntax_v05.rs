@@ -4,6 +4,7 @@
 //! declaration collection, type checking, bytecode lowering, and VM support
 //! can be integrated atomically. It provides the lossless lexical contract and
 //! recursive type-expression model used by the staged 0.5 parser.
+use std::collections::HashSet;
 use std::ops::Range;
 
 const MAX_V05_SOURCE_BYTES: usize = 1_048_576;
