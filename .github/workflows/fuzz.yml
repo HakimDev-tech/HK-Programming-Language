@@ -37,6 +37,10 @@ jobs:
         run: cargo fuzz build run
       - name: Fuzz HK source parser and interpreter
         run: cargo fuzz run run -- -max_total_time=45 -max_len=4096
+      - name: Build v0.5 syntax fuzz target
+        run: cargo fuzz build syntax_v05
+      - name: Fuzz v0.5 lexer, type-expression and nominal parsers
+        run: cargo fuzz run syntax_v05 -- -max_total_time=30 -max_len=4096
       - name: Build module resolver fuzz target
         run: cargo fuzz build modules
       - name: Fuzz module specifiers and filesystem resolution
