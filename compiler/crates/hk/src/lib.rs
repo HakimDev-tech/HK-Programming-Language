@@ -82,6 +82,12 @@ mod tests {
     }
 
     #[test]
+    fn module_functions_are_hoisted_for_forward_calls() {
+        let source = "print(first(4)); fn first(value) { return later(value) + 1; } fn later(value) { return value * 2; }";
+        assert_eq!(run("forward.hk", source).unwrap(), vec!["9"]);
+    }
+
+    #[test]
     fn arithmetic_precedence() {
         assert_eq!(run("test.hk", "print(10 + 5 * 2);").unwrap(), vec!["20"]);
     }
