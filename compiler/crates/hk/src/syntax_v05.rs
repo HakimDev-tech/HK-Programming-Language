@@ -6,6 +6,9 @@
 //! recursive type-expression model used by the staged 0.5 parser.
 use std::ops::Range;
 
+const MAX_V05_GENERIC_PARAMETERS: usize = 256;
+const MAX_V05_TRAIT_BOUNDS_PER_PARAMETER: usize = 256;
+
 /// Keywords introduced by HK 0.5.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum V05Keyword {
@@ -352,6 +355,7 @@ pub fn parse_generic_parameters(
     }
     *cursor += 1;
     let mut parameters = Vec::new();
+    let mut parameter_names = std::collections::HashSet::new();
     loop {
         let start = *cursor;
         let token = tokens
@@ -367,8 +371,12 @@ pub fn parse_generic_parameters(
                 ))
             }
         };
+        if !parameter_names.insert(parameter.clone()) {
+            return Err(parse_error(tokens, *cursor, "Duplicate generic parameter."));
+        }
         *cursor += 1;
         let mut traits = Vec::new();
+        let mut trait_names = std::collections::HashSet::new();
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Colon) {
             *cursor += 1;
             loop {
@@ -376,7 +384,12 @@ pub fn parse_generic_parameters(
                     .get(*cursor)
                     .ok_or_else(|| parse_error(tokens, *cursor, "Expected a trait bound."))?;
                 match &bound.kind {
-                    V05TokenKind::Identifier(name) => traits.push(name.clone()),
+                    V05TokenKind::Identifier(name) => {
+                        if !trait_names.insert(name.clone()) {
+                            return Err(parse_error(tokens, *cursor, "Duplicate trait bound."));
+                        }
+                        traits.push(name.clone());
+                    },
                     _ => {
                         return Err(parse_error(
                             tokens,
@@ -386,6 +399,13 @@ pub fn parse_generic_parameters(
                     }
                 }
                 *cursor += 1;
+                if traits.len() > MAX_V05_TRAIT_BOUNDS_PER_PARAMETER {
+                    return Err(parse_error(
+                        tokens,
+                        *cursor,
+                        "Trait-bound list exceeds the supported limit (256).",
+                    ));
+                }
                 if is_punctuation(tokens.get(*cursor), V05Punctuation::Plus) {
                     *cursor += 1;
                 } else {
@@ -402,6 +422,13 @@ pub fn parse_generic_parameters(
             traits,
             span: token.span.start..end,
         });
+        if parameters.len() > MAX_V05_GENERIC_PARAMETERS {
+            return Err(parse_error(
+                tokens,
+                *cursor,
+                "Generic parameter list exceeds the supported limit (256).",
+            ));
+        }
         if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
             *cursor += 1;
             if is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
@@ -414,13 +441,7 @@ pub fn parse_generic_parameters(
         } else {
             break;
         }
-        if *cursor - start > 256 {
-            return Err(parse_error(
-                tokens,
-                *cursor,
-                "Generic parameter list exceeds the supported limit.",
-            ));
-        }
+        let _ = start;
     }
     if !is_punctuation(tokens.get(*cursor), V05Punctuation::Greater) {
         return Err(parse_error(
@@ -754,6 +775,31 @@ mod tests {
     fn nominal_parser_rejects_trailing_unknown_syntax_and_unclosed_blocks() {
         assert!(parse_nominal_declarations(&lex_v05("struct S {} fn f() {}").unwrap()).is_err());
         assert!(parse_nominal_declarations(&lex_v05("enum E { A").unwrap()).is_err());
+    }
+
+    #[test]
+    fn generic_parameter_parser_rejects_duplicates_and_caps_lists() {
+        let duplicate = lex_v05("<T, T>").unwrap();
+        let mut cursor = 0;
+        assert!(parse_generic_parameters(&duplicate, &mut cursor)
+            .unwrap_err()
+            .message
+            .contains("Duplicate generic"));
+
+        let repeated_bound = lex_v05("<T: Display + Display>").unwrap();
+        let mut cursor = 0;
+        assert!(parse_generic_parameters(&repeated_bound, &mut cursor)
+            .unwrap_err()
+            .message
+            .contains("Duplicate trait"));
+
+        let many = format!("<{}>", (0..257).map(|i| format!("T{i}")).collect::<Vec<_>>().join(","));
+        let tokens = lex_v05(&many).unwrap();
+        let mut cursor = 0;
+        assert!(parse_generic_parameters(&tokens, &mut cursor)
+            .unwrap_err()
+            .message
+            .contains("supported limit"));
     }
     #[test]
     fn recognizes_v05_keywords_and_generic_punctuation() {
