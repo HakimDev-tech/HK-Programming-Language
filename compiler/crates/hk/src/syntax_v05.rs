@@ -1763,7 +1763,14 @@ mod tests {
     fn generic_inference_rejects_conflicts_ambiguity_and_unsatisfied_bounds() {
         let source = "fn pair<T>(left: T, right: T) -> T { return left; } fn create<T>() -> T { return null; } trait Display { fn display(self) -> string; } fn render<T: Display>(value: T) -> string { return value.display(); }";
         let tokens = lex_v05(source).unwrap();
-        let functions = parse_function_declarations(&tokens).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let functions = declarations
+            .iter()
+            .filter_map(|declaration| match declaration {
+                V05TopLevelDeclaration::Function(function) => Some(function.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
         let number = lex_v05("number").unwrap();
         let string = lex_v05("string").unwrap();
         let mut cursor = 0;
