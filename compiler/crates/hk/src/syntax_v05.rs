@@ -864,3 +864,308 @@ mod tests {
         }
     }
 }
+
+
+// ---- Trait and impl declaration parsing (staged M1.1 slice) ----------------
+
+/// A named, typed instance-method parameter. The receiver is represented as the
+/// ordinary first parameter and validated by later semantic analysis.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05MethodParameter {
+    pub name: String,
+    pub ty: Option<TypeExpr>,
+    pub span: Range<usize>,
+}
+
+/// Method signature/body shape. Trait methods have no body; impl methods retain
+/// their body token range for a later expression-parser integration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05Method {
+    pub name: String,
+    pub parameters: Vec<V05MethodParameter>,
+    pub return_type: Option<TypeExpr>,
+    pub body_span: Option<Range<usize>>,
+    pub span: Range<usize>,
+}
+
+/// Trait declaration: method signatures only, per the normative v0.5 contract.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05TraitDecl {
+    pub name: String,
+    pub methods: Vec<V05Method>,
+    pub span: Range<usize>,
+}
+
+/// An impl declaration. A missing trait name denotes an inherent impl.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05ImplDecl {
+    pub generics: Vec<GenericBound>,
+    pub target: TypeExpr,
+    pub trait_name: Option<String>,
+    pub methods: Vec<V05Method>,
+    pub span: Range<usize>,
+}
+
+/// Parses trait signatures and impl method headers, preserving impl bodies as
+/// token spans. This is syntax-only: bodies are not expression-parsed and no
+/// declaration is integrated into the executable compiler by this API.
+pub fn parse_trait_and_impl_declarations(
+    tokens: &[V05Token],
+) -> Result<Vec<V05TraitOrImpl>, V05ParseError> {
+    let mut parser = V05TraitImplParser { tokens, cursor: 0 };
+    let mut declarations = Vec::new();
+    while parser.cursor < tokens.len() {
+        let declaration = match parser.peek_keyword() {
+            Some(V05Keyword::Trait) => parser.parse_trait().map(V05TraitOrImpl::Trait),
+            Some(V05Keyword::Impl) => parser.parse_impl().map(V05TraitOrImpl::Impl),
+            _ => Err(parser.error("Expected a trait or impl declaration.")),
+        };
+        declarations.push(declaration?);
+    }
+    Ok(declarations)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum V05TraitOrImpl {
+    Trait(V05TraitDecl),
+    Impl(V05ImplDecl),
+}
+
+struct V05TraitImplParser<'a> {
+    tokens: &'a [V05Token],
+    cursor: usize,
+}
+
+impl V05TraitImplParser<'_> {
+    fn peek_keyword(&self) -> Option<V05Keyword> {
+        match self.tokens.get(self.cursor)?.kind {
+            V05TokenKind::Keyword(keyword) => Some(keyword),
+            _ => None,
+        }
+    }
+
+    fn error(&self, message: &str) -> V05ParseError {
+        parse_error(self.tokens, self.cursor, message)
+    }
+
+    fn expect_identifier(&mut self, what: &str) -> Result<String, V05ParseError> {
+        let token = self.tokens.get(self.cursor).ok_or_else(|| self.error(what))?;
+        if let V05TokenKind::Identifier(name) = &token.kind {
+            self.cursor += 1;
+            Ok(name.clone())
+        } else {
+            Err(self.error(what))
+        }
+    }
+
+    fn expect_punctuation(&mut self, punctuation: V05Punctuation, message: &str) -> Result<(), V05ParseError> {
+        if is_punctuation(self.tokens.get(self.cursor), punctuation) {
+            self.cursor += 1;
+            Ok(())
+        } else {
+            Err(self.error(message))
+        }
+    }
+
+    fn parse_trait(&mut self) -> Result<V05TraitDecl, V05ParseError> {
+        let start = self.tokens[self.cursor].span.start;
+        self.cursor += 1; // trait
+        let name = self.expect_identifier("Expected trait name.")?;
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected '{' after trait name.")?;
+        let mut methods = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+            if self.cursor >= self.tokens.len() {
+                return Err(self.error("Unterminated trait declaration."));
+            }
+            let method = self.parse_method(false)?;
+            if !names.insert(method.name.clone()) {
+                return Err(self.error("Duplicate trait method."));
+            }
+            methods.push(method);
+        }
+        self.cursor += 1;
+        let end = self.tokens[self.cursor - 1].span.end;
+        Ok(V05TraitDecl { name, methods, span: start..end })
+    }
+
+    fn parse_impl(&mut self) -> Result<V05ImplDecl, V05ParseError> {
+        let start = self.tokens[self.cursor].span.start;
+        self.cursor += 1; // impl
+        let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
+        let first = parse_type_expr(self.tokens, &mut self.cursor)?;
+        let (trait_name, target) = if self.tokens.get(self.cursor).is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(s) if s == "for")) {
+            self.cursor += 1;
+            let target = parse_type_expr(self.tokens, &mut self.cursor)?;
+            let trait_name = match first {
+                TypeExpr::Named { name, arguments, .. } if arguments.is_empty() => name,
+                _ => return Err(self.error("Trait name in impl must be a non-generic identifier here.")),
+            };
+            (Some(trait_name), target)
+        } else {
+            (None, first)
+        };
+        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected '{' to begin impl body.")?;
+        let mut methods = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
+            if self.cursor >= self.tokens.len() {
+                return Err(self.error("Unterminated impl declaration."));
+            }
+            let method = self.parse_method(true)?;
+            if !names.insert(method.name.clone()) {
+                return Err(self.error("Duplicate impl method."));
+            }
+            methods.push(method);
+        }
+        self.cursor += 1;
+        let end = self.tokens[self.cursor - 1].span.end;
+        Ok(V05ImplDecl { generics, target, trait_name, methods, span: start..end })
+    }
+
+    fn parse_method(&mut self, has_body: bool) -> Result<V05Method, V05ParseError> {
+        let start = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected method declaration."))?.span.start;
+        // fn is not a dedicated v0.5 keyword yet; it is an identifier token.
+        if !self.tokens.get(self.cursor).is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "fn")) {
+            return Err(self.error("Expected 'fn' method declaration."));
+        }
+        self.cursor += 1;
+        let name = self.expect_identifier("Expected method name.")?;
+        self.expect_punctuation(V05Punctuation::LeftParen, "Expected '(' after method name.")?;
+        let mut parameters = Vec::new();
+        let mut names = std::collections::HashSet::new();
+        if !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+            loop {
+                let token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected method parameter."))?;
+                let pname = match &token.kind {
+                    V05TokenKind::Identifier(name) => name.clone(),
+                    _ => return Err(self.error("Expected parameter name.")),
+                };
+                if !names.insert(pname.clone()) {
+                    return Err(self.error("Duplicate method parameter."));
+                }
+                self.cursor += 1;
+                let ty = if pname == "self" {
+                    if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Colon) {
+                        return Err(self.error("The self receiver type is inferred and must not be annotated."));
+                    }
+                    None
+                } else {
+                    self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after parameter name.")?;
+                    Some(parse_type_expr(self.tokens, &mut self.cursor)?)
+                };
+                let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
+                parameters.push(V05MethodParameter { name: pname, ty, span: token.span.start..end });
+                if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
+                    self.cursor += 1;
+                    if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after method parameters.")?;
+        let return_type = if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Arrow) {
+            self.cursor += 1;
+            Some(parse_type_expr(self.tokens, &mut self.cursor)?)
+        } else {
+            None
+        };
+        let body_span = if has_body {
+            self.expect_punctuation(V05Punctuation::LeftBrace, "Expected method body '{'.")?;
+            let body_start = self.tokens[self.cursor - 1].span.start;
+            let mut depth = 1usize;
+            while self.cursor < self.tokens.len() && depth > 0 {
+                match self.tokens[self.cursor].kind {
+                    V05TokenKind::Punctuation(V05Punctuation::LeftBrace) => depth += 1,
+                    V05TokenKind::Punctuation(V05Punctuation::RightBrace) => depth -= 1,
+                    _ => {}
+                }
+                self.cursor += 1;
+                if depth > 64 {
+                    return Err(self.error("Maximum method-body brace nesting depth (64) exceeded."));
+                }
+            }
+            if depth != 0 {
+                return Err(self.error("Unterminated method body."));
+            }
+            Some(body_start..self.tokens[self.cursor - 1].span.end)
+        } else {
+            self.expect_punctuation(V05Punctuation::Semicolon, "Trait method signatures must end with ';'.")?;
+            None
+        };
+        let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(start);
+        Ok(V05Method { name, parameters, return_type, body_span, span: start..end })
+    }
+}
+
+#[cfg(test)]
+mod v05_trait_impl_parser_tests {
+    use super::{lex_v05, parse_trait_and_impl_declarations, V05TraitOrImpl};
+
+    #[test]
+    fn parses_trait_signatures_and_generic_inherent_impl_methods() {
+        let tokens = lex_v05("trait Display { fn display(self) -> string; } impl<T: Display> Box<T> { fn get(self) -> T { return self.value; } }").unwrap();
+        let declarations = parse_trait_and_impl_declarations(&tokens).unwrap();
+        assert_eq!(declarations.len(), 2);
+        match &declarations[0] {
+            V05TraitOrImpl::Trait(decl) => {
+                assert_eq!(decl.name, "Display");
+                assert_eq!(decl.methods[0].name, "display");
+                assert_eq!(decl.methods[0].parameters[0].name, "self");
+                assert_eq!(decl.methods[0].return_type.as_ref().unwrap(), &super::TypeExpr::Named { name: "string".into(), arguments: vec![], span: 36..42 });
+                assert!(decl.methods[0].body_span.is_none());
+            }
+            _ => panic!("expected trait"),
+        }
+        match &declarations[1] {
+            V05TraitOrImpl::Impl(decl) => {
+                assert_eq!(decl.generics[0].parameter, "T");
+                assert_eq!(decl.target, super::TypeExpr::Named { name: "Box".into(), arguments: vec![super::TypeExpr::Named { name: "T".into(), arguments: vec![], span: 71..72 }], span: 67..73 });
+                assert_eq!(decl.methods[0].name, "get");
+                assert!(decl.methods[0].body_span.is_some());
+            }
+            _ => panic!("expected impl"),
+        }
+    }
+
+    #[test]
+    fn parses_trait_impl_and_captures_body_without_parsing_expressions() {
+        let tokens = lex_v05("trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"p\"; } }").unwrap();
+        let declarations = parse_trait_and_impl_declarations(&tokens).unwrap();
+        match &declarations[1] {
+            V05TraitOrImpl::Impl(decl) => {
+                assert_eq!(decl.trait_name.as_deref(), Some("Display"));
+                assert_eq!(decl.target, super::TypeExpr::Named { name: "Point".into(), arguments: vec![], span: 65..70 });
+            }
+            _ => panic!("expected trait impl"),
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_method_names_and_parameter_names() {
+        let duplicate_method = lex_v05("trait T { fn x(self); fn x(self); }").unwrap();
+        assert!(parse_trait_and_impl_declarations(&duplicate_method).is_err());
+        let duplicate_parameter = lex_v05("impl T { fn x(self, value: number, value: string) {} }").unwrap();
+        assert!(parse_trait_and_impl_declarations(&duplicate_parameter).is_err());
+    }
+
+    #[test]
+    fn rejects_missing_receiver_and_annotated_receiver() {
+        let no_receiver = lex_v05("trait T { fn x(value: number); }").unwrap();
+        // Receiver policy is semantic validation, not parser validation; parse accepts this syntax.
+        assert!(parse_trait_and_impl_declarations(&no_receiver).is_ok());
+        let annotated = lex_v05("trait T { fn x(self: T); }").unwrap();
+        assert!(parse_trait_and_impl_declarations(&annotated).is_err());
+    }
+
+    #[test]
+    fn body_capture_is_bounded_and_requires_closing_brace() {
+        let unterminated = lex_v05("impl T { fn x(self) { if (true) { }").unwrap();
+        assert!(parse_trait_and_impl_declarations(&unterminated).is_err());
+        let excessive = lex_v05(&format!("impl T {{ fn x(self) {{ {} }} }}", "{".repeat(70))).unwrap();
+        assert!(parse_trait_and_impl_declarations(&excessive).is_err());
+    }
+}
