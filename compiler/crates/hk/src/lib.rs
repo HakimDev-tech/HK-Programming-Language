@@ -6,6 +6,7 @@ mod ast;
 pub mod bench_support;
 mod bytecode;
 mod compiler;
+mod declaration_collector;
 
 use ast::S;
 pub mod diagnostics;
