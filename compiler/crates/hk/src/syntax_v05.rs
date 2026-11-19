@@ -1841,3 +1841,230 @@ mod v05_enum_constructor_parser_tests {
         assert_eq!(cursor, 0);
     }
 }
+
+ 
+// ---- Statement-level match syntax (staged M1.1 slice) ---------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum V05MatchPattern {
+    Wildcard { span: Range<usize> },
+    Variant {
+        enum_type: TypeExpr,
+        variant: String,
+        bindings: Vec<String>,
+        span: Range<usize>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05MatchArm {
+    pub pattern: V05MatchPattern,
+    pub body_span: Range<usize>,
+    pub span: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05MatchStatement {
+    pub scrutinee_span: Range<usize>,
+    pub arms: Vec<V05MatchArm>,
+    pub span: Range<usize>,
+}
+
+/// Parses statement-level match arms and captures scrutinee/arm-block spans.
+/// Exhaustiveness and pattern/type validation are intentionally semantic stages.
+pub fn parse_match_statement(tokens: &[V05Token], cursor: &mut usize) -> Result<V05MatchStatement, V05ParseError> {
+    let original = *cursor;
+    match parse_match_statement_at(tokens, cursor) {
+        Ok(statement) => Ok(statement),
+        Err(error) => {
+            *cursor = original;
+            Err(error)
+        }
+    }
+}
+
+fn parse_match_statement_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V05MatchStatement, V05ParseError> {
+    let start_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected match statement."))?;
+    if !matches!(&start_token.kind, V05TokenKind::Keyword(V05Keyword::Match)) {
+        return Err(parse_error(tokens, *cursor, "Expected match keyword."));
+    }
+    let start = start_token.span.start;
+    *cursor += 1;
+    let scrutinee_start_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected match scrutinee."))?;
+    let scrutinee_start = scrutinee_start_token.span.start;
+    let mut depth = 0usize;
+    let mut scrutinee_end = scrutinee_start;
+    while *cursor < tokens.len() {
+        let token = &tokens[*cursor];
+        match token.kind {
+            V05TokenKind::Punctuation(V05Punctuation::LeftParen | V05Punctuation::LeftBracket) => depth += 1,
+            V05TokenKind::Punctuation(V05Punctuation::RightParen | V05Punctuation::RightBracket) => {
+                if depth == 0 { return Err(parse_error(tokens, *cursor, "Unbalanced match scrutinee delimiter.")); }
+                depth -= 1;
+            }
+            V05TokenKind::Punctuation(V05Punctuation::LeftBrace) if depth == 0 => break,
+            V05TokenKind::Punctuation(V05Punctuation::LeftBrace) => depth += 1,
+            V05TokenKind::Punctuation(V05Punctuation::RightBrace) => {
+                if depth == 0 { return Err(parse_error(tokens, *cursor, "Expected match arm block after scrutinee.")); }
+                depth -= 1;
+            }
+            _ => {}
+        }
+        scrutinee_end = token.span.end;
+        *cursor += 1;
+        if depth > 64 {
+            return Err(parse_error(tokens, *cursor, "Maximum match scrutinee nesting (64) exceeded."));
+        }
+    }
+    if scrutinee_end == scrutinee_start {
+        return Err(parse_error(tokens, *cursor, "Match scrutinee cannot be empty."));
+    }
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::LeftBrace) {
+        return Err(parse_error(tokens, *cursor, "Expected '{' before match arms."));
+    }
+    *cursor += 1;
+    let mut arms = Vec::new();
+    let mut variant_keys = std::collections::HashSet::new();
+    let mut wildcard_seen = false;
+    while !is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) {
+        if *cursor >= tokens.len() {
+            return Err(parse_error(tokens, *cursor, "Unterminated match statement."));
+        }
+        let arm_start = tokens[*cursor].span.start;
+        let pattern = if is_punctuation(tokens.get(*cursor), V05Punctuation::Underscore) {
+            if wildcard_seen {
+                return Err(parse_error(tokens, *cursor, "Duplicate wildcard match arm."));
+            }
+            wildcard_seen = true;
+            let span = tokens[*cursor].span.clone();
+            *cursor += 1;
+            V05MatchPattern::Wildcard { span }
+        } else {
+            let enum_type = parse_type_expr(tokens, cursor)?;
+            if !is_punctuation(tokens.get(*cursor), V05Punctuation::DoubleColon) {
+                return Err(parse_error(tokens, *cursor, "Match variants must be fully qualified with '::'."));
+            }
+            *cursor += 1;
+            let variant_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected variant name in match pattern."))?;
+            let variant = match &variant_token.kind {
+                V05TokenKind::Identifier(name) => name.clone(),
+                _ => return Err(parse_error(tokens, *cursor, "Expected variant name in match pattern.")),
+            };
+            *cursor += 1;
+            let mut bindings = Vec::new();
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::LeftParen) {
+                *cursor += 1;
+                let mut names = std::collections::HashSet::new();
+                while !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
+                    let binder = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Unterminated match pattern bindings."))?;
+                    let name = match &binder.kind {
+                        V05TokenKind::Identifier(name) => name.clone(),
+                        _ => return Err(parse_error(tokens, *cursor, "Expected pattern binding name.")),
+                    };
+                    if !names.insert(name.clone()) {
+                        return Err(parse_error(tokens, *cursor, "Duplicate match pattern binding."));
+                    }
+                    bindings.push(name);
+                    *cursor += 1;
+                    if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+                        *cursor += 1;
+                        if is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) { break; }
+                    } else { break; }
+                }
+                if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightParen) {
+                    return Err(parse_error(tokens, *cursor, "Expected ')' after pattern bindings."));
+                }
+                *cursor += 1;
+            }
+            let variant_key = (type_expr_name(&enum_type).to_owned(), variant.clone());
+            if !variant_keys.insert(variant_key) {
+                return Err(parse_error(tokens, *cursor, "Duplicate match variant arm."));
+            }
+            let pattern_end = tokens.get(cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(variant_token.span.end);
+            V05MatchPattern::Variant { enum_type, variant, bindings, span: arm_start..pattern_end }
+        };
+        if wildcard_seen && !matches!(pattern, V05MatchPattern::Wildcard { .. }) {
+            return Err(parse_error(tokens, *cursor, "Wildcard match arm must be last."));
+        }
+        // The arrow is lexed as '=' followed by '>' for this staged lexer.
+        if !is_punctuation(tokens.get(*cursor), V05Punctuation::Equal)
+            || !is_punctuation(tokens.get(*cursor + 1), V05Punctuation::Greater)
+        {
+            return Err(parse_error(tokens, *cursor, "Expected '=>' after match pattern."));
+        }
+        *cursor += 2;
+        if !is_punctuation(tokens.get(*cursor), V05Punctuation::LeftBrace) {
+            return Err(parse_error(tokens, *cursor, "Match arm body must be a block."));
+        }
+        let body_start = tokens[*cursor].span.start;
+        let mut body_depth = 0usize;
+        while *cursor < tokens.len() {
+            match tokens[*cursor].kind {
+                V05TokenKind::Punctuation(V05Punctuation::LeftBrace) => body_depth += 1,
+                V05TokenKind::Punctuation(V05Punctuation::RightBrace) => body_depth -= 1,
+                _ => {}
+            }
+            *cursor += 1;
+            if body_depth == 0 { break; }
+            if body_depth > 64 {
+                return Err(parse_error(tokens, *cursor, "Maximum match-arm block nesting (64) exceeded."));
+            }
+        }
+        if body_depth != 0 {
+            return Err(parse_error(tokens, *cursor, "Unterminated match arm block."));
+        }
+        let body_end = tokens[*cursor - 1].span.end;
+        let arm_end = body_end;
+        arms.push(V05MatchArm { pattern, body_span: body_start..body_end, span: arm_start..arm_end });
+        if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+            *cursor += 1;
+        }
+    }
+    if arms.is_empty() {
+        return Err(parse_error(tokens, *cursor, "Match statement requires at least one arm."));
+    }
+    *cursor += 1;
+    let end = tokens[*cursor - 1].span.end;
+    Ok(V05MatchStatement { scrutinee_span: scrutinee_start..scrutinee_end, arms, span: start..end })
+}
+
+fn type_expr_name(ty: &TypeExpr) -> &str {
+    match ty {
+        TypeExpr::Named { name, .. } => name,
+        TypeExpr::Any { .. } => "any",
+    }
+}
+
+#[cfg(test)]
+mod v05_match_parser_tests {
+    use super::{lex_v05, parse_match_statement, V05MatchPattern};
+
+    #[test]
+    fn parses_qualified_variant_patterns_and_wildcard() {
+        let tokens = lex_v05("match value { Result<number, string>::Ok(x) => { print(x); } Result<number, string>::Err(message) => { print(message); } _ => { } }").unwrap();
+        let mut cursor = 0;
+        let statement = parse_match_statement(&tokens, &mut cursor).unwrap();
+        assert_eq!(statement.arms.len(), 3);
+        assert!(matches!(statement.arms[0].pattern, V05MatchPattern::Variant { ref bindings, .. } if bindings == &["x"]));
+        assert!(matches!(statement.arms[2].pattern, V05MatchPattern::Wildcard { .. }));
+        assert_eq!(cursor, tokens.len());
+    }
+
+    #[test]
+    fn rejects_duplicate_variants_duplicate_binders_and_nonfinal_wildcard() {
+        let duplicate_variant = lex_v05("match value { E::A => {} E::A => {} }").unwrap();
+        assert!(parse_match_statement(&duplicate_variant, &mut 0).is_err());
+        let duplicate_binder = lex_v05("match value { E::A(x, x) => {} }").unwrap();
+        assert!(parse_match_statement(&duplicate_binder, &mut 0).is_err());
+        let wildcard_not_last = lex_v05("match value { _ => {} E::A => {} }").unwrap();
+        assert!(parse_match_statement(&wildcard_not_last, &mut 0).is_err());
+    }
+
+    #[test]
+    fn match_parser_rolls_back_on_malformed_arm() {
+        let tokens = lex_v05("match value { E::A =>").unwrap();
+        let mut cursor = 0;
+        assert!(parse_match_statement(&tokens, &mut cursor).is_err());
+        assert_eq!(cursor, 0);
+    }
+}
