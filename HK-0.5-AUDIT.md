@@ -127,3 +127,8 @@ Limitations remain explicit: body grammar is opaque, module parser isn't wired i
 Added module-local nominal type-name resolution and generic arity validation (field, payload, function/method signatures, impl targets), generic parameter and trait-bound validation, plus coherence checks (orphan rule, inherent ownership, duplicate impls/methods, trait signature conformance/missing/extra methods, inherent/trait name conflicts). Added `analyze_v05_declaration_module` orchestration pipeline lex→mixed parser→type-name validation→coherence→sorted symbol index. Fuzz target exercises these APIs. CI #1032/#1033 green on `29bfbeda95b11acd8b2157d49d99b9d88a82fbd7`; fuzz #459 pending. Test commit `cb079b682de21ac7f410d08f5d65fc3a3844621b` pending.
 
 This is staged frontend groundwork only: bodies are opaque and no production compiler integration, runtime, bytecode, verifier or VM nominal feature support is claimed.
+
+
+## Coherence diagnostic correction — 2026-11-19
+
+A CI assertion exposed an overly broad trait-method conflict diagnostic. The implementation now distinguishes inherent/trait name conflict from duplicate trait method names. CI #1045 is green on `d27da2199033fd09c3e9f46522435cdc6891393b` across Linux/macOS/Windows. Fuzz #459 completed successfully on the declaration analyzer checkpoint; campaign #465 on the updated validator remains running. Forward nominal-reference test commit `c015a78a82c6dba6aa245668cabed5763a2b8619` is awaiting validation.
