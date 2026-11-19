@@ -373,8 +373,10 @@ pub fn validate_v05_coherence(
         .collect();
 
     let mut trait_impls: Vec<(String, TypeExpr, HashSet<String>, Range<usize>)> = Vec::new();
-    let mut inherent_methods: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut trait_methods_by_target: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut inherent_methods: Vec<(TypeExpr, HashSet<String>, HashSet<String>, Range<usize>)> =
+        Vec::new();
+    let mut trait_methods_by_target: Vec<(TypeExpr, HashSet<String>, HashSet<String>, Range<usize>)> =
+        Vec::new();
 
     for declaration in declarations {
         let V05TopLevelDeclaration::Impl(implementation) = declaration else {
@@ -387,7 +389,11 @@ pub fn validate_v05_coherence(
                 "Invalid impl target type.",
             )
         })?;
-        let target_key = canonical_type(&implementation.target);
+        let generic_names: HashSet<String> = implementation
+            .generics
+            .iter()
+            .map(|bound| bound.parameter.clone())
+            .collect();
 
         if implementation.trait_name.is_none() && !local_types.contains(target_name) {
             return Err(parse_error_at_span(
@@ -404,14 +410,8 @@ pub fn validate_v05_coherence(
                     "Trait impl violates the orphan rule: neither trait nor target type is local.",
                 ));
             }
-            let generic_names: HashSet<String> = implementation
-                .generics
-                .iter()
-                .map(|bound| bound.parameter.clone())
-                .collect();
-            if trait_impls
-                .iter()
-                .any(|(existing_trait, existing_target, existing_generics, _)| {
+            if trait_impls.iter().any(
+                |(existing_trait, existing_target, existing_generics, _)| {
                     existing_trait == trait_name
                         && type_patterns_overlap(
                             existing_target,
@@ -419,8 +419,8 @@ pub fn validate_v05_coherence(
                             &implementation.target,
                             &generic_names,
                         )
-                })
-            {
+                },
+            ) {
                 return Err(parse_error_at_span(
                     tokens,
                     implementation.span.clone(),
@@ -430,7 +430,7 @@ pub fn validate_v05_coherence(
             trait_impls.push((
                 trait_name.clone(),
                 implementation.target.clone(),
-                generic_names,
+                generic_names.clone(),
                 implementation.span.clone(),
             ));
         }
@@ -447,68 +447,88 @@ pub fn validate_v05_coherence(
         }
 
         if implementation.trait_name.is_none() {
-            let names = inherent_methods.entry(target_key.clone()).or_default();
-            for method in &implementation.methods {
-                if !names.insert(method.name.clone()) {
-                    return Err(parse_error_at_span(
-                        tokens,
-                        method.span.clone(),
-                        "Duplicate inherent method for target type.",
-                    ));
+            for (existing_target, existing_generics, existing_names, _) in &inherent_methods {
+                if type_patterns_overlap(
+                    existing_target,
+                    existing_generics,
+                    &implementation.target,
+                    &generic_names,
+                ) {
+                    if let Some(method) = current_names.intersection(existing_names).next() {
+                        return Err(parse_error_at_span(
+                            tokens,
+                            implementation.span.clone(),
+                            &format!("Duplicate inherent method '{method}' for overlapping target types."),
+                        ));
+                    }
                 }
             }
+            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target {
+                if type_patterns_overlap(
+                    existing_target,
+                    existing_generics,
+                    &implementation.target,
+                    &generic_names,
+                ) {
+                    if let Some(method) = current_names.intersection(existing_names).next() {
+                        return Err(parse_error_at_span(
+                            tokens,
+                            implementation.span.clone(),
+                            &format!("Inherent and trait method name '{method}' conflict."),
+                        ));
+                    }
+                }
+            }
+            inherent_methods.push((
+                implementation.target.clone(),
+                generic_names,
+                current_names,
+                implementation.span.clone(),
+            ));
         } else {
-            let names = trait_methods_by_target
-                .entry(target_key.clone())
-                .or_default();
-            for method in &implementation.methods {
-                if inherent_methods
-                    .get(&target_key)
-                    .is_some_and(|inherent| inherent.contains(&method.name))
-                {
-                    return Err(parse_error_at_span(
-                        tokens,
-                        method.span.clone(),
-                        "Inherent and trait method name conflict.",
-                    ));
-                }
-                if !names.insert(method.name.clone()) {
-                    return Err(parse_error_at_span(
-                        tokens,
-                        method.span.clone(),
-                        "Duplicate trait method name for target type.",
-                    ));
+            for (existing_target, existing_generics, existing_names, _) in &trait_methods_by_target {
+                if type_patterns_overlap(
+                    existing_target,
+                    existing_generics,
+                    &implementation.target,
+                    &generic_names,
+                ) {
+                    if let Some(method) = current_names.intersection(existing_names).next() {
+                        return Err(parse_error_at_span(
+                            tokens,
+                            implementation.span.clone(),
+                            &format!("Duplicate trait method '{method}' for overlapping target types."),
+                        ));
+                    }
                 }
             }
+            for (existing_target, existing_generics, existing_names, _) in &inherent_methods {
+                if type_patterns_overlap(
+                    existing_target,
+                    existing_generics,
+                    &implementation.target,
+                    &generic_names,
+                ) {
+                    if let Some(method) = current_names.intersection(existing_names).next() {
+                        return Err(parse_error_at_span(
+                            tokens,
+                            implementation.span.clone(),
+                            &format!("Inherent and trait method name '{method}' conflict."),
+                        ));
+                    }
+                }
+            }
+            trait_methods_by_target.push((
+                implementation.target.clone(),
+                generic_names,
+                current_names,
+                implementation.span.clone(),
+            ));
         }
 
         if let Some(trait_name) = &implementation.trait_name {
             if let Some(trait_declaration) = traits.get(trait_name) {
                 validate_trait_methods(trait_declaration, implementation, tokens)?;
-            }
-        }
-    }
-
-    // Inherent impls may precede trait impls in the source; check all names
-    // after collection so declaration order cannot affect ambiguity results.
-    for (target, trait_methods) in trait_methods_by_target {
-        if let Some(inherent) = inherent_methods.get(&target) {
-            if let Some(method) = trait_methods.intersection(inherent).next() {
-                return Err(parse_error_at_span(
-                    tokens,
-                    declarations
-                        .iter()
-                        .find_map(|declaration| match declaration {
-                            V05TopLevelDeclaration::Impl(value)
-                                if canonical_type(&value.target) == target =>
-                            {
-                                Some(value.span.clone())
-                            }
-                            _ => None,
-                        })
-                        .unwrap_or(0..0),
-                    &format!("Inherent and trait method name '{method}' conflict."),
-                ));
             }
         }
     }
