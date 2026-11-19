@@ -1910,7 +1910,7 @@ fn parse_match_statement_at(
         match token.kind {
             V05TokenKind::Punctuation(V05Punctuation::LeftParen | V05Punctuation::LeftBracket) => {
                 depth += 1
-            },
+            }
             V05TokenKind::Punctuation(
                 V05Punctuation::RightParen | V05Punctuation::RightBracket,
             ) => {
@@ -2063,7 +2063,12 @@ fn parse_match_statement_at(
                 .get(cursor.saturating_sub(1))
                 .map(|t| t.span.end)
                 .unwrap_or(variant_token.span.end);
-            V05MatchPattern::Variant { enum_type, variant, bindings, span: arm_start..pattern_end }
+            V05MatchPattern::Variant {
+                enum_type,
+                variant,
+                bindings,
+                span: arm_start..pattern_end,
+            }
         };
         if wildcard_seen && !matches!(pattern, V05MatchPattern::Wildcard { .. }) {
             return Err(parse_error(
@@ -2099,7 +2104,9 @@ fn parse_match_statement_at(
                 _ => {}
             }
             *cursor += 1;
-            if body_depth == 0 { break; }
+            if body_depth == 0 {
+                break;
+            }
             if body_depth > 64 {
                 return Err(parse_error(
                     tokens,
