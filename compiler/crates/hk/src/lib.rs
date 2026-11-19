@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
         let source = "const value = 1;\nvalue = 2;";
-        let error = run("diagnostic.hk", source).unwrap_err();;
+        let error = run("diagnostic.hk", source).unwrap_err();
         let rendered = error.to_string();
         assert!(rendered.contains("2 | value = 2;"));
         assert!(rendered.contains("^"));
@@ -298,8 +298,11 @@ mod tests {
     }
     #[test]
     fn strings_support_only_documented_escapes() {
-        assert_eq!(run("test.hk", "print(\"a\\\\nb\");").unwrap(), vec![\"a\\nb\"]);
-        assert_eq!(run("test.hk", "print(\"a\\nb\");").unwrap(), vec![\"a\\nb\"]);
+        assert_eq!(run("test.hk", "print(\"a\\nb\");").unwrap(), vec!["a\nb"]);
+        assert_eq!(
+            run("test.hk", concat!("print(\"a", "\n", "b\");")).unwrap(),
+            vec!["a\nb"]
+        );
     }
 
     #[test]
