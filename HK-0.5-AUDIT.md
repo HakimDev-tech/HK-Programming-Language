@@ -69,3 +69,7 @@ Verified prior head `a2cac3f3ec09e3b98e6a60311da3063f85a84220`: PR #21 remains D
 ## Corrected latest-state record — 2026-11-19
 
 The preceding status text is historical and stale. Latest implementation head: `d9270d6c9d6be68439aa1ddee5295325897dcec3`. The trait/impl syntax parser is added but still isolated: it parses signatures, captures method body spans, checks duplicate names and requires `self` as first parameter. CI run #842 is successful on Linux/macOS/Windows (workspace tests, format, Clippy, rustdoc). Fuzz run #371 is still running. Several intermediate CI/fuzz runs failed due formatting mistakes and a missing parser receiver argument; these were corrected, and the current successful CI evidence supersedes those failed attempts. This does not prove complete v0.5 semantics or integration. M1.1 incomplete; M1.2–M8 outstanding.
+
+## Current continuation checkpoint — 2026-11-19
+
+Latest code/fuzz-target commit `bb547f7127499002c634dd30be8938c33af49eb9`. It includes the prior trait/impl parser and a new generic function declaration parser (generic bounds, typed parameters, optional return type, body span, duplicate function/parameter checks, bounded body depth); the `syntax_v05` fuzz target invokes it. CI #858 succeeded on Linux/macOS/Windows (format, workspace tests, Clippy, rustdoc). Fuzz run #378 is in progress. M1.1 remains incomplete; this parser is isolated and function/method bodies remain opaque token spans. M1.2–M8 not implemented.
