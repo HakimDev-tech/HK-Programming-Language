@@ -949,7 +949,7 @@ impl V05TraitImplParser<'_> {
     }
 
     fn expect_identifier(&mut self, what: &str) -> Result<String, V05ParseError> {
-        let token = self.tokens.get(self.cursor).ok_or_else(|| self.error(what))?;
+        let token = self\n            .tokens\n            .get(self.cursor)\n            .ok_or_else(|| self.error(what))?;
         if let V05TokenKind::Identifier(name) = &token.kind {
             self.cursor += 1;
             Ok(name.clone())
@@ -958,7 +958,7 @@ impl V05TraitImplParser<'_> {
         }
     }
 
-    fn expect_punctuation(&mut self, punctuation: V05Punctuation, message: &str) -> Result<(), V05ParseError> {
+    fn expect_punctuation(\n        &mut self,\n        punctuation: V05Punctuation,\n        message: &str,\n    ) -> Result<(), V05ParseError> {
         if is_punctuation(self.tokens.get(self.cursor), punctuation) {
             self.cursor += 1;
             Ok(())
@@ -986,7 +986,7 @@ impl V05TraitImplParser<'_> {
         }
         self.cursor += 1;
         let end = self.tokens[self.cursor - 1].span.end;
-        Ok(V05TraitDecl { name, methods, span: start..end })
+        Ok(V05TraitDecl {\n            name,\n            methods,\n            span: start..end,\n        })
     }
 
     fn parse_impl(&mut self) -> Result<V05ImplDecl, V05ParseError> {
@@ -994,18 +994,18 @@ impl V05TraitImplParser<'_> {
         self.cursor += 1; // impl
         let generics = parse_generic_parameters(self.tokens, &mut self.cursor)?;
         let first = parse_type_expr(self.tokens, &mut self.cursor)?;
-        let (trait_name, target) = if self.tokens.get(self.cursor).is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(s) if s == "for")) {
+        let (trait_name, target) = if self\n            .tokens\n            .get(self.cursor)\n            .is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(s) if s == "for"))\n        {
             self.cursor += 1;
             let target = parse_type_expr(self.tokens, &mut self.cursor)?;
             let trait_name = match first {
-                TypeExpr::Named { name, arguments, .. } if arguments.is_empty() => name,
-                _ => return Err(self.error("Trait name in impl must be a non-generic identifier here.")),
+                TypeExpr::Named {\n                    name, arguments, ..\n                } if arguments.is_empty() => name,
+                _ => {\n                    return Err(self.error(\n                        "Trait name in impl must be a non-generic identifier here."\n                    ))\n                }
             };
             (Some(trait_name), target)
         } else {
             (None, first)
         };
-        self.expect_punctuation(V05Punctuation::LeftBrace, "Expected '{' to begin impl body.")?;
+        self.expect_punctuation(\n            V05Punctuation::LeftBrace,\n            "Expected '{' to begin impl body.",\n        )?;
         let mut methods = Vec::new();
         let mut names = std::collections::HashSet::new();
         while !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightBrace) {
@@ -1020,13 +1020,13 @@ impl V05TraitImplParser<'_> {
         }
         self.cursor += 1;
         let end = self.tokens[self.cursor - 1].span.end;
-        Ok(V05ImplDecl { generics, target, trait_name, methods, span: start..end })
+        Ok(V05ImplDecl {\n            generics,\n            target,\n            trait_name,\n            methods,\n            span: start..end,\n        })
     }
 
     fn parse_method(&mut self, has_body: bool) -> Result<V05Method, V05ParseError> {
-        let start = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected method declaration."))?.span.start;
+        let start = self\n            .tokens\n            .get(self.cursor)\n            .ok_or_else(|| self.error("Expected method declaration."))?\n            .span\n            .start;
         // fn is not a dedicated v0.5 keyword yet; it is an identifier token.
-        if !self.tokens.get(self.cursor).is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "fn")) {
+        if !self\n            .tokens\n            .get(self.cursor)\n            .is_some_and(|t| matches!(&t.kind, V05TokenKind::Identifier(name) if name == "fn"))\n        {
             return Err(self.error("Expected 'fn' method declaration."));
         }
         self.cursor += 1;
@@ -1036,7 +1036,7 @@ impl V05TraitImplParser<'_> {
         let mut names = std::collections::HashSet::new();
         if !is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
             loop {
-                let token = self.tokens.get(self.cursor).ok_or_else(|| self.error("Expected method parameter."))?;
+                let token = self\n                    .tokens\n                    .get(self.cursor)\n                    .ok_or_else(|| self.error("Expected method parameter."))?;
                 let pname = match &token.kind {
                     V05TokenKind::Identifier(name) => name.clone(),
                     _ => return Err(self.error("Expected parameter name.")),
@@ -1047,15 +1047,15 @@ impl V05TraitImplParser<'_> {
                 self.cursor += 1;
                 let ty = if pname == "self" {
                     if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Colon) {
-                        return Err(self.error("The self receiver type is inferred and must not be annotated."));
+                        return Err(self.error(\n                            "The self receiver type is inferred and must not be annotated.",\n                        ));
                     }
                     None
                 } else {
-                    self.expect_punctuation(V05Punctuation::Colon, "Expected ':' after parameter name.")?;
+                    self.expect_punctuation(\n                        V05Punctuation::Colon,\n                        "Expected ':' after parameter name.",\n                    )?;
                     Some(parse_type_expr(self.tokens, &mut self.cursor)?)
                 };
-                let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(token.span.end);
-                parameters.push(V05MethodParameter { name: pname, ty, span: token.span.start..end });
+                let end = self\n                    .tokens\n                    .get(self.cursor.saturating_sub(1))\n                    .map(|t| t.span.end)\n                    .unwrap_or(token.span.end);
+                parameters.push(V05MethodParameter {\n                    name: pname,\n                    ty,\n                    span: token.span.start..end,\n                });
                 if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Comma) {
                     self.cursor += 1;
                     if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::RightParen) {
@@ -1066,7 +1066,7 @@ impl V05TraitImplParser<'_> {
                 }
             }
         }
-        self.expect_punctuation(V05Punctuation::RightParen, "Expected ')' after method parameters.")?;
+        self.expect_punctuation(\n            V05Punctuation::RightParen,\n            "Expected ')' after method parameters.",\n        )?;
         let return_type = if is_punctuation(self.tokens.get(self.cursor), V05Punctuation::Arrow) {
             self.cursor += 1;
             Some(parse_type_expr(self.tokens, &mut self.cursor)?)
@@ -1085,7 +1085,7 @@ impl V05TraitImplParser<'_> {
                 }
                 self.cursor += 1;
                 if depth > 64 {
-                    return Err(self.error("Maximum method-body brace nesting depth (64) exceeded."));
+                    return Err(\n                        self.error("Maximum method-body brace nesting depth (64) exceeded.")\n                    );
                 }
             }
             if depth != 0 {
@@ -1093,11 +1093,11 @@ impl V05TraitImplParser<'_> {
             }
             Some(body_start..self.tokens[self.cursor - 1].span.end)
         } else {
-            self.expect_punctuation(V05Punctuation::Semicolon, "Trait method signatures must end with ';'.")?;
+            self.expect_punctuation(\n                V05Punctuation::Semicolon,\n                "Trait method signatures must end with ';'.",\n            )?;
             None
         };
-        let end = self.tokens.get(self.cursor.saturating_sub(1)).map(|t| t.span.end).unwrap_or(start);
-        Ok(V05Method { name, parameters, return_type, body_span, span: start..end })
+        let end = self\n            .tokens\n            .get(self.cursor.saturating_sub(1))\n            .map(|t| t.span.end)\n            .unwrap_or(start);
+        Ok(V05Method {\n            name,\n            parameters,\n            return_type,\n            body_span,\n            span: start..end,\n        })
     }
 }
 
@@ -1115,7 +1115,7 @@ mod v05_trait_impl_parser_tests {
                 assert_eq!(decl.name, "Display");
                 assert_eq!(decl.methods[0].name, "display");
                 assert_eq!(decl.methods[0].parameters[0].name, "self");
-                assert_eq!(decl.methods[0].return_type.as_ref().unwrap(), &super::TypeExpr::Named { name: "string".into(), arguments: vec![], span: 36..42 });
+                assert_eq!(\n                    decl.methods[0].return_type.as_ref().unwrap(),\n                    &super::TypeExpr::Named {\n                        name: "string".into(),\n                        arguments: vec![],\n                        span: 36..42,\n                    }\n                );
                 assert!(decl.methods[0].body_span.is_none());
             }
             _ => panic!("expected trait"),
