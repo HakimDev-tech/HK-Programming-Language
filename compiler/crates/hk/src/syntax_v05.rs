@@ -100,8 +100,7 @@ impl std::error::Error for V05ModuleError {}
 /// validation, trait coherence, and deterministic symbol indexing.
 pub fn analyze_v05_declaration_module(source: &str) -> Result<V05ModuleIndex, V05ModuleError> {
     let tokens = lex_v05(source).map_err(V05ModuleError::Lex)?;
-    let declarations =
-        parse_v05_top_level_declarations(&tokens).map_err(V05ModuleError::Parse)?;
+    let declarations = parse_v05_top_level_declarations(&tokens).map_err(V05ModuleError::Parse)?;
     validate_v05_type_names(&declarations, &tokens).map_err(V05ModuleError::Parse)?;
     validate_v05_coherence(&declarations, &tokens).map_err(V05ModuleError::Parse)?;
 
@@ -117,10 +116,13 @@ pub fn analyze_v05_declaration_module(source: &str) -> Result<V05ModuleIndex, V0
             V05TopLevelDeclaration::Function(_) => V05SymbolKind::Function,
             V05TopLevelDeclaration::Impl(_) => unreachable!("impl blocks are not named symbols"),
         };
-        symbols.insert(name.to_owned(), V05Symbol {
-            kind,
-            span: declaration.span(),
-        });
+        symbols.insert(
+            name.to_owned(),
+            V05Symbol {
+                kind,
+                span: declaration.span(),
+            },
+        );
     }
     Ok(V05ModuleIndex {
         declarations,
