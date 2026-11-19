@@ -1470,3 +1470,144 @@ mod v05_function_parser_tests {
         assert!(parse_function_declarations(&deep).is_err());
     }
 }
+
+ 
+// ---- Struct literal field syntax (staged M1.1 slice) ----------------------
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05StructLiteralField {
+    pub name: String,
+    pub value_span: Range<usize>,
+    pub span: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct V05StructLiteral {
+    pub ty: TypeExpr,
+    pub fields: Vec<V05StructLiteralField>,
+    pub span: Range<usize>,
+}
+
+/// Parses a standalone nominal struct literal. Field expressions are retained
+/// as source spans and will be parsed by the expression parser in integration.
+pub fn parse_struct_literal(tokens: &[V05Token], cursor: &mut usize) -> Result<V05StructLiteral, V05ParseError> {
+    let original = *cursor;
+    match parse_struct_literal_at(tokens, cursor) {
+        Ok(literal) => Ok(literal),
+        Err(error) => {
+            *cursor = original;
+            Err(error)
+        }
+    }
+}
+
+fn parse_struct_literal_at(tokens: &[V05Token], cursor: &mut usize) -> Result<V05StructLiteral, V05ParseError> {
+    let ty = parse_type_expr(tokens, cursor)?;
+    let start = ty_span_start(&ty);
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::LeftBrace) {
+        return Err(parse_error(tokens, *cursor, "Expected '{' after struct literal type."));
+    }
+    *cursor += 1;
+    let mut fields = Vec::new();
+    let mut names = std::collections::HashSet::new();
+    while !is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) {
+        if *cursor >= tokens.len() {
+            return Err(parse_error(tokens, *cursor, "Unterminated struct literal."));
+        }
+        let field_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected field name."))?;
+        let field_name = match &field_token.kind {
+            V05TokenKind::Identifier(name) => name.clone(),
+            _ => return Err(parse_error(tokens, *cursor, "Expected struct literal field name.")),
+        };
+        if !names.insert(field_name.clone()) {
+            return Err(parse_error(tokens, *cursor, "Duplicate struct literal field."));
+        }
+        *cursor += 1;
+        if !is_punctuation(tokens.get(*cursor), V05Punctuation::Colon) {
+            return Err(parse_error(tokens, *cursor, "Expected ':' after field name."));
+        }
+        *cursor += 1;
+        let value_start_token = tokens.get(*cursor).ok_or_else(|| parse_error(tokens, *cursor, "Expected field expression."))?;
+        let value_start = value_start_token.span.start;
+        let mut nested = 0usize;
+        let mut value_end = value_start;
+        while *cursor < tokens.len() {
+            let token = &tokens[*cursor];
+            match token.kind {
+                V05TokenKind::Punctuation(V05Punctuation::LeftParen | V05Punctuation::LeftBracket | V05Punctuation::LeftBrace) => nested += 1,
+                V05TokenKind::Punctuation(V05Punctuation::RightParen | V05Punctuation::RightBracket) => {
+                    if nested == 0 { return Err(parse_error(tokens, *cursor, "Unbalanced field expression delimiter.")); }
+                    nested -= 1;
+                }
+                V05TokenKind::Punctuation(V05Punctuation::RightBrace) if nested == 0 => break,
+                V05TokenKind::Punctuation(V05Punctuation::RightBrace) => nested -= 1,
+                V05TokenKind::Punctuation(V05Punctuation::Comma) if nested == 0 => break,
+                _ => {}
+            }
+            value_end = token.span.end;
+            *cursor += 1;
+            if nested > 64 {
+                return Err(parse_error(tokens, *cursor, "Maximum struct-literal expression nesting (64) exceeded."));
+            }
+        }
+        if value_end == value_start {
+            return Err(parse_error(tokens, *cursor, "Field expression cannot be empty."));
+        }
+        fields.push(V05StructLiteralField { name: field_name, value_span: value_start..value_end, span: field_token.span.start..value_end });
+        if is_punctuation(tokens.get(*cursor), V05Punctuation::Comma) {
+            *cursor += 1;
+            if is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) { break; }
+        } else {
+            break;
+        }
+    }
+    if !is_punctuation(tokens.get(*cursor), V05Punctuation::RightBrace) {
+        return Err(parse_error(tokens, *cursor, "Expected '}' to close struct literal."));
+    }
+    *cursor += 1;
+    let end = tokens[*cursor - 1].span.end;
+    Ok(V05StructLiteral { ty, fields, span: start..end })
+}
+
+fn ty_span_start(ty: &TypeExpr) -> usize {
+    match ty {
+        TypeExpr::Named { span, .. } | TypeExpr::Any { span } => span.start,
+    }
+}
+
+#[cfg(test)]
+mod v05_struct_literal_parser_tests {
+    use super::{lex_v05, parse_struct_literal};
+
+    #[test]
+    fn parses_struct_literal_fields_and_generic_type() {
+        let tokens = lex_v05("Point { x: 1 + 2, y: [3, 4], }").unwrap();
+        let mut cursor = 0;
+        let literal = parse_struct_literal(&tokens, &mut cursor).unwrap();
+        assert_eq!(literal.fields.len(), 2);
+        assert_eq!(literal.fields[0].name, "x");
+        assert_eq!(literal.fields[1].name, "y");
+        assert_eq!(cursor, tokens.len());
+
+        let tokens = lex_v05("Box<number> { value: 42 }").unwrap();
+        let mut cursor = 0;
+        let literal = parse_struct_literal(&tokens, &mut cursor).unwrap();
+        assert_eq!(literal.fields[0].name, "value");
+    }
+
+    #[test]
+    fn rejects_duplicate_and_empty_struct_literal_fields() {
+        let duplicate = lex_v05("Point { x: 1, x: 2 }").unwrap();
+        assert!(parse_struct_literal(&duplicate, &mut 0).is_err());
+        let empty = lex_v05("Point { x: }").unwrap();
+        assert!(parse_struct_literal(&empty, &mut 0).is_err());
+    }
+
+    #[test]
+    fn struct_literal_parser_rolls_back_cursor_on_failure() {
+        let tokens = lex_v05("Point { x: }").unwrap();
+        let mut cursor = 0;
+        assert!(parse_struct_literal(&tokens, &mut cursor).is_err());
+        assert_eq!(cursor, 0);
+    }
+}
