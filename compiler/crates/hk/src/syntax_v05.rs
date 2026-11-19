@@ -171,7 +171,7 @@ fn infer_v05_constraint(
             arguments,
             span,
         } if generic_parameters.contains(name) && arguments.is_empty() => {
-            if matches!(actual, TypeExpr::Any { .. } | TypeExpr::Named { name, arguments, .. } if name == "any" && arguments.is_empty()) {
+            if is_v05_any_type(actual) {
                 return Ok(());
             }
             if let Some(existing) = substitutions.get(name) {
@@ -224,6 +224,13 @@ fn infer_v05_constraint(
                 span: span.clone(),
             }),
         },
+    }
+}
+
+fn is_v05_any_type(ty: &TypeExpr) -> bool {
+    match ty {
+        TypeExpr::Any { .. } => true,
+        TypeExpr::Named { name, arguments, .. } => name == "any" && arguments.is_empty(),
     }
 }
 
