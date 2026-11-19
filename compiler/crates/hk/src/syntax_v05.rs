@@ -861,7 +861,10 @@ mod tests {
         let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
         assert_eq!(declarations.len(), 5);
         assert_eq!(
-            declarations.iter().filter_map(V05TopLevelDeclaration::name).collect::<Vec<_>>(),
+            declarations
+                .iter()
+                .filter_map(V05TopLevelDeclaration::name)
+                .collect::<Vec<_>>(),
             vec!["Point", "Direction", "Display", "identity"]
         );
         assert!(declarations.iter().all(|declaration| {
@@ -869,7 +872,10 @@ mod tests {
             span.start < span.end && source.get(span.clone()).is_some()
         }));
         assert!(matches!(declarations[3], V05TopLevelDeclaration::Impl(_)));
-        assert!(matches!(declarations[4], V05TopLevelDeclaration::Function(_)));
+        assert!(matches!(
+            declarations[4],
+            V05TopLevelDeclaration::Function(_)
+        ));
     }
 
     #[test]
