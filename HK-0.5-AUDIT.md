@@ -73,3 +73,7 @@ The preceding status text is historical and stale. Latest implementation head: `
 ## Current continuation checkpoint — 2026-11-19
 
 Latest code/fuzz-target commit `bb547f7127499002c634dd30be8938c33af49eb9`. It includes the prior trait/impl parser and a new generic function declaration parser (generic bounds, typed parameters, optional return type, body span, duplicate function/parameter checks, bounded body depth); the `syntax_v05` fuzz target invokes it. CI #858 succeeded on Linux/macOS/Windows (format, workspace tests, Clippy, rustdoc). Fuzz run #378 is in progress. M1.1 remains incomplete; this parser is isolated and function/method bodies remain opaque token spans. M1.2–M8 not implemented.
+
+## Latest checkpoint — 2026-11-19
+
+Head `ffd1ea40eabdbf4c6b04abef2abfa2fb6afc9af3` adds a standalone struct-literal parser that records field value spans, detects duplicate/empty fields, supports nested delimiters and rolls back the cursor on failure. Dedicated syntax fuzz target now invokes this parser. CI #871 passed Linux/macOS/Windows (fmt, workspace tests, Clippy, rustdoc). Fuzz #384 is in progress and has not yet reached its v0.5 syntax campaign. All new parsers remain isolated; captured expressions/function/method bodies are not parsed or executed. M1.1 incomplete; M1.2–M8 outstanding.
