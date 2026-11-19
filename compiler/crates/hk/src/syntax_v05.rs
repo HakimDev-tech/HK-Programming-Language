@@ -986,7 +986,7 @@ impl V05TraitImplParser<'_> {
                 return Err(self.error("Unterminated trait declaration."));
             }
             let method = self.parse_method(false)?;
-            Self::validate_receiver(&method)?;
+            self.validate_receiver(&method)?;
             if !names.insert(method.name.clone()) {
                 return Err(self.error("Duplicate trait method."));
             }
@@ -1053,14 +1053,9 @@ impl V05TraitImplParser<'_> {
         })
     }
 
-    fn validate_receiver(method: &V05Method) -> Result<(), V05ParseError> {
+    fn validate_receiver(&self, method: &V05Method) -> Result<(), V05ParseError> {
         if method.parameters.first().is_none_or(|parameter| parameter.name != "self") {
-            return Err(V05ParseError {
-                message: "Instance methods require `self` as their first parameter.".into(),
-                span: method.span.clone(),
-                line: 1,
-                column: 1,
-            });
+            return Err(self.error("Instance methods require `self` as their first parameter."));
         }
         Ok(())
     }
