@@ -209,7 +209,8 @@ mod tests {
     #[test]
     fn duplicate_declarations_in_one_scope_are_rejected() {
         let error = run("test.hk", "let value=1;let value=2;").unwrap_err();
-        assert_eq!(error.code, "E4001");\n        assert!(error.message.contains("Duplicate module binding"));
+        assert_eq!(error.code, "E4001");
+        assert!(error.message.contains("Duplicate module binding"));
     }
     #[test]
     fn diagnostics_include_source_excerpt_and_caret() {
