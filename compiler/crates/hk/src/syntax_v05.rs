@@ -1537,6 +1537,20 @@ mod tests {
     }
 
     #[test]
+    fn coherence_detects_overlapping_generic_trait_impls() {
+        let overlap = "struct Box<T> { value: T, } trait Display { fn display(self) -> string; } impl<T> Display for Box<T> { fn display(self) -> string { return \"generic\"; } } impl Display for Box<number> { fn display(self) -> string { return \"number\"; } }";
+        let tokens = lex_v05(overlap).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        let error = validate_v05_coherence(&declarations, &tokens).unwrap_err();
+        assert!(error.message.contains("Overlapping trait implementation"));
+
+        let disjoint = "struct Box<T> { value: T, } trait Display { fn display(self) -> string; } impl Display for Box<number> { fn display(self) -> string { return \"number\"; } } impl Display for Box<string> { fn display(self) -> string { return \"string\"; } }";
+        let tokens = lex_v05(disjoint).unwrap();
+        let declarations = parse_v05_top_level_declarations(&tokens).unwrap();
+        validate_v05_coherence(&declarations, &tokens).unwrap();
+    }
+
+    #[test]
     fn rejects_duplicate_trait_impl_pairs_and_inherent_methods() {
         let duplicate_impl = "struct Point { x: number, } trait Display { fn display(self) -> string; } impl Display for Point { fn display(self) -> string { return \"a\"; } } impl Display for Point { fn display(self) -> string { return \"b\"; } }";
         let tokens = lex_v05(duplicate_impl).unwrap();
