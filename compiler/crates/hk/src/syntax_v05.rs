@@ -6,6 +6,8 @@
 //! recursive type-expression model used by the staged 0.5 parser.
 use std::ops::Range;
 
+const MAX_V05_SOURCE_BYTES: usize = 1_048_576;
+const MAX_V05_TOKENS: usize = 100_000;
 const MAX_V05_GENERIC_PARAMETERS: usize = 256;
 const MAX_V05_TRAIT_BOUNDS_PER_PARAMETER: usize = 256;
 
@@ -701,6 +703,17 @@ pub struct V05Token {
 /// expression tokens for the established 0.4 lexer/parser to interpret later.
 pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
     let bytes = source.as_bytes();
+    if bytes.len() > MAX_V05_SOURCE_BYTES {
+        return Err(V05LexError {
+            message: format!(
+                "Maximum HK 0.5 source size ({} bytes) exceeded.",
+                MAX_V05_SOURCE_BYTES
+            ),
+            span: 0..bytes.len(),
+            line: 1,
+            column: 1,
+        });
+    }
     let mut offset = 0;
     let mut line = 1;
     let mut column = 1;
@@ -827,6 +840,14 @@ pub fn lex_v05(source: &str) -> Result<Vec<V05Token>, V05LexError> {
             }
         };
 
+        if tokens.len() >= MAX_V05_TOKENS {
+            return Err(V05LexError {
+                message: format!("Maximum HK 0.5 token count ({MAX_V05_TOKENS}) exceeded."),
+                span: start..offset,
+                line: start_line,
+                column: start_column,
+            });
+        }
         tokens.push(V05Token {
             kind,
             span: start..offset,
